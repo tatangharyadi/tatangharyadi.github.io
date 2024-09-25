@@ -47,7 +47,7 @@ body {
 
 .home {
     height: 100vh;
-    background: url(thBW.png) no-repeat;
+    background: url(THBW.png) no-repeat;
     background-position: right;
     display:flex;
     align-items: center;
