@@ -1,4 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300,400,500,700,800,900&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600&display=swap");
+
+:root {
+    --first-color: hsl(38, 92%, 58%);
+    --first-color-light: hsl(38, 100%, 78%);
+    --first-color-alt: hsl(32, 75%, 50%);
+    --second-color: hsl(195, 75%, 52%);
+    --dark-color: hsl(212, 40%, 12%);
+    --white-color: hsl(212, 4%, 95%);
+    --body-color: hsl(212, 42%, 15%);
+    --container-color: hsl(212, 42%, 20%);
+
+    --body-font: "Bai Jamjuree", sans-serif;
+    --h2-font-size: 1.25rem;
+    --normal-font-size: 1rem;
+}
 
 * {
     margin: 0;
@@ -47,7 +63,7 @@ body {
 
 .home {
     height: 100vh;
-    background: url(assets/images/tatangharyadi.png) no-repeat;
+    background: url(../assets/images/tatangharyadi.png) no-repeat;
     background-position: right;
     display:flex;
     align-items: center;
@@ -73,65 +89,6 @@ body {
 .home-content p {
     font-size: 16px;
     margin: 20px 0 40px;
-}
-
-.home-content .btn-box {
-    display: flex;
-    justify-content: space-between;
-    width: 345px;
-    height: 50px;
-}
-
-.btn-box a {
-    position: relative;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    width: 150px;
-    height: 100%;
-    background: #00abf0;
-    border: 2px solid #00abf0;
-    border-radius: 8px;
-    font-size: 19px;
-    color: #081b29;
-    text-decoration: none;
-    font-weight: 600;
-    letter-spacing: 1px;
-    z-index: 1;
-    overflow: hidden;
-    transition: .5s;
-}
-
-.btn-box a:hover {
-    color: #00abf0;
-}
-.btn-box a:nth-child(2) {
-    background: transparent;
-    color: #00abf0;
-}
-
-.btn-box a:nth-child(2):hover {
-    color: #081b29;
-}
-
-.btn-box a:nth-child(2)::before {
-    background: #00abf0;
-}
-
-.btn-box a::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 0;
-    height: 100%;
-    background: #081b29;
-    z-index: -1;
-    transition: .5s;
-}
-
-.btn-box a:hover::before {
-    width: 100%;
 }
 
 .home-sci {
@@ -180,43 +137,45 @@ body {
     width: 100%;
 }
 
-.projects {
-    padding: 100px 10%;
-}
-
-.projects-content {
+.portfolio-container {
     display: flex;
-    flex-direction: column;
-    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 100px;
 }
 
-.project {
-    display: flex;
-    align-items: center;
-    gap: 20px;
+.card {
+    width: 325px;
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 20px;
 }
 
-.project-container {
-    display: flex;
-    align-items: center;
-    border-radius: 10px;
-}
-
-.project-image {
-    width: 150px;
+.card img {
+    width: 100%;
     height: auto;
-    border-top-left-radius: 10px;
-    border-bottom-left-radius: 10px;
-    margin-top: 0;
 }
 
-.project-info {
-    flex: 1;
-    align-self: flex-start;
-    padding: 20px;
+.card-content {
+    padding: 16px;
 }
 
-.impacts {
-    display: flex;
-    gap: 10px;
+.card-content h3 {
+    font-size: 28px;
+    margin-bottom: 8px;
+}
+
+.card-content p {
+    font-size: 16px;
+    line-height: 1.3;
+}
+
+.card-content .card-button{
+    display: inline-block;
+    padding: 8px 16px;
+    background: #00abf0;
+    color: #081b29;
+    text-decoration: none;
+    border-radius: 4px;
+    margin-top: 16px;
 }
