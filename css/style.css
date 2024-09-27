@@ -1,5 +1,4 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300,400,500,700,800,900&display=swap');
-@import url("https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600&display=swap");
 
 :root {
     --first-color: hsl(38, 92%, 58%);
@@ -118,7 +117,7 @@ body {
 }
 
 .home-sci {
-    position: absolute;
+    position: fixed;
     bottom: 40px;
     width: 170px;
     display: flex;
