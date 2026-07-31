@@ -1,31 +1,79 @@
-let nextButton = document.getElementById('next');
-let prevButton = document.getElementById('prev');
-let carousel = document.querySelector('.casestudy--container');
-let listHTML = document.querySelector('.casestudy--list');
+'use strict';
 
-nextButton.onclick = function() {
-    showSlider(next);
-}
-prevButton.onclick = function() {
-    showSlider(prev);
-}
+const nextButton = document.getElementById('next');
+const prevButton = document.getElementById('prev');
+const carousel = document.querySelector('.casestudy--container');
+const listHTML = document.querySelector('.casestudy--list');
 
-let unAcceptClick;
+const NEXT = 'next';
+const PREV = 'prev';
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+/* Single source of truth for the slide duration lives in css/style.css as
+   --casestudy-slide-duration, so changing the animation there cannot drift out
+   of sync with how long the buttons stay locked here. */
+const slideDuration = () => {
+    const raw = getComputedStyle(document.documentElement)
+        .getPropertyValue('--casestudy-slide-duration')
+        .trim();
+    const ms = raw.endsWith('ms') ? parseFloat(raw) : parseFloat(raw) * 1000;
+    return Number.isFinite(ms) ? ms : 700;
+};
+
+let isSliding = false;
+let settleTimer;
+
+const setButtonsEnabled = (enabled) => {
+    nextButton.disabled = !enabled;
+    prevButton.disabled = !enabled;
+};
+
+const settle = () => {
+    clearTimeout(settleTimer);
+    carousel.classList.remove(NEXT, PREV);
+    setButtonsEnabled(true);
+    isSliding = false;
+};
+
 const showSlider = (type) => {
-    nextButton.style.pointerEvents = 'none';
-    prevButton.style.pointerEvents = 'none';
+    if (isSliding) return;
 
-    let items = document.querySelectorAll('.casestudy--item');
-    if(type === next) {
+    const items = listHTML.querySelectorAll('.casestudy--item');
+    if (items.length < 2) return;
+
+    if (type === NEXT) {
         listHTML.appendChild(items[0]);
     } else {
-        let positionLast = items.length - 1;
-        listHTML.prepend(items[positionLast]);
+        listHTML.prepend(items[items.length - 1]);
     }
 
-    clearTimeout(unAcceptClick);
-    unAcceptClick = setTimeout(() => {
-        nextButton.style.pointerEvents = 'auto';
-        prevButton.style.pointerEvents = 'auto';
-    }, 1000);
-}
+    /* Reduced motion: the CSS animations are disabled, so animating would only
+       leave the buttons locked waiting for an event that never fires. */
+    if (reduceMotion.matches) {
+        settle();
+        return;
+    }
+
+    isSliding = true;
+    setButtonsEnabled(false);
+
+    carousel.classList.remove(NEXT, PREV);
+    void carousel.offsetWidth; // reflow, so re-adding the class restarts the animations
+    carousel.classList.add(type);
+
+    settleTimer = setTimeout(settle, slideDuration());
+};
+
+nextButton.addEventListener('click', () => showSlider(NEXT));
+prevButton.addEventListener('click', () => showSlider(PREV));
+
+carousel.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        showSlider(NEXT);
+    } else if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        showSlider(PREV);
+    }
+});
