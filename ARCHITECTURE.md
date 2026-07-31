@@ -35,6 +35,7 @@ assets/images/          profile photo (webp) and the 1200x630 social share card
 robots.txt, sitemap.xml crawler hints
 ARCHITECTURE.md         this file
 DESIGN.md               the Catppuccin palette, semantic tokens and contrast floors
+                        (in the google-labs-code/design.md format)
 AGENTS.md               working rules and invariants
 CLAUDE.md               one line, imports AGENTS.md
 LICENSE                 MIT, code only

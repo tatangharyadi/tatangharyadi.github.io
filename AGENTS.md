@@ -48,6 +48,9 @@ There is no test suite. Verify by hand, in roughly this order:
 7. For anything touching markup, metadata or colour, run a Lighthouse navigation
    audit — **once per scheme**. Accessibility, Best Practices and SEO are all at
    100 in both; keep them there.
+8. If `DESIGN.md` changed, `npx @google/design.md lint DESIGN.md`. It is at **0
+   errors and 0 warnings**; keep it there. This is a one-off command, not a
+   dependency — the repo still has no `package.json`.
 
 ## Accessibility invariants
 
@@ -101,6 +104,13 @@ Three further rules for any change:
 - **`404.html` styles are inline on purpose.** It must render even if the
   stylesheet is what failed. Its palette is therefore a hand-kept copy of the one
   in `css/style.css` — change one and change the other.
+- **`DESIGN.md`'s front matter is a third copy of the palette.** It follows the
+  [DESIGN.md format](https://github.com/google-labs-code/design.md), so the tokens
+  are machine-readable and must stay in step with `css/style.css` and `404.html`.
+  Two traps: the dark values are duplicated as `mocha-*` tokens because the format
+  has no light/dark axis yet, and an illustrative fenced block in that file is
+  tagged `text` rather than `yaml` on purpose — the parser reads fenced YAML as a
+  token source and a second `colors:` key makes the linter stop early.
 - **The `theme-color` metas come in pairs**, one per `prefers-color-scheme`, in
   both `index.html` and `404.html`. A single unconditional tag would paint the
   browser chrome the wrong colour for half of all visitors.

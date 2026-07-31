@@ -29,7 +29,9 @@ Pushing to `main` publishes automatically.
   CSS-only interaction patterns, how the case study carousel works, breakpoints
   and the GitHub Pages deployment model.
 - **[DESIGN.md](DESIGN.md)** — the Catppuccin palette, the semantic colour
-  tokens, and the contrast floors every colour is verified against.
+  tokens, and the contrast floors every colour is verified against. Written to the
+  [DESIGN.md format](https://github.com/google-labs-code/design.md), so the tokens
+  are machine-readable as well as documented.
 - **[AGENTS.md](AGENTS.md)** — how to verify a change, and the accessibility
   invariants that are easy to break by accident.
 
