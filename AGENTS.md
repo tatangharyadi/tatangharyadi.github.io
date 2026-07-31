@@ -73,7 +73,7 @@ inline comment; do not "clean them up".
   are nav destinations whose visible content is decorative or image-based. Without
   the heading, heading navigation lands in an unnamed empty region.
 
-Two further rules for any change:
+Three further rules for any change:
 
 - **Animations stay behind a `prefers-reduced-motion` guard.** `js/script.js`
   checks the same media query, so removing the CSS guard alone would leave the
