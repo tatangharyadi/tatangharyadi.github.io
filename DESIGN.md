@@ -480,6 +480,15 @@ of them; several look like mistakes and are load-bearing.
   interactive control in both flavours. Not optional and not restyleable per
   component.
 
+One schema gap to read past: component properties cover fill and text, but there
+is no stroke or `borderColor`. `focus-ring` therefore carries its *outline* colour
+in `textColor` — that is the only colour slot available, so read it as a stroke,
+not a label. Its `2px` width and 2–4px offset have no schema home at all and live
+only in this prose; `rounded.xs` is the ring's corner radius. `carousel-arrow` is
+luckier: its `textColor` really is a glyph colour, because the arrow is a
+monospace `<` / `>` character, and its border happens to be that same
+`on-surface` — so nothing is lost there, but nothing records the border either.
+
 Each of these has a `-dark` variant in the front matter carrying its Mocha
 colours. Those variants exist to make the dark flavour machine-readable and
 contrast-checkable; they are not separate components in the markup.
