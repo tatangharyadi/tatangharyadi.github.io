@@ -62,7 +62,13 @@ Two patterns here are easy to break by accident:
   panels unreachable by keyboard and invisible to screen readers.
 - Every decorative Boxicons glyph is `aria-hidden="true"`, and the tech stack
   marquee rows are hidden as a whole. Without this, a screen reader announces
-  hundreds of meaningless items.
+  hundreds of meaningless items. The two sections whose content is decorative or
+  image-based carry a `visually-hidden` `<h2>` so heading navigation still names
+  every region the nav links to.
+- The carousel arrows use `aria-disabled` while a slide is in flight, **never
+  the `disabled` property**. Disabling the element the user just pressed moves
+  focus to `<body>`, stranding keyboard users outside the carousel; re-entry is
+  already blocked by the `isSliding` guard in JavaScript.
 
 Animations are wrapped in a `prefers-reduced-motion` guard. `js/script.js`
 checks the same media query, so the carousel arrows are not left disabled

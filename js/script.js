@@ -24,9 +24,13 @@ const slideDuration = () => {
 let isSliding = false;
 let settleTimer;
 
+/* aria-disabled rather than the disabled property: disabling the element the
+   user just activated moves focus to <body>, which strands keyboard users
+   outside the carousel. Re-entry is already blocked by the isSliding guard, so
+   this only needs to communicate the state, not enforce it. */
 const setButtonsEnabled = (enabled) => {
-    nextButton.disabled = !enabled;
-    prevButton.disabled = !enabled;
+    nextButton.setAttribute('aria-disabled', String(!enabled));
+    prevButton.setAttribute('aria-disabled', String(!enabled));
 };
 
 const settle = () => {

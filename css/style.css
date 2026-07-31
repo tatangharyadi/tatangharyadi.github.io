@@ -372,6 +372,13 @@ nav .logo a:hover {
   outline-offset: 3px;
 }
 
+/* Set by js/script.js while a slide is in flight. Purely an affordance — the
+   click guard lives in JavaScript so that focus is never taken away. */
+.casestudy--arrows button[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .casestudy--item:nth-child(2) .casestudy--intro .category,
 .casestudy--item:nth-child(2) .casestudy--intro .title,
 .casestudy--item:nth-child(2) .casestudy--intro .description {
