@@ -1,17 +1,22 @@
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
+/* Poppins is loaded via <link rel="preconnect"> + <link rel="stylesheet"> in index.html.
+   Using @import here would serialize the request chain and delay first paint. */
 
 :root {
   --primary-color: #00abf0;
-  --primary-color-dark: #ededed;
+  /* Darker cyan for text on light backgrounds: --primary-color fails WCAG AA there. */
+  --primary-color-text: #006d94;
   --secondary-color: #ededed;
   --text-dark: #1f2937;
-  --text-light: #6b7280;
+  --text-light: #5c6370;
   --extra-light: #faf5ff;
 
   --primary-background-color: #081b29;
   --secondary-background-color: #0c2c42;
 
   --max-width: 1200px;
+
+  /* Longest carousel slide animation. js/script.js reads this value, so keep it in ms. */
+  --casestudy-slide-duration: 700ms;
 
   --casestudy-item1-transform: translate(-100%, -5%) scale(1.5);
   --casestudy-item1-filter: blur(30px);
@@ -31,7 +36,13 @@
   padding: 0;
   margin: 0;
   box-sizing: border-box;
+}
+
+html {
   scroll-behavior: smooth;
+}
+
+body {
   font-family: "Poppins", sans-serif;
 }
 
@@ -39,14 +50,19 @@ a {
   text-decoration: none;
 }
 
-.more-btn {
-  display: inline-block;
-  padding: 8px 16px;
-  background: var(--primary-color);
-  color: var(--text-dark);
-  text-decoration: none;
-  border-radius: 4px;
-  margin-top: 16px;
+/* Keeps an element operable by keyboard and announced by screen readers while
+   hiding it visually. `display: none` would remove it from the tab order and
+   the accessibility tree entirely. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 nav {
@@ -75,9 +91,12 @@ nav .logo a {
 }
 
 nav .logo a:hover {
-  color: var(--primary-color-dark);
+  color: var(--secondary-color);
 }
 
+/* Desktop: the nav links are always visible, so the toggle is genuinely
+   irrelevant and should not become a phantom tab stop. It is made
+   visually-hidden (but focusable) inside the mobile media query below. */
 #sidebar-toggle {
   display: none;
 }
@@ -90,6 +109,11 @@ nav .logo a:hover {
   font-size: 2rem;
   color: var(--primary-color);
   cursor: pointer;
+}
+
+#sidebar-toggle:focus-visible + .sidebar-checkbox {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 4px;
 }
 
 .nav-links--container {
@@ -115,7 +139,7 @@ nav .logo a:hover {
 }
 
 .home--container {
-  min-height: 100vh;
+  min-height: 100dvh;
   max-width: var(--max-width);
   margin: auto;
   padding: 1rem;
@@ -154,12 +178,28 @@ nav .logo a:hover {
   flex-wrap: wrap;
 }
 
+/* Visually hidden rather than display:none so the tabs stay keyboard-reachable
+   (native radio group: arrow keys switch panels) and screen-reader accessible. */
 .hero--options input {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 .hero--options input:checked + .hero--links {
-  color: var(--primary-color);
+  color: var(--primary-color-text);
+  font-weight: 600;
+}
+
+.hero--options input:focus-visible + .hero--links {
+  outline: 2px solid var(--primary-color-text);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .hero--options input:checked + label + .hero--txt {
@@ -187,6 +227,7 @@ nav .logo a:hover {
 
 .image img {
   width: min(25rem, 90%);
+  height: auto;
   border-radius: 100%;
 }
 
@@ -212,50 +253,14 @@ nav .logo a:hover {
   overflow: hidden;
 }
 
-.portfolio {
-  background-color: var(--primary-background-color);
+.hero-socials a:hover,
+.hero-socials a:focus-visible {
   color: var(--primary-color);
-}
-
-.portfolio--container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.portfolio--detail {
-  width: 325px;
-  height: 700px;
-  border-radius: 8px;
-  overflow: hidden;
-  margin: 20px;
-}
-
-.portfolio--detail img {
-  width: 100%;
-  height: auto;
-}
-
-.portfolio--content {
-  padding: 16px;
-}
-
-.portfolio--content h3 {
-  font-size: 28px;
-  margin-bottom: 8px;
-}
-
-.portfolio--content p {
-  font-size: 16px;
-  line-height: 1.3;
 }
 
 .casestudy--container {
   position: relative;
-  /* margin-top: 50px; */
-  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -276,14 +281,7 @@ nav .logo a:hover {
   width: 70%;
   height: 100%;
   font-size: 15px;
-}
-
-.casestudy--item img {
-  width: 50%;
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  transition: opacity 2s;
 }
 
 .casestudy--intro {
@@ -323,11 +321,6 @@ nav .logo a:hover {
   transition: opacity 0.5s;
 }
 
-.casestudy-item:nth-child(n + 3) {
-  opacity: 0;
-  pointer-events: none;
-}
-
 .casestudy--item:nth-child(2) {
   transform: var(--casestudy-item2-transform);
   filter: var(--casestudy-item2-filter);
@@ -345,7 +338,7 @@ nav .logo a:hover {
 
 .casestudy--item:nth-child(3) {
   transform: var(--casestudy-item3-transform);
-  filter: var(--casestudy-item1-filter);
+  filter: var(--casestudy-item3-filter);
   z-index: var(--casestudy-item3-zindex);
   opacity: var(--casestudy-item3-opacity);
 }
@@ -371,6 +364,12 @@ nav .logo a:hover {
   font-size: large;
   font-weight: bold;
   border: 1px solid #555;
+  cursor: pointer;
+}
+
+.casestudy--arrows button:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 3px;
 }
 
 .casestudy--item:nth-child(2) .casestudy--intro .category,
@@ -399,34 +398,51 @@ nav .logo a:hover {
   animation-delay: 0.7s;
 }
 
+/* Slide transitions.
+   js/script.js reorders the DOM, then adds .next or .prev to the container.
+   Each keyframe declares only a `from` block, so an item animates out of the
+   slot it just left and into the slot its :nth-child rule already assigns. */
 .casestudy--container.next .casestudy--item:nth-child(1) {
-  animation: positionItem2 0.5s ease-in-out 1 forwards;
+  animation: fromItem2 var(--casestudy-slide-duration) ease-in-out 1 forwards;
 }
 
-@keyframes positionItem2 {
+.casestudy--container.next .casestudy--item:nth-child(2) {
+  animation: fromItem3 var(--casestudy-slide-duration) ease-in-out 1 forwards;
+}
+
+.casestudy--container.prev .casestudy--item:nth-child(2) {
+  animation: fromItem1 var(--casestudy-slide-duration) ease-in-out 1 forwards;
+}
+
+.casestudy--container.prev .casestudy--item:nth-child(3) {
+  animation: fromItem2 var(--casestudy-slide-duration) ease-in-out 1 forwards;
+}
+
+@keyframes fromItem1 {
+  from {
+    transform: var(--casestudy-item1-transform);
+    filter: var(--casestudy-item1-filter);
+    z-index: var(--casestudy-item1-zindex);
+    opacity: var(--casestudy-item1-opacity);
+  }
+}
+
+@keyframes fromItem2 {
   from {
     transform: var(--casestudy-item2-transform);
     filter: var(--casestudy-item2-filter);
     z-index: var(--casestudy-item2-zindex);
-    opacity: 1;
+    opacity: var(--casestudy-item2-opacity);
   }
 }
 
-.casestudy--container.next .casestudy--item:nth-child(3) {
-  animation: positionItem3 0.7s ease-in-out 1 forwards;
-}
-
-@keyframes positionItem3 {
+@keyframes fromItem3 {
   from {
     transform: var(--casestudy-item3-transform);
     filter: var(--casestudy-item3-filter);
     z-index: var(--casestudy-item3-zindex);
     opacity: var(--casestudy-item3-opacity);
   }
-}
-
-.casestudy--item {
-  transition: opacity 2s;
 }
 
 .techstack {
@@ -436,7 +452,7 @@ nav .logo a:hover {
 .techstack--container {
   position: relative;
   width: 100%;
-  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -494,7 +510,56 @@ nav .logo a:hover {
   }
 }
 
+@media (width < 1200px) {
+  .casestudy--list {
+    left: 0%;
+  }
+
+  .casestudy--item {
+    width: 100%;
+  }
+
+  .casestudy--intro {
+    left: 65%;
+    width: 80%;
+  }
+}
+
+@media (width < 850px) {
+  .casestudy--container {
+    height: 600px;
+  }
+
+  .casestudy--list {
+    left: 0%;
+    height: 100%;
+  }
+
+  .casestudy--item {
+    width: 100%;
+  }
+
+  .casestudy--intro {
+    top: 15%;
+    left: 65%;
+    width: 80%;
+  }
+}
+
 @media (width < 750px) {
+  /* Mobile: the toggle drives the slide-out menu, so it must be focusable. */
+  #sidebar-toggle {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
   .sidebar-checkbox {
     display: block;
   }
@@ -503,7 +568,7 @@ nav .logo a:hover {
     position: fixed;
     top: 85px;
     right: -100%;
-    height: calc(100vh - 85px);
+    height: calc(100dvh - 85px);
     width: 300px;
 
     background-color: var(--secondary-background-color);
@@ -540,42 +605,34 @@ nav .logo a:hover {
 
   .image {
     display: none;
-    /*grid-area: 1/1/2/2;*/
   }
 }
 
-@media (width < 1200px) {
-  .casestudy--list {
-    left: 0%;
+/* WCAG 2.3.3 - respect an OS-level request for reduced motion.
+   The marquees stop, the carousel becomes an instant cut, and blur/opacity
+   transitions are removed. js/script.js checks the same media query so the
+   arrow buttons do not stay locked waiting for an animation that never runs. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
   }
 
-  .casestudy--item {
-    width: 100%;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 
-  .casestudy--intro {
-    left: 65%;
-    width: 80%;
-  }
-}
-
-@media (width < 850px) {
-  .casestudy--container {
-    height: 600px;
+  .techstack--detail div {
+    animation: none;
   }
 
-  .casestudy--list {
-    left: 0%;
-    height: 100%;
-  }
-
-  .casestudy--item {
-    width: 100%;
-  }
-
-  .casestudy--intro {
-    top: 15%;
-    left: 65%;
-    width: 80%;
+  .casestudy--item:nth-child(2) .casestudy--intro .category,
+  .casestudy--item:nth-child(2) .casestudy--intro .title,
+  .casestudy--item:nth-child(2) .casestudy--intro .description {
+    opacity: 1;
+    animation: none;
   }
 }
