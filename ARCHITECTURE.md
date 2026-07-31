@@ -40,7 +40,9 @@ LICENSE                 MIT, code only
 ```
 
 `404.html` intentionally duplicates its styles inline. It has to render correctly
-even if `css/style.css` is the thing that failed to load, so it depends on nothing.
+even if `css/style.css` is the thing that failed to load, so its only external
+references are the favicon and a `Poppins` font-family that degrades to a system
+sans-serif rather than being fetched.
 
 ## Design tokens
 
@@ -76,11 +78,19 @@ The only JavaScript in the site. The mechanism is unusual enough to be worth
 spelling out.
 
 **Position comes from DOM order.** Three `.casestudy--item` elements are styled by
-`:nth-child`, so item 1 is the incoming slide, item 2 is front-and-centre, item 3
-is the outgoing one. Advancing the carousel does not change any styles — it moves
-a node. `showSlider('next')` appends the first item to the end of the list;
-`'prev'` prepends the last. The `:nth-child` rules then re-apply themselves to
-whatever now sits in each slot.
+`:nth-child`, and each slot has a fixed role:
+
+| Slot              | Role       | State                                                     |
+| ----------------- | ---------- | --------------------------------------------------------- |
+| `:nth-child(1)`   | just left  | `opacity: 0`, off to the left, blurred, `pointer-events: none` |
+| `:nth-child(2)`   | centre     | visible, unblurred, the only slot whose text is readable  |
+| `:nth-child(3)`   | on deck    | visible but small and blurred, offset to the right        |
+
+Advancing the carousel does not change any styles — it moves a node.
+`showSlider('next')` appends the first item to the end of the list, so the centre
+card slides out to slot 1 and the on-deck card is promoted into the centre.
+`'prev'` prepends the last item instead, running the same shuffle backwards. The
+`:nth-child` rules then re-apply themselves to whatever now sits in each slot.
 
 **The animation runs backwards.** Because the new layout is already correct the
 instant the DOM changes, the slide has to animate *out of* the slot each element
