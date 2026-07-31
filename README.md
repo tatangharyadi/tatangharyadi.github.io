@@ -28,6 +28,8 @@ Pushing to `main` publishes automatically.
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — file layout, design tokens, the
   CSS-only interaction patterns, how the case study carousel works, breakpoints
   and the GitHub Pages deployment model.
+- **[DESIGN.md](DESIGN.md)** — the Catppuccin palette, the semantic colour
+  tokens, and the contrast floors every colour is verified against.
 - **[AGENTS.md](AGENTS.md)** — how to verify a change, and the accessibility
   invariants that are easy to break by accident.
 

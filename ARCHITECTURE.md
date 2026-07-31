@@ -34,6 +34,7 @@ assets/images/          profile photo (webp) and the 1200x630 social share card
 .nojekyll               opt out of Jekyll processing (see Deployment)
 robots.txt, sitemap.xml crawler hints
 ARCHITECTURE.md         this file
+DESIGN.md               the Catppuccin palette, semantic tokens and contrast floors
 AGENTS.md               working rules and invariants
 CLAUDE.md               one line, imports AGENTS.md
 LICENSE                 MIT, code only
@@ -42,21 +43,30 @@ LICENSE                 MIT, code only
 `404.html` intentionally duplicates its styles inline. It has to render correctly
 even if `css/style.css` is the thing that failed to load, so its only external
 references are the favicon and a `Poppins` font-family that degrades to a system
-sans-serif rather than being fetched.
+sans-serif rather than being fetched. The cost of that independence is that its
+palette is a copy of the one in `css/style.css` and has to be kept in step by hand.
 
 ## Design tokens
 
-Everything themeable lives in the `:root` block at the top of `css/style.css`.
-Three of those tokens carry constraints that aren't obvious from their names:
+Everything themeable lives in the `:root` block at the top of `css/style.css`,
+with a `prefers-color-scheme: dark` block immediately after it holding the dark
+overrides. Colour is [Catppuccin](https://catppuccin.com) — Latte in light mode,
+Mocha in dark. **[DESIGN.md](DESIGN.md) is the reference for which token to reach
+for and what contrast each one is verified at**; the rules below are the
+constraints that are not about colour at all:
 
-- `--primary-color-text` (`#006d94`) exists because `--primary-color` (`#00abf0`)
-  fails WCAG AA contrast against light backgrounds. The bright cyan is for dark
-  surfaces; the darker one is for text on light ones. They are not
-  interchangeable.
 - `--casestudy-slide-duration` is read by `js/script.js`, so it must stay in
   milliseconds. See the carousel section below.
 - The `--casestudy-item1/2/3-*` tokens are not styling knobs — they are animation
-  state. See below.
+  state, and they are deliberately *not* duplicated in the dark block because they
+  are flavour-independent. See below.
+- `color-scheme: light dark` on `:root` is what makes native scrollbars and form
+  controls follow the active flavour. Removing it leaves them light under Mocha.
+
+One colour constraint is worth repeating here because it has already been
+rediscovered once: the accent exists in two variants, and they are not
+interchangeable. `--accent` is decoration only; `--accent-text` is for text and
+every focus ring. See [DESIGN.md](DESIGN.md#the-accent-rule).
 
 ## Interaction patterns
 

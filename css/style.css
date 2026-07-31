@@ -1,17 +1,27 @@
 /* Poppins is loaded via <link rel="preconnect"> + <link rel="stylesheet"> in index.html.
    Using @import here would serialize the request chain and delay first paint. */
 
+/* Colour comes from Catppuccin: Latte in light mode, Mocha in dark. Rules below
+   only ever reference the semantic tokens, never a palette name, so a flavour
+   swap is a change to these two blocks and nothing else. See DESIGN.md. */
 :root {
-  --primary-color: #00abf0;
-  /* Darker cyan for text on light backgrounds: --primary-color fails WCAG AA there. */
-  --primary-color-text: #006d94;
-  --secondary-color: #ededed;
-  --text-dark: #1f2937;
-  --text-light: #5c6370;
-  --extra-light: #faf5ff;
+  /* Tells the browser to render native controls and scrollbars for the active
+     scheme. Without it they stay light-mode under Mocha. */
+  color-scheme: light dark;
 
-  --primary-background-color: #081b29;
-  --secondary-background-color: #0c2c42;
+  /* Catppuccin Latte */
+  --bg: #eff1f5; /* base */
+  --bg-alt: #e6e9ef; /* mantle */
+  --bg-chrome: #dce0e8; /* crust */
+  --border: #acb0be; /* surface2 */
+  --text: #4c4f69; /* text */
+  --text-muted: #5c5f77; /* subtext1 — subtext0 is 4.37:1 here, just under AA */
+  --text-subtle: #acb0be; /* surface2, decorative glyphs only */
+  --accent: #04a5e5; /* sky — decoration only, 2.47:1 is unreadable as text */
+  /* Latte sky deepened to 60% lightness, hue and saturation preserved. The one
+     non-Catppuccin value in the system: no Latte cyan reaches 4.5:1 as text.
+     Do not "correct" this back to sky — it is also every focus ring. */
+  --accent-text: #026389;
 
   --max-width: 1200px;
 
@@ -32,6 +42,24 @@
   --casestudy-item3-opacity: 1;
 }
 
+/* Catppuccin Mocha. Only the colour tokens are overridden — layout, animation
+   state and --casestudy-slide-duration are flavour-independent. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e2e; /* base */
+    --bg-alt: #181825; /* mantle */
+    --bg-chrome: #11111b; /* crust */
+    --border: #585b70; /* surface2 */
+    --text: #cdd6f4; /* text */
+    --text-muted: #a6adc8; /* subtext0 */
+    --text-subtle: #585b70; /* surface2, decorative glyphs only */
+    --accent: #89dceb; /* sky */
+    /* Mocha's sky clears 4.5:1 on every surface, so no deepened variant is
+       needed here — the two accent tokens collapse to one value. */
+    --accent-text: #89dceb;
+  }
+}
+
 * {
   padding: 0;
   margin: 0;
@@ -44,6 +72,8 @@ html {
 
 body {
   font-family: "Poppins", sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
 }
 
 a {
@@ -70,7 +100,11 @@ nav {
   position: fixed;
   top: 0;
   left: 0;
-  background-color: var(--primary-background-color);
+  background-color: var(--bg-chrome);
+  /* Catppuccin's darkest and second-darkest surfaces sit close together in both
+     flavours (crust vs base is 1.17:1 in Latte, 1.14:1 in Mocha), so tone alone
+     does not separate this band from the page. The hairline does. */
+  border-bottom: 1px solid var(--border);
   z-index: 99;
 }
 
@@ -86,12 +120,12 @@ nav {
 nav .logo a {
   font-size: 1.5rem;
   font-weight: 600;
-  color: var(--primary-color);
+  color: var(--accent-text);
   align-self: flex-start;
 }
 
 nav .logo a:hover {
-  color: var(--secondary-color);
+  color: var(--text);
 }
 
 /* Desktop: the nav links are always visible, so the toggle is genuinely
@@ -107,12 +141,12 @@ nav .logo a:hover {
 
 .sidebar-checkbox i {
   font-size: 2rem;
-  color: var(--primary-color);
+  color: var(--accent-text);
   cursor: pointer;
 }
 
 #sidebar-toggle:focus-visible + .sidebar-checkbox {
-  outline: 2px solid var(--primary-color);
+  outline: 2px solid var(--accent-text);
   outline-offset: 4px;
 }
 
@@ -127,15 +161,15 @@ nav .logo a:hover {
   padding: 0.5rem 1rem;
   text-decoration: none;
   font-weight: 600;
-  color: var(--secondary-color);
+  color: var(--text);
 }
 
 .nav-links--container li a:hover {
-  color: var(--primary-color);
+  color: var(--accent-text);
 }
 
 .home {
-  background-color: var(--extra-light);
+  background-color: var(--bg-alt);
 }
 
 .home--container {
@@ -156,7 +190,7 @@ nav .logo a:hover {
 
 .hero--subtitle {
   letter-spacing: 2px;
-  color: var(--text-light);
+  color: var(--text-muted);
   font-weight: 600;
   margin-bottom: 0.5rem;
 }
@@ -165,7 +199,7 @@ nav .logo a:hover {
   font-size: 2.5rem;
   font-weight: 400;
   line-height: 3rem;
-  color: var(--text-dark);
+  color: var(--text);
   margin-bottom: 1rem;
 }
 
@@ -192,12 +226,12 @@ nav .logo a:hover {
 }
 
 .hero--options input:checked + .hero--links {
-  color: var(--primary-color-text);
+  color: var(--accent-text);
   font-weight: 600;
 }
 
 .hero--options input:focus-visible + .hero--links {
-  outline: 2px solid var(--primary-color-text);
+  outline: 2px solid var(--accent-text);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -214,7 +248,7 @@ nav .logo a:hover {
 .hero--txt {
   order: 1;
   line-height: 1.5rem;
-  color: var(--text-light);
+  color: var(--text-muted);
   margin-bottom: 2rem;
   min-height: 200px;
   display: none;
@@ -245,17 +279,23 @@ nav .logo a:hover {
   align-items: center;
   width: 40px;
   height: 40px;
-  background: var(--primary-background-color);
+  background: var(--bg-chrome);
   border-radius: 50%;
   font-size: 1.5rem;
-  color: var(--secondary-color);
+  color: var(--text);
   text-decoration: none;
   overflow: hidden;
 }
 
 .hero-socials a:hover,
 .hero-socials a:focus-visible {
-  color: var(--primary-color);
+  color: var(--accent-text);
+}
+
+/* Colour alone is not a sufficient focus indicator (WCAG 1.4.11). */
+.hero-socials a:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 3px;
 }
 
 .casestudy--container {
@@ -311,7 +351,7 @@ nav .logo a:hover {
 .casestudy--intro .summary {
   gap: 10px;
   width: 100%;
-  border-top: 1px solid #555;
+  border-top: 1px solid var(--border);
   margin-top: 20px;
 }
 
@@ -363,12 +403,14 @@ nav .logo a:hover {
   font-family: monospace;
   font-size: large;
   font-weight: bold;
-  border: 1px solid #555;
+  background-color: var(--bg-chrome);
+  color: var(--text);
+  border: 1px solid var(--text);
   cursor: pointer;
 }
 
 .casestudy--arrows button:focus-visible {
-  outline: 2px solid var(--primary-color);
+  outline: 2px solid var(--accent-text);
   outline-offset: 3px;
 }
 
@@ -453,7 +495,8 @@ nav .logo a:hover {
 }
 
 .techstack {
-  background-color: var(--primary-background-color);
+  background-color: var(--bg-chrome);
+  border-top: 1px solid var(--border);
 }
 
 .techstack--container {
@@ -477,7 +520,7 @@ nav .logo a:hover {
 }
 
 .techstack--detail i {
-  color: var(--text-dark);
+  color: var(--text-subtle);
   transition: 1s;
   padding: 0 5px;
   user-select: none;
@@ -485,7 +528,7 @@ nav .logo a:hover {
 }
 
 .techstack--detail i:hover {
-  color: var(--primary-color);
+  color: var(--accent);
   transition: 0s;
 }
 
@@ -578,7 +621,11 @@ nav .logo a:hover {
     height: calc(100dvh - 85px);
     width: 300px;
 
-    background-color: var(--secondary-background-color);
+    background-color: var(--bg-alt);
+    /* Same reason as the hairline on nav: mantle is only ~1.08:1 against base in
+       both flavours, so without an edge this panel has no visible boundary and
+       the links read as floating on the page. */
+    border-left: 1px solid var(--border);
     flex-direction: column;
     align-items: flex-start;
     justify-content: flex-start;

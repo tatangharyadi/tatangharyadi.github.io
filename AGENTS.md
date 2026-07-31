@@ -42,8 +42,12 @@ There is no test suite. Verify by hand, in roughly this order:
    regression.
 5. Check the layout at each breakpoint (1200 / 850 / 750px) and with
    `prefers-reduced-motion: reduce` enabled.
-6. For anything touching markup, metadata or colour, run a Lighthouse navigation
-   audit. Accessibility, Best Practices and SEO are all at 100 — keep them there.
+6. **Check both colour schemes.** The site themes itself off
+   `prefers-color-scheme`, so every visual change has two results. A
+   default-scheme-only check leaves half the work unverified.
+7. For anything touching markup, metadata or colour, run a Lighthouse navigation
+   audit — **once per scheme**. Accessibility, Best Practices and SEO are all at
+   100 in both; keep them there.
 
 ## Accessibility invariants
 
@@ -74,9 +78,15 @@ Two further rules for any change:
 - **Animations stay behind a `prefers-reduced-motion` guard.** `js/script.js`
   checks the same media query, so removing the CSS guard alone would leave the
   carousel arrows locked forever waiting on an animation that never runs.
-- **Text contrast stays at or above 4.5:1.** This is why
-  `--primary-color-text` exists alongside `--primary-color`; do not substitute one
-  for the other to "keep the colours consistent".
+- **Text contrast stays at or above 4.5:1, in both flavours.** This is why
+  `--accent-text` exists alongside `--accent`; do not substitute one for the other
+  to "keep the colours consistent". `--accent` is `sky`, which measures 2.47:1 on
+  Catppuccin Latte's page background — it is legal on `aria-hidden` decoration and
+  nowhere else, at any font size. Check any colour change against **Latte**, which
+  is always the tighter of the two flavours. See [DESIGN.md](DESIGN.md).
+- **`--accent-text` is Latte `#026389`, which is deliberately not a Catppuccin
+  colour.** No Latte cyan reaches 4.5:1 as text. Do not "fix" it back to `sky`;
+  that makes every focus ring on the site fall below the 3:1 floor.
 
 ## Other things not to break
 
@@ -89,7 +99,11 @@ Two further rules for any change:
   the animation restart.
 - **`--casestudy-slide-duration` must stay in `ms`.** `js/script.js` parses it.
 - **`404.html` styles are inline on purpose.** It must render even if the
-  stylesheet is what failed.
+  stylesheet is what failed. Its palette is therefore a hand-kept copy of the one
+  in `css/style.css` — change one and change the other.
+- **The `theme-color` metas come in pairs**, one per `prefers-color-scheme`, in
+  both `index.html` and `404.html`. A single unconditional tag would paint the
+  browser chrome the wrong colour for half of all visitors.
 
 ## Contributing
 
