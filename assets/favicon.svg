@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="TH">
+  <rect width="64" height="64" rx="12" fill="#081b29" />
+  <text x="32" y="44" text-anchor="middle" font-family="Poppins, Helvetica, Arial, sans-serif"
+        font-size="34" font-weight="600" fill="#00abf0">T.</text>
+</svg>
