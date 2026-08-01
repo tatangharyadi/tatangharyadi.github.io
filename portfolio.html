@@ -27,12 +27,10 @@
     <meta name="twitter:description" content="What the problem was, what I decided, and what it cost. Four projects in detail." />
     <meta name="twitter:image" content="https://tatangharyadi.github.io/assets/images/og-card.jpg" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" />
+    <!-- No webfont and no icon font. See the note at the top of css/style.css:
+         both were third-party requests on the critical path buying nothing the
+         system stack does not already do. -->
     <link rel="stylesheet" href="css/style.css" />
-    <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
 
     <!-- This page has no interaction of its own yet, but htmx is loaded here for
          the same reason it is loaded everywhere else: the invariant is that no
@@ -49,22 +47,26 @@
         <div class="nav--container">
             <div class="logo"><a href="index.html">Tatang.</a></div>
             <div class="nav-content">
-                <input type="checkbox" id="sidebar-toggle" />
+                <input type="checkbox" id="sidebar-toggle" class="visually-hidden" />
                 <label for="sidebar-toggle" class="sidebar-checkbox">
-                    <i class="bx bx-menu" aria-hidden="true"></i>
+                    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false">
+                        <path d="M3 6h18M3 12h18M3 18h18" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" />
+                    </svg>
                     <span class="visually-hidden">Menu</span>
                 </label>
                 <label id="overlay" for="sidebar-toggle"></label>
 
                 <!-- This page is deliberately absent from its own nav, which is why
                      nothing here carries aria-current. It is not a menu choice any
-                     more: a visitor arrives from an Ask result, from the link under
-                     the case study deck, or from a search engine. Removing the entry
-                     did not make it unreachable or unindexed, so do not "fix" this by
-                     putting it back. See AGENTS.md. -->
-                <ul class="nav-links--container">
-                    <li><a href="index.html">Home</a></li>
-                    <li><a href="ask.html">Ask</a></li>
+                     more: a visitor arrives from an Ask result, from a title in the
+                     work index, from the link below it, or from a search engine.
+                     Removing the entry did not make it unreachable or unindexed, so
+                     do not "fix" this by putting it back. See AGENTS.md. -->
+                <ul class="nav-links--container" role="list">
+                    <li><a href="index.html#ask">Ask</a></li>
+                    <li><a href="index.html#work">Work</a></li>
+                    <li><a href="index.html#colophon">Colophon</a></li>
                 </ul>
             </div>
         </div>
@@ -83,8 +85,8 @@
                 <h1>Portfolio</h1>
                 <p class="page--lead">Building and fixing technology organisations, from
                     writing the code myself to leading a global team of fifty. Three
-                    engagements below, in the detail the home page carousel has no room
-                    for: what the problem actually was, what I decided, and what it
+                    engagements below, in the detail the work index on the home page has
+                    no room for: what the problem actually was, what I decided, and what it
                     cost. Then one thing I built rather than led, the search on this
                     site, which runs its model in your browser. What I am working on
                     now, and what I bring, follow at the end.</p>
@@ -126,7 +128,7 @@
                 <p>I also took ownership of product management directly, driving the
                     roadmap for B2B value-added services and loyalty features.</p>
 
-                <ul class="project--impact">
+                <ul class="project--impact" role="list">
                     <li>From MVP to <strong>100+ outlets in 6 months</strong></li>
                     <li><strong>Increased RPR</strong></li>
                 </ul>
@@ -162,7 +164,7 @@
                     Buying permanent headcount for a temporary specialism is how technology
                     budgets quietly ratchet upward.</p>
 
-                <ul class="project--impact">
+                <ul class="project--impact" role="list">
                     <li><strong>80% reduction</strong> in ICT-related expenses</li>
                     <li><strong>50% faster</strong> release cycle</li>
                 </ul>
@@ -204,21 +206,27 @@
                     Indonesia, Vietnam and the Philippines scaled to 1.5 million monthly
                     active users.</p>
 
-                <ul class="project--impact">
+                <ul class="project--impact" role="list">
                     <li>Completed in <strong>9 months</strong>, after three years behind schedule</li>
                     <li>Realised the <strong>USD 3 million ROI</strong></li>
                     <li>Scaled to <strong>1.5 million MAU</strong> across three markets</li>
                 </ul>
             </article>
 
-            <!-- This section is also the corpus the Ask page searches. js/ask.js
-                 fetches this file at runtime and chunks it on .project sections,
-                 reading the h2, the paragraphs and the .project--impact list while
-                 skipping .project--meta and anything under 40 characters. So the
-                 class names here are an interface, not just styling: rename one and
-                 the section silently contributes nothing while the status line still
-                 reports a healthy-looking count. After editing, load ask.html and
-                 check that the passage count moved. -->
+            <!-- This page is the source of the corpus Ask searches, but nothing
+                 parses it at runtime. scripts/build-corpus.html chunks this file on
+                 .project sections, reading the h2, the paragraphs and the
+                 .project--impact list while skipping .project--meta and anything
+                 under 40 characters, embeds each passage and writes corpus.json.
+                 So the class names here are an interface, not just styling: rename
+                 one and the section silently contributes nothing while the status
+                 line still reports a healthy-looking count.
+
+                 After editing prose anywhere on this page, re-run that generator in
+                 a browser and commit the result. scripts/check_corpus.py fails CI
+                 when a committed passage no longer appears here, which catches text
+                 that changed; only loading the page and watching the passage count
+                 move catches text that was added and never indexed. -->
             <article class="project" id="browser-local-semantic-search">
                 <h2>Browser-Local Semantic Search</h2>
                 <p class="project--meta">
@@ -226,8 +234,9 @@
                     <span class="project--role">This site</span>
                 </p>
 
-                <p>The Ask page on this site answers questions about these case studies
-                    by running a sentence embedding model inside the visitor's browser.
+                <p>The search on the front page of this site answers questions about
+                    these projects by running a sentence embedding model inside the
+                    visitor's own browser.
                     There is no inference server, no API key and no request carrying the
                     question anywhere. It is small, and it is deliberately small: the
                     point was to build the thing end to end rather than describe having
@@ -261,12 +270,21 @@
                     crossover sits is the engineering; reaching for the vector database
                     before it is the failure mode.</p>
 
-                <p>The corpus is parsed out of this page at load time rather than
-                    committed as a generated embeddings file, so there is no build step to
-                    forget and no way for the index to describe a version of these case
-                    studies that no longer exists.</p>
+                <p><strong>The index is generated by a page, not by a script.</strong>
+                    Embeddings are precomputed and committed, because asking every
+                    visitor's device to embed the whole corpus before answering the
+                    first question is a cost paid thousands of times to save paying it
+                    once. What that buys is a way for the index to drift from the prose
+                    it describes, so the generator runs in a browser, against the same
+                    vendored runtime and weights the site ships, which makes the vectors
+                    the ones the live code would have produced by construction. A build
+                    on a server could not promise that: outside a browser the runtime's
+                    backend registry is empty, and a vector computed by a different
+                    stack does not raise an error, it just retrieves worse. A check in
+                    CI then fails the build if any committed passage stops appearing on
+                    this page.</p>
 
-                <ul class="project--impact">
+                <ul class="project--impact" role="list">
                     <li><strong>No inference cost and no data egress</strong> — the
                         question never leaves the tab</li>
                     <li><strong>~25ms per query</strong> after a one-time model load</li>
@@ -317,7 +335,7 @@
                 <p>Before the CTO roles: leading IT functions, delivering projects and
                     writing code, including building offshore IT services startups.</p>
 
-                <ul class="history--list">
+                <ul class="history--list" role="list">
                     <li><span>Head of Information Technology</span>
                         <span>Panorama Transportasi Tbk</span></li>
                     <li><span>IT Manager</span>

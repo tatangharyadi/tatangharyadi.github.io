@@ -35,18 +35,19 @@ jobs:
 
       # Replaces the old `node --check js/script.js`: there is no JavaScript file
       # left to syntax-check. The interaction is htmx fetching static fragments,
-      # and the failure modes moved with it — a fragment that 404s, a copy of the
-      # case studies that drifted, a control that loses the id htmx re-focuses by.
-      # A browser reports none of those as an error.
-      - name: htmx fragments resolve and agree with index.html
+      # and the failure modes moved with it: a fragment that 404s, a work panel
+      # whose slug has no section behind it, a trigger that moved inside the
+      # region it swaps and can strand focus. A browser reports none of those as
+      # an error.
+      - name: htmx fragments resolve and keep their focus invariants
         run: python3 scripts/check_htmx.py
 
-      # The check above proves the fragments agree with index.html. This one
-      # proves they are still exactly what the generator produces — so the way to
-      # fix a drift is to re-run the generator, not to hand-patch the copy that
-      # CI happened to name.
-      - name: Case study fragments are freshly generated
-        run: python3 scripts/propagate_casestudy.py --check
+      # The check above proves the fragments agree with index.html and
+      # portfolio.html. This one proves they are still exactly what the generator
+      # produces, so the way to fix a drift is to re-run the generator, not to
+      # hand-patch the copy that CI happened to name.
+      - name: Work fragments are freshly generated
+        run: python3 scripts/propagate_work.py --check
 
       # The same bargain again, for the Ask page's search index. The embeddings
       # cannot be recomputed here — that needs the model and a browser — so this

@@ -5,7 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tatang Haryadi | CTO</title>
-    <meta name="description" content="Tatang Haryadi. A CTO with a career in accelerating digital transformations and product innovation." />
+    <meta name="description" content="Tatang Haryadi. A CTO with a career in accelerating digital transformations and product innovation. Semantic search over the portfolio runs in your browser, with no server." />
     <meta name="google-site-verification" content="vDsGU0qgKGAePTmZvoJturlzNm57tdt-G8hGfJXNAuk" />
     <!-- Matches --bg-chrome (Catppuccin crust) in each flavour, so the browser
          chrome continues the nav band rather than fighting it. -->
@@ -19,22 +19,22 @@
     <meta property="og:site_name" content="Tatang Haryadi" />
     <meta property="og:url" content="https://tatangharyadi.github.io/" />
     <meta property="og:title" content="Tatang Haryadi | CTO" />
-    <meta property="og:description" content="A CTO with a career in accelerating digital transformations and product innovation. Fractional CTO services available." />
+    <meta property="og:description" content="A CTO with a career in accelerating digital transformations and product innovation. The search on this page runs a sentence-transformer in your browser, with no server." />
     <meta property="og:image" content="https://tatangharyadi.github.io/assets/images/og-card.jpg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Portrait of Tatang Haryadi" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Tatang Haryadi | CTO" />
-    <meta name="twitter:description" content="A CTO with a career in accelerating digital transformations and product innovation. Fractional CTO services available." />
+    <meta name="twitter:description" content="A CTO with a career in accelerating digital transformations and product innovation. The search on this page runs a sentence-transformer in your browser, with no server." />
     <meta name="twitter:image" content="https://tatangharyadi.github.io/assets/images/og-card.jpg" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" />
+    <!-- No webfont and no icon font. Both were third-party requests on the
+         critical path, and the type here is a system stack: the interface font
+         the reader already has, and a monospace face for anything that is a
+         measurement. Nothing renders in a fallback face while a CDN is
+         consulted, because no CDN is consulted. -->
     <link rel="stylesheet" href="css/style.css" />
-    <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
 
     <script type="application/ld+json">
     {
@@ -53,194 +53,465 @@
     }
     </script>
 
-    <!-- Interaction runs on htmx. The case study carousel asks
-         for static HTML fragments under /fragments/ and swaps them in, so the
+    <!-- Interaction runs on htmx. Each entry in the work index asks for the
+         static fragment holding that project's detail and swaps it in, so the
          markup the server sends is the whole application state. Pinned by
-         version and SRI digest for the same reason Boxicons is: a CDN this site
-         does not own must not be able to change what executes here. -->
+         version and SRI digest: a CDN this site does not own must not be able to
+         change what executes here. -->
     <script src="https://unpkg.com/htmx.org@2.0.10/dist/htmx.min.js"
         integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
         crossorigin="anonymous" defer></script>
+
+    <!-- The one first-party script in the repository. It is a module, so it is
+         deferred by definition; the reason it exists at all is at the top of the
+         file and in the colophon below. -->
+    <script type="module" src="js/ask.js"></script>
 </head>
 
 <body>
     <nav>
         <div class="nav--container">
-            <div class="logo"><a href="#section-home">Tatang.</a></div>
+            <div class="logo"><a href="#masthead">Tatang.</a></div>
             <div class="nav-content">
-                <input type="checkbox" id="sidebar-toggle" />
+                <input type="checkbox" id="sidebar-toggle" class="visually-hidden" />
                 <label for="sidebar-toggle" class="sidebar-checkbox">
-                    <i class="bx bx-menu" aria-hidden="true"></i>
+                    <!-- Inline, because three social marks and one menu glyph did
+                         not justify an icon font from a CDN. -->
+                    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false">
+                        <path d="M3 6h18M3 12h18M3 18h18" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" />
+                    </svg>
                     <span class="visually-hidden">Menu</span>
                 </label>
                 <label id="overlay" for="sidebar-toggle"></label>
 
                 <!-- No Portfolio entry, on purpose. That page is a destination you
                      arrive at rather than one you pick: Ask is the way into the
-                     detail, and the link below the case study deck is the way to
-                     read it straight through. It stays crawlable and stays in
-                     sitemap.xml. See AGENTS.md before adding it back. -->
-                <ul class="nav-links--container">
-                    <li><a href="#section-home">Home</a></li>
-                    <li><a href="ask.html">Ask</a></li>
+                     detail, each work entry links straight to its section, and the
+                     link below the index is the way to read it straight through. It
+                     stays crawlable and stays in sitemap.xml. See AGENTS.md before
+                     adding it back. -->
+                <ul class="nav-links--container" role="list">
+                    <li><a href="#ask">Ask</a></li>
+                    <li><a href="#work">Work</a></li>
+                    <li><a href="#colophon">Colophon</a></li>
                 </ul>
             </div>
         </div>
     </nav>
 
     <main>
-    <section id="section-home" class="home">
-        <div class="home--container">
-            <div class="home--content">
-                <p class="hero--subtitle">HELLO THERE</p>
-                <h1 class="hero--title">
-                    I'm <span>Tatang Haryadi</span>
-                </h1>
-                <!-- Plain prose, not a tab panel. This was three htmx tabs — Dear
-                     All, My Services, For Recruiters — until the Ask page made two
-                     of them redundant: the fractional CTO copy is on
-                     portfolio.html#now and therefore in corpus.json, and the
-                     recruiter tab was a link to the LinkedIn icon three inches
-                     below it. What is left is the positioning statement, which
-                     was never a choice among three and should not have looked
-                     like one. -->
-                <p class="hero--txt">
-                    I'm a CTO with a career in accelerating digital transformations and product innovation.
-                    I have launched a portfolio of products for travel, retail and F&B industries.
-                    I led a global Technology team of up to 50.
-                </p>
+        <header class="masthead" id="masthead">
+            <div class="masthead--container">
+                <div class="masthead--identity">
+                    <h1 class="masthead--name">Tatang Haryadi</h1>
+                    <p class="masthead--role">Chief Technology Officer</p>
+                    <p class="masthead--lead">
+                        I accelerate digital transformations and product innovation. I have
+                        launched a portfolio of products for travel, retail and F&amp;B
+                        industries, and led a global technology team of up to 50. I still
+                        read the diffs.
+                    </p>
+                    <ul class="masthead--socials" role="list">
+                        <li>
+                            <a href="https://www.linkedin.com/in/tatangharyadi/" rel="me noopener" target="_blank">
+                                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                                    <path fill="currentColor" d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.225 0z" />
+                                </svg>
+                                <span>LinkedIn</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://github.com/tatangharyadi" rel="me noopener" target="_blank">
+                                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                                    <path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+                                </svg>
+                                <span>GitHub</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://medium.com/@tatangharyadi" rel="me noopener" target="_blank">
+                                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                                    <path fill="currentColor" d="M13.54 12a6.8 6.8 0 0 1-6.77 6.82A6.8 6.8 0 0 1 0 12a6.8 6.8 0 0 1 6.77-6.82A6.8 6.8 0 0 1 13.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z" />
+                                </svg>
+                                <span>Medium</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="masthead--portrait">
+                    <img src="assets/images/tatangharyadi.webp" width="567" height="565"
+                        alt="Portrait of Tatang Haryadi" />
+                </div>
             </div>
+        </header>
 
-            <div class="image">
-                <img src="assets/images/tatangharyadi.webp" width="567" height="565"
-                    alt="Portrait of Tatang Haryadi" />
-            </div>
+        <section class="ask" id="ask" aria-labelledby="ask--heading">
+            <div class="ask--container">
+                <h2 id="ask--heading">Ask</h2>
+                <p class="section--lead">Semantic search over my portfolio, running
+                    entirely in this tab. A sentence-transformer turns your question into
+                    a vector, compares it against the passages on this site, and shows
+                    the closest ones. Nothing is sent anywhere, because there is no
+                    server to send it to. How it works, and what it deliberately is not,
+                    is in the <a href="#colophon">colophon</a>.</p>
 
-            <div class="hero-socials">
-                <a href="https://www.linkedin.com/in/tatangharyadi/" aria-label="LinkedIn profile"
-                    rel="me noopener" target="_blank"><i class='bx bxl-linkedin' aria-hidden="true"></i></a>
-                <a href="https://github.com/tatangharyadi" aria-label="GitHub profile"
-                    rel="me noopener" target="_blank"><i class='bx bxl-github' aria-hidden="true"></i></a>
-                <a href="https://medium.com/@tatangharyadi" aria-label="Medium articles"
-                    rel="me noopener" target="_blank"><i class='bx bxl-medium' aria-hidden="true"></i></a>
-            </div>
+                <!-- Hidden until js/ask.js reveals it. A no-JS visitor should never
+                     be shown a button that cannot do anything; what they get instead
+                     is the fallback at the bottom of this section. -->
+                <div class="ask--gate" id="ask--gate" hidden>
+                    <!-- Transfer sizes, not the sizes on disk. The server compresses
+                         both, and the runtime compresses nearly fourfold, so quoting
+                         the uncompressed 22 MB and 13 MB overstated the download by
+                         three quarters of the runtime. Measure before changing these:
+                         curl -H 'Accept-Encoding: br, gzip' -o /dev/null
+                         -w '%{size_download}' against the deployed URL. -->
+                    <p>The model is <strong>16 MB</strong> and the WebAssembly runtime
+                        <strong>3 MB</strong>, so neither loads until you ask for it.
+                        Your browser caches both, so this is a one-time cost. The
+                        passages are already indexed; the model is here to read your
+                        question, not this site.</p>
+                    <button type="button" class="ask--load" id="ask--load">
+                        Load the model
+                    </button>
 
-        </div>
-    </section>
-
-    <section id="section-casestudy" class="casestudy">
-        <h2 class="visually-hidden">Case studies</h2>
-        <!-- The carousel is hypermedia too: an arrow fetches the fragment for the
-             rotation it moves to, and that fragment carries the reordered deck
-             plus arrows pointing at the next two rotations. Because the incoming
-             items are fresh nodes their entry animation starts on its own, which
-             is why no reflow nudge is needed here.
-             hx-on:keydown only suppresses the page scroll that the arrow keys
-             would otherwise cause; the requests themselves are declared by the
-             hx-trigger on each button. -->
-        <div class="casestudy--container" id="casestudy" hx-target="#casestudy" hx-swap="innerHTML"
-            hx-on:keydown="if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') event.preventDefault()">
-            <div class="casestudy--list">
-
-                <div class="casestudy--item">
-                    <div class="casestudy--intro">
-                        <div class="category">Product Management</div>
-                        <div class="title">Restaurant Technology Platform</div>
-                        <div class="description">
-                            <p>Fast-tracked PMF front and back house technology solutions for the restaurant industry:
-                                (1) Point-of-sale, kitchen display system, loyalty program and real-time analytics;
-                                (2) IoT system for temperature monitoring, energy metering and AI-on-the-edge detection;
-                                (3) Menu planning system utilizing LLM and vector search to query product mix data and
-                                infer location-specific variations.</p>
-                            <div class="impact">
-                                <div>
-                                    <p>From MVP to 100+ outlets in 6 months</p>
-                                    <p>Increased RPR</p>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="ask--progress-wrap" id="ask--progress-wrap" hidden>
+                        <!-- Determinate, with a real value. See the note in ask.js:
+                             a spinner in front of a 20 MB download says nothing
+                             about whether it is working. -->
+                        <label class="visually-hidden" for="ask--progress">Loading progress</label>
+                        <progress id="ask--progress" max="100" value="0"></progress>
+                        <p class="ask--progress-label" id="ask--progress-label"></p>
                     </div>
                 </div>
 
-                <div class="casestudy--item">
-                    <div class="casestudy--intro">
-                        <div class="category">Technology Strategy Optimization</div>
-                        <div class="title">Ghost Kitchen Startup</div>
-                        <div class="description">
-                            <p>Achieved sustainable scaling by refactoring the entire technology platform:
-                                (1) AWS-to-GCP migration and repurchasing cloud native ERP;
-                                (2) Introduced Github Actions, Terraform and Go and leveraged GCP technologies;
-                                (3) Developed trainee and upskilling programs.</p>
-                            <div class="impact">
-                                <div>
-                                    <p>Reduced 80% of ICT related expenses</p>
-                                    <p>Achieved 50% faster release cycle</p>
-                                </div>
-                            </div>
-                        </div>
+                <form class="ask--form" id="ask--form" hidden>
+                    <label for="ask--input">Your question</label>
+                    <div class="ask--field">
+                        <input type="search" id="ask--input" name="q" autocomplete="off"
+                            placeholder="How did you cut cloud costs?" required />
+                        <button type="submit" id="ask--submit">Search</button>
                     </div>
+                </form>
+
+                <div class="ask--examples" id="ask--examples" hidden>
+                    <p id="ask--examples-label">Or try one of these:</p>
+                    <ul aria-labelledby="ask--examples-label" role="list">
+                        <li><button type="button" data-q="How did you reduce cloud and ICT costs?">How did you reduce cloud costs?</button></li>
+                        <li><button type="button" data-q="What have you built with IoT and edge AI?">What have you built with IoT?</button></li>
+                        <li><button type="button" data-q="Tell me about rescuing a failing ERP project.">Rescuing a failing project</button></li>
+                        <li><button type="button" data-q="What is your experience with AI and vector search?">AI and vector search</button></li>
+                        <li><button type="button" data-q="Have you led a team across multiple countries?">Leading a global team</button></li>
+                    </ul>
                 </div>
 
-                <div class="casestudy--item">
-                    <div class="casestudy--intro">
-                        <div class="category">Digital Transformation</div>
-                        <div class="title">Multinational Retail Company</div>
-                        <div class="description">
-                            <p>Turned around 3 years behind schedule digital transformation:
-                                (1) New WMS implementation;
-                                (2) Refactored distributor point-of-sale system;
-                                (3) Seamless omnichannel UX across e-commerce, point-of-sales and loyalty systems.</p>
-                            <div class="impact">
-                                <div>
-                                    <p>Completed in 9 months</p>
-                                    <p>Realized the USD 3 millions ROI</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- The answer appears seconds after the question, which is unlike
+                     every other interaction here: the work index swaps are
+                     synchronous fetches of markup. Without a live region a screen
+                     reader user gets silence and no way to know the search finished.
+                     The status line carries the count and the timing; the results
+                     themselves are not live, because announcing five full passages
+                     would be unusable. -->
+                <p class="ask--status" id="ask--status" role="status" aria-live="polite"></p>
+                <div class="ask--results" id="ask--results"></div>
 
-                <div class="casestudy--item">
-                    <div class="casestudy--intro">
-                        <div class="category">Applied AI</div>
-                        <div class="title">Browser-Local Semantic Search</div>
-                        <div class="description">
-                            <p>Built the search on this site to run entirely in the visitor's browser, with no
-                                inference server:
-                                (1) all-MiniLM-L6-v2 quantised to 8-bit, executed by ONNX Runtime on WebAssembly;
-                                (2) Transformers.js embedding the question client-side, with the model, runtime and
-                                weights all served from origin so nothing is fetched from a model hub at runtime;
-                                (3) Exhaustive cosine search rather than an approximate index, which at this corpus
-                                size costs more than it saves.</p>
-                            <div class="impact">
-                                <div>
-                                    <p>No API key, no inference cost, no data leaves the tab</p>
-                                    <p>Answers in ~25ms after a one-time load</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- Never hidden, and not inside the gate. Search is one way to read
+                     this material and it costs a 20 MB download; someone who would
+                     rather just read, or who does not want to spend that, should not
+                     have to decline a model first to find out there is a plain page.
+                     The <noscript> block below covers a different visitor: this one
+                     is for a visitor who can run the search and does not want to. -->
+                <p class="ask--straight"><a href="portfolio.html">Or read the portfolio
+                        straight through</a>, without loading anything.</p>
 
+                <!-- What remains when the module does not run: no dead controls, and
+                     the content the search would have surfaced, reachable. -->
+                <noscript>
+                    <p class="ask--empty">The search needs to run a model in your browser,
+                        so it needs JavaScript. Everything it searches is plain HTML and
+                        none of it is behind the search: the
+                        <a href="portfolio.html">portfolio page</a> is all there to read
+                        directly, and the work index below links into it section by
+                        section.</p>
+                </noscript>
             </div>
-            <div class="casestudy--arrows" role="group" aria-label="Case study navigation">
-                <button type="button" id="prev" aria-label="Previous case study"
-                    hx-get="fragments/casestudy/r2-prev.html"
-                    hx-trigger="click, keydown[key=='ArrowLeft'] from:#casestudy"
-                    hx-sync="closest .casestudy--container:replace">&lt;</button>
-                <button type="button" id="next" aria-label="Next case study"
-                    hx-get="fragments/casestudy/r1-next.html"
-                    hx-trigger="click, keydown[key=='ArrowRight'] from:#casestudy"
-                    hx-sync="closest .casestudy--container:replace">&gt;</button>
-            </div>
-        </div>
-        <!-- Deliberately outside #casestudy. A focusable control inside the
-             swapped region would need a stable id in every copy of the deck,
-             here and in each fragment, or htmx's post-swap focus lookup strands
-             the user on <body>. This link never moves, so it never needs one. -->
-        <p class="casestudy--more"><a href="portfolio.html">Read the portfolio in full</a></p>
-    </section>
+        </section>
 
+        <section class="work" id="work" aria-labelledby="work--heading">
+            <div class="work--container">
+                <h2 id="work--heading">Work</h2>
+                <p class="section--lead">Four projects. Each title opens the detail in
+                    place, including what it cost and what it returned. With no
+                    JavaScript the same title is an ordinary link into the portfolio
+                    page, which is where that detail is written and where every fragment
+                    below is generated from. Nothing on this page restates a figure that
+                    lives there, because two copies of a number is one copy too many.</p>
+
+                <!-- Hypermedia, and the swap is real rather than decorative: the
+                     detail prose lives once, in portfolio.html, and
+                     scripts/propagate_work.py emits one fragment per project from it.
+                     The trigger is an <a> with a working href, so htmx is an
+                     enhancement: without it the link navigates to the same prose at
+                     its own URL.
+
+                     The triggers deliberately sit outside the region they swap. htmx
+                     re-focuses the previously focused element by id after a swap, so
+                     a control that replaces itself must keep a stable id or strand
+                     the keyboard user on <body>. Nothing focusable can be inside an
+                     empty panel, so nothing here can be stranded. See AGENTS.md. -->
+                <ol class="work--index" role="list">
+
+                    <li class="work--entry">
+                        <p class="work--category">Product Management</p>
+                        <h3 class="work--title">
+                            <a id="work--open-restaurant-technology-platform"
+                                href="portfolio.html#restaurant-technology-platform"
+                                hx-get="fragments/work/restaurant-technology-platform.html"
+                                hx-target="#work--panel-restaurant-technology-platform"
+                                hx-swap="innerHTML">Restaurant Technology Platform</a>
+                        </h3>
+                        <p class="work--scope">Point-of-sale, kitchen display and loyalty;
+                            an ESP32 and EMQX sensor layer running inference on the device;
+                            menu planning by retrieval over real product mix data.</p>
+                        <div class="work--panel" id="work--panel-restaurant-technology-platform" aria-live="polite"></div>
+                    </li>
+
+                    <li class="work--entry">
+                        <p class="work--category">Technology Strategy Optimization</p>
+                        <h3 class="work--title">
+                            <a id="work--open-ghost-kitchen-startup"
+                                href="portfolio.html#ghost-kitchen-startup"
+                                hx-get="fragments/work/ghost-kitchen-startup.html"
+                                hx-target="#work--panel-ghost-kitchen-startup"
+                                hx-swap="innerHTML">Ghost Kitchen Startup</a>
+                        </h3>
+                        <p class="work--scope">A cost-structure problem before an
+                            engineering one: AWS to GCP, repurchasing ERP rather than
+                            carrying it across, GitHub Actions and Terraform and Go, and
+                            building capability in-house instead of buying it.</p>
+                        <div class="work--panel" id="work--panel-ghost-kitchen-startup" aria-live="polite"></div>
+                    </li>
+
+                    <li class="work--entry">
+                        <p class="work--category">Digital Transformation</p>
+                        <h3 class="work--title">
+                            <a id="work--open-multinational-retail-company"
+                                href="portfolio.html#multinational-retail-company"
+                                hx-get="fragments/work/multinational-retail-company.html"
+                                hx-target="#work--panel-multinational-retail-company"
+                                hx-swap="innerHTML">Multinational Retail Company</a>
+                        </h3>
+                        <p class="work--scope">A rescue that turned on scope rather than
+                            delivery speed: new WMS, legacy ERP kept for financials,
+                            omnichannel across e-commerce and point-of-sale and loyalty,
+                            then harmonising systems across three more markets.</p>
+                        <div class="work--panel" id="work--panel-multinational-retail-company" aria-live="polite"></div>
+                    </li>
+
+                    <li class="work--entry">
+                        <p class="work--category">Applied AI</p>
+                        <h3 class="work--title">
+                            <a id="work--open-browser-local-semantic-search"
+                                href="portfolio.html#browser-local-semantic-search"
+                                hx-get="fragments/work/browser-local-semantic-search.html"
+                                hx-target="#work--panel-browser-local-semantic-search"
+                                hx-swap="innerHTML">Browser-Local Semantic Search</a>
+                        </h3>
+                        <p class="work--scope">The search at the top of this page. Built
+                            end to end rather than specified: a quantised transformer under
+                            WebAssembly, every byte served from this origin, and an
+                            exhaustive scan because the approximate index would be slower.</p>
+                        <div class="work--panel" id="work--panel-browser-local-semantic-search" aria-live="polite"></div>
+                    </li>
+
+                </ol>
+
+                <p class="work--more"><a href="portfolio.html">Read the portfolio in full</a></p>
+            </div>
+        </section>
+
+        <section class="colophon" id="colophon" aria-labelledby="colophon--heading">
+            <div class="colophon--container">
+                <h2 id="colophon--heading">Colophon</h2>
+                <p class="section--lead">What this page is made of, what it measures, and
+                    what a machine checks on every commit. All of it is verifiable from
+                    the <a href="https://github.com/tatangharyadi/tatangharyadi.github.io">repository</a>,
+                    which is the point of writing it down.</p>
+
+                <!-- Numbers a reader could otherwise only take on trust. Deliberately
+                     no passage count here: that one is generated, so it would drift
+                     silently. js/ask.js reports the live count in the status line
+                     above, which cannot. -->
+                <dl class="readout">
+                    <div>
+                        <dt>Model</dt>
+                        <dd>all-MiniLM-L6-v2, quantised to 8-bit ONNX</dd>
+                    </div>
+                    <div>
+                        <dt>Runtime</dt>
+                        <dd>ONNX Runtime Web on WebAssembly, one thread</dd>
+                    </div>
+                    <div>
+                        <dt>Embedding</dt>
+                        <dd>384 dimensions, L2-normalised, precomputed</dd>
+                    </div>
+                    <div>
+                        <dt>Retrieval</dt>
+                        <dd>Exhaustive cosine, no approximate index</dd>
+                    </div>
+                    <div>
+                        <dt>Transfer</dt>
+                        <dd>20.0 MB over the wire, 37.3 MB on disk, gzip</dd>
+                    </div>
+                    <div>
+                        <dt>Inference servers</dt>
+                        <dd>None. There is no backend to this site</dd>
+                    </div>
+                    <div>
+                        <dt>First-party JavaScript</dt>
+                        <dd>One module, <code>js/ask.js</code>. No bundler, no package manager</dd>
+                    </div>
+                    <div>
+                        <dt>Build step</dt>
+                        <dd>None. GitHub Pages serves the repository as written</dd>
+                    </div>
+                </dl>
+
+                <div class="colophon--prose">
+                    <h3>How the search works, and what it deliberately is not</h3>
+
+                    <p>The library is <a href="https://huggingface.co/docs/transformers.js/index">Transformers.js</a>,
+                        running <strong>all-MiniLM-L6-v2</strong> quantised to 8-bit
+                        through ONNX Runtime on WebAssembly. Every piece of it, the
+                        library, the runtime, the tokenizer and the weights, is served
+                        from this domain. No part of it comes from a CDN or a model hub
+                        at runtime, which is what lets the claim above be literal rather
+                        than approximate: the question is tokenised, embedded and
+                        compared in this tab, and no network request carries it. One
+                        script on this page does come from a CDN, htmx, pinned to a
+                        version and a Subresource Integrity digest so the host cannot
+                        change what runs here. It is loaded before you ask anything and
+                        takes no part in answering.</p>
+
+                    <p><strong>It runs on one thread, and that is not a choice.</strong>
+                        Multi-threaded ONNX Runtime needs <code>SharedArrayBuffer</code>,
+                        which needs cross-origin isolation, which needs COOP and COEP
+                        response headers. GitHub Pages cannot set headers, so
+                        <code>crossOriginIsolated</code> is <code>false</code> here and
+                        threads are unavailable no matter what the config asks for. The
+                        interesting part is that it does not matter: embedding one short
+                        question is a few tens of milliseconds single-threaded.</p>
+
+                    <p><strong>The search is a linear scan, on purpose.</strong> There is
+                        no HNSW graph, no IVF index and no vector database, because at
+                        this size every one of them would be slower and all of them would
+                        be worse. The status line above tells you how many passages are
+                        indexed; a few dozen at 384 dimensions is under ten thousand
+                        multiply-accumulates per query, which is microseconds, so the
+                        measured search time it reports is almost entirely the model
+                        embedding your question, not the search. An approximate index is
+                        a trade: you spend build time, memory and exact recall to avoid a
+                        scan that has become expensive. Here the scan has not become
+                        expensive, so the trade is all cost and no benefit. The crossover
+                        is somewhere around a hundred thousand vectors, four orders of
+                        magnitude away.</p>
+
+                    <p><strong>It retrieves; it does not generate.</strong> What comes
+                        back is the passage I actually wrote, with its similarity score,
+                        linked to where it sits on the portfolio page. There is no
+                        language model writing prose about me, which means there is
+                        nothing here that can invent a credential. The honest limitation
+                        of that: it answers <em>"what did he do with IoT"</em> well and
+                        <em>"would he suit a fintech CTO role"</em> badly, because the
+                        second question is asking for a judgement and this only knows how
+                        to find the nearest paragraph.</p>
+
+                    <p><strong>The corpus is this site.</strong> Every passage is
+                        generated from the portfolio page, embedded once, and committed
+                        as a JSON file next to it. The first version did the opposite: it
+                        fetched the portfolio, split it up and ran the model over all of
+                        it in your browser, to avoid keeping a second copy of the prose
+                        that could drift from the first. That was a real concern answered
+                        in the wrong currency. It charged every visitor seconds of
+                        WebAssembly inference to recompute a value that is the same for
+                        everyone, and it quietly made five CSS class names an interface,
+                        so renaming one would drop a whole section out of the search
+                        while the count still looked healthy. Precomputing turns a silent
+                        failure into a loud one: the generator is the only thing that
+                        writes the index, and CI fails if a passage in it is no longer on
+                        the page.</p>
+
+                    <h3>What a machine checks, so you do not have to trust me</h3>
+
+                    <p>The interesting claim on a page like this is never the design, it
+                        is whether anything stops the design from quietly going wrong.
+                        Six checks run on every pull request, and each one exists
+                        because the failure it catches is invisible on a page that loads
+                        cleanly.</p>
+
+                    <ul class="colophon--checks" role="list">
+                        <li><strong>The palette is written out in four places</strong>, in
+                            the stylesheet, in the offline 404 page, in the machine-readable
+                            design token file and in the browser-chrome colour metas, and a
+                            check fails the build if any copy drifts from the source of
+                            truth. Contrast is held at 4.5:1 for text against the tighter of
+                            the two colour schemes, which is why one accent colour in this
+                            system is deliberately not a Catppuccin value: none of them
+                            reach the floor as text.</li>
+                        <li><strong>The navigation is written out three times</strong>, on
+                            this page, on the portfolio page and in the offline fallback,
+                            because the site has to navigate with no JavaScript at all and a
+                            crawler should see the links as content. A check compares the
+                            visible labels rather than the URLs, which legitimately differ
+                            per page.</li>
+                        <li><strong>Every passage in the search index must still exist on
+                            the page it was generated from.</strong> Editing the prose
+                            without regenerating the index would leave a passage describing
+                            one thing and its vector describing another, which retrieves
+                            worse without ever raising an error.</li>
+                        <li><strong>Every project fragment must be exactly what the
+                            generator emits.</strong> The detail you open in the index above
+                            is generated from the portfolio page, so the two cannot
+                            disagree. Hand-patching a fragment fails the build.</li>
+                        <li><strong>Every fragment an interaction asks for must resolve,
+                            and every control that fetches one must keep a stable
+                            identifier.</strong> A missing fragment is a silent no-op on
+                            click rather than an error, and a control that loses its
+                            identifier mid-swap sends keyboard focus to the top of the
+                            document, which a mouse user would never notice.</li>
+                        <li><strong>The design tokens must still parse as design
+                            tokens.</strong> The colours, type scale and components are
+                            described in a machine-readable file, and the build fails on a
+                            warning, not only on an error, because a warning there means
+                            the file has started describing something that is no longer on
+                            the page.</li>
+                    </ul>
+
+                    <h3>On how this was built</h3>
+
+                    <p>A frontier model wrote most of the code here, and saying so is not
+                        the interesting part: in 2026 that is true of most pages, and a
+                        model asked for a personal site will hand back the same
+                        centred hero and the same carousel every time. This page had one
+                        of each until recently. The difference is not what the model can
+                        produce, it is what it is asked to hold itself to. The
+                        constraints above are the actual artifact: no build step, one
+                        first-party script with a written justification, an accessibility
+                        rule for every place the obvious implementation strands a
+                        keyboard user, and a machine check behind each invariant that a
+                        person would otherwise have to remember. Judge the repository, not
+                        the hero.</p>
+
+                    <p class="colophon--links">
+                        <a href="https://github.com/tatangharyadi/tatangharyadi.github.io">Source</a>
+                        <a href="https://github.com/tatangharyadi/tatangharyadi.github.io/blob/main/ARCHITECTURE.md">Architecture</a>
+                        <a href="https://github.com/tatangharyadi/tatangharyadi.github.io/blob/main/DESIGN.md">Design tokens</a>
+                        <a href="https://github.com/tatangharyadi/tatangharyadi.github.io/actions">CI</a>
+                    </p>
+                </div>
+            </div>
+        </section>
     </main>
 </body>
 

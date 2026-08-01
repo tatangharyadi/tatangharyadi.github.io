@@ -1,0 +1,50 @@
+<!-- Detail for "Ghost Kitchen Startup", served to the work index on index.html.
+
+     GENERATED FILE — do not edit. The prose here exists once, in
+     portfolio.html#ghost-kitchen-startup, because that page is also what corpus.json is
+     generated from and the search must not be able to disagree with the index.
+     scripts/propagate_work.py rewrites this from it and
+     scripts/check_htmx.py fails CI if it drifts. To change this project, edit
+     portfolio.html and re-run the propagate script.
+
+     The link at the end is focusable and carries no id, which is safe only
+     because it arrives in a panel that was empty: htmx re-focuses the
+     previously focused element by id after a swap, and nothing inside an empty
+     panel can have been that element. The control that triggered this swap sits
+     outside the panel and never moves. See AGENTS.md. -->
+<div class="work--detail">
+    <p class="project--meta">
+        <span class="project--category">Technology Strategy Optimization</span>
+        <span class="project--role">Director of Engineering, Yummy Corp</span>
+    </p>
+
+    <p>The platform worked but the unit economics did not scale: cost per
+        outlet was not falling as outlets were added. Refactoring the entire
+        technology platform was the only way to change that shape, so it was a
+        cost-structure problem before it was an engineering one.</p>
+
+    <p><strong>Migrating AWS to GCP and repurchasing cloud-native ERP.</strong>
+        Repurchasing rather than migrating the existing ERP was the harder call
+        and the right one — carrying a self-managed system into a new
+        environment would have moved the licence and operational burden intact
+        rather than removing it.</p>
+
+    <p><strong>Then developer experience, treated as a cost lever rather than a
+        perk.</strong> GitHub Actions, Terraform and Go, leaning on managed GCP
+        services wherever running something ourselves earned nothing. Release
+        cycle time is the metric that compounds: everything downstream of it
+        gets cheaper when it drops.</p>
+
+    <p><strong>And the org chart, because the expense line is mostly
+        people.</strong> Trainee and upskilling programmes to build capability
+        in-house, with outsourcing reserved for genuinely specialised work.
+        Buying permanent headcount for a temporary specialism is how technology
+        budgets quietly ratchet upward.</p>
+
+    <ul class="project--impact" role="list">
+        <li><strong>80% reduction</strong> in ICT-related expenses</li>
+        <li><strong>50% faster</strong> release cycle</li>
+    </ul>
+
+    <p class="work--detail-more"><a href="portfolio.html#ghost-kitchen-startup">Read this in context</a></p>
+</div>

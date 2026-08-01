@@ -49,7 +49,11 @@
             text-align: center;
             background-color: var(--bg);
             color: var(--text);
-            font-family: "Poppins", Helvetica, Arial, sans-serif;
+            /* The same system UI stack css/style.css uses. Named in full rather
+               than referenced, because this page must render when the stylesheet
+               is the thing that failed. No webfont: the site fetches none. */
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto,
+                "Helvetica Neue", Arial, sans-serif;
         }
 
         h1 {

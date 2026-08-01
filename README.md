@@ -7,11 +7,16 @@ Live at **<https://tatangharyadi.github.io/>**
 ## Stack
 
 Plain HTML and CSS with no build step and no package manager, served directly by
-GitHub Pages from `main`. Interaction is [htmx](https://htmx.org): the case study
-carousel fetches static HTML fragments and swaps them in, so the only JavaScript of
-our own is the Ask page's search. Poppins, Boxicons and htmx load from a CDN
-at runtime, each pinned. Keeping it build-free is deliberate: the site stays
-editable years from now without reviving a toolchain.
+GitHub Pages from `main`. Interaction is [htmx](https://htmx.org): each entry in
+the work index fetches a static HTML fragment and swaps it in, so the only
+JavaScript of our own is the search on the home page. That search runs a
+sentence-transformer over WebAssembly against an index committed to this
+repository, which is why it can answer a question without sending it anywhere.
+
+One runtime dependency, htmx, pinned by version and Subresource Integrity digest.
+No webfont and no icon font: the icons are inline SVG and the type is the system
+stack. Keeping it build-free is deliberate: the site stays editable years from now
+without reviving a toolchain.
 
 ## Local development
 
@@ -28,8 +33,8 @@ Pushing to `main` publishes automatically.
 ## Further reading
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — file layout, design tokens, the
-  hypermedia interaction patterns, how the case study carousel works, breakpoints
-  and the GitHub Pages deployment model.
+  hypermedia interaction patterns, how the work index and the search work,
+  breakpoints and the GitHub Pages deployment model.
 - **[DESIGN.md](DESIGN.md)** — the Catppuccin palette, the semantic colour
   tokens, and the contrast floors every colour is verified against. Written to the
   [DESIGN.md format](https://github.com/google-labs-code/design.md), so the tokens
