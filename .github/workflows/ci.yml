@@ -1,0 +1,66 @@
+# Checks the invariants that this repo documents but cannot otherwise enforce.
+#
+# This site has no build step and no test suite, and that is deliberate — see
+# ARCHITECTURE.md#no-build-step. So this workflow deliberately does not try to be
+# a build. It checks the handful of things that are duplicated by necessity or
+# asserted in prose, where a mistake is silent rather than loud.
+#
+# What it cannot check is the part that actually matters most: keyboard
+# operability, focus order, both colour schemes, and Lighthouse. Those need a
+# real browser and a human looking at it. AGENTS.md#verifying-a-change is still
+# the authority; this only covers the mechanical subset.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check invariants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No `cache:` key — there is no package.json to cache against, and naming
+      # one fails the step. Node is here only for `node --check` and the one-off
+      # design.md linter; it is not a dependency of the site.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Syntax-check the JavaScript
+        run: node --check js/script.js
+
+      - name: Palette is in step across all four copies
+        run: python3 scripts/check_palette.py
+
+      - name: .nojekyll present and sitemap in step
+        run: python3 scripts/check_repo.py
+
+      # Pinned rather than floating: an unpinned alpha changing under us turns CI
+      # red with no change to this repo, which is exactly the maintenance burden
+      # the no-toolchain stance exists to avoid.
+      #
+      # The linter exits 1 on errors but 0 on warnings, and AGENTS.md commits
+      # this file to *0 errors and 0 warnings* — so gate on the JSON summary
+      # rather than the exit code, or CI would permit a state the docs forbid.
+      - name: DESIGN.md conforms to the design.md format
+        run: |
+          npx --yes @google/design.md@0.4.0 lint DESIGN.md --format=json > lint.json
+          cat lint.json
+          python3 - <<'PY'
+          import json, sys
+          report = json.load(open("lint.json"))
+          summary = report.get("summary", {})
+          errors, warnings = summary.get("errors", 0), summary.get("warnings", 0)
+          if errors or warnings:
+              print(f"\nDESIGN.md lint: {errors} error(s), {warnings} warning(s).")
+              print("AGENTS.md holds this file at 0 and 0 — see step 8.")
+              sys.exit(1)
+          print("\nDESIGN.md lint: clean.")
+          PY

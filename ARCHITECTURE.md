@@ -33,6 +33,8 @@ assets/favicon.svg      favicon
 assets/images/          profile photo (webp) and the 1200x630 social share card
 .nojekyll               opt out of Jekyll processing (see Deployment)
 robots.txt, sitemap.xml crawler hints
+.github/workflows/ci.yml  the invariant checks (see Continuous integration)
+scripts/                stdlib-Python checkers run by CI; not a build step
 ARCHITECTURE.md         this file
 DESIGN.md               the Catppuccin palette, semantic tokens and contrast floors
                         (in the google-labs-code/design.md format)
@@ -154,8 +156,9 @@ crop the viewport.
 ## Deployment
 
 Pushing to `main` publishes automatically. GitHub Pages builds from the `main`
-branch, root directory. There is no CI: the site has no build to verify and no
-test suite, so a workflow would only add latency.
+branch, root directory. There is no build to verify and no test suite, so
+deployment is a file copy — but there are invariants worth checking before the
+copy happens. See below.
 
 ### Why `.nojekyll` matters
 
@@ -171,3 +174,36 @@ Pages serves static files only and cannot set custom response headers. That rule
 out `Cross-Origin-Opener-Policy` / `Cross-Origin-Embedder-Policy`, and therefore
 `SharedArrayBuffer` — so any WebAssembly content added here has to be
 single-threaded.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request and on pushes to `main`. It
+is not a build, and it is deliberately narrow: it checks only the things this repo
+duplicates by necessity or asserts in prose, where a mistake is **silent** rather
+than loud.
+
+| Check | Why it cannot be left to review |
+| ----- | ------------------------------- |
+| `node --check js/script.js` | A syntax error ships a dead carousel with a clean-looking diff |
+| `scripts/check_palette.py` | The palette exists in four copies (below) |
+| `scripts/check_repo.py` | Deleting `.nojekyll` breaks paths with no build error; `sitemap.xml` drifts silently |
+| `npx @google/design.md lint DESIGN.md` | Holds the file at 0 errors and 0 warnings |
+
+**The palette check is the one that earns its keep.** The Catppuccin values are
+written out in four places — the `:root` and dark blocks in `css/style.css`,
+`404.html`'s inline subset, `DESIGN.md`'s front matter under semantic names, and
+the `theme-color` meta pair in each page. Every one of those duplications is
+justified, and none of them is enforced by anything at runtime. Changing one and
+not the others produces no error, no visual break in the scheme you happen to be
+testing, and no reviewable signal. `scripts/check_palette.py` reads
+`css/style.css` as the source of truth and holds the other three against it.
+
+Two things this deliberately does **not** do. It does not check the parts that
+matter most — keyboard operability, focus order, both colour schemes, Lighthouse
+— because those need a real browser and human judgement;
+[AGENTS.md](AGENTS.md#verifying-a-change) remains the authority and CI covers only
+its mechanical subset. And it does not introduce a toolchain: the checkers are
+stdlib Python, the linter is a pinned one-off `npx` invocation, and there is still
+**no `package.json`, no lockfile and no dependency to patch**. The no-build-step
+rule above is intact, and a future reader should not "tidy" this into a Node
+project.

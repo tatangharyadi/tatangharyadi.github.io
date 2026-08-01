@@ -30,9 +30,14 @@ is wrong. Starting a server on a different port gives you a fresh cache key.
 
 ## Verifying a change
 
-There is no test suite. Verify by hand, in roughly this order:
+There is no test suite. Verify by hand, in roughly this order.
 
-1. `node --check js/script.js` if the JavaScript changed.
+Steps marked **[CI]** also run automatically on every pull request — see
+[ARCHITECTURE.md](ARCHITECTURE.md#continuous-integration). The rest are yours:
+they need a real browser and someone looking at the result, which is why CI does
+not pretend to cover them. **A green CI does not mean a change is verified.**
+
+1. **[CI]** `node --check js/script.js` if the JavaScript changed.
 2. Load the page and confirm the console is clean.
 3. Tab through the whole page. Every interactive control must be reachable and
    show a visible focus ring.
@@ -48,9 +53,14 @@ There is no test suite. Verify by hand, in roughly this order:
 7. For anything touching markup, metadata or colour, run a Lighthouse navigation
    audit — **once per scheme**. Accessibility, Best Practices and SEO are all at
    100 in both; keep them there.
-8. If `DESIGN.md` changed, `npx @google/design.md lint DESIGN.md`. It is at **0
-   errors and 0 warnings**; keep it there. This is a one-off command, not a
-   dependency — the repo still has no `package.json`.
+8. **[CI]** If `DESIGN.md` changed, `npx @google/design.md lint DESIGN.md`. It is
+   at **0 errors and 0 warnings**; keep it there. Note the linter exits `0` on
+   warnings, so read the summary rather than the exit code — CI gates on the JSON
+   for that reason. This is a one-off command, not a dependency — the repo still
+   has no `package.json`.
+9. **[CI]** If any colour changed, `python3 scripts/check_palette.py`. The palette
+   is written out in **four** places and nothing but this script keeps them in
+   step; see the bullet under "Other things not to break".
 
 ## Accessibility invariants
 
@@ -104,7 +114,12 @@ Three further rules for any change:
 - **`404.html` styles are inline on purpose.** It must render even if the
   stylesheet is what failed. Its palette is therefore a hand-kept copy of the one
   in `css/style.css` — change one and change the other.
-- **`DESIGN.md`'s front matter is a third copy of the palette.** It follows the
+- **The palette is written out in four places.** `css/style.css` is the source of
+  truth; `404.html`, `DESIGN.md`'s front matter and the `theme-color` metas are
+  copies. `scripts/check_palette.py` is what holds them together — run it after any
+  colour change, and do not work around it by editing only the copy you are looking
+  at. Each duplication is justified in its own bullet below.
+- **`DESIGN.md`'s front matter is the third copy of the palette.** It follows the
   [DESIGN.md format](https://github.com/google-labs-code/design.md), so the tokens
   are machine-readable and must stay in step with `css/style.css` and `404.html`.
   Two traps: the dark values are duplicated as `mocha-*` tokens because the format
@@ -112,8 +127,11 @@ Three further rules for any change:
   tagged `text` rather than `yaml` on purpose — the parser reads fenced YAML as a
   token source and a second `colors:` key makes the linter stop early.
 - **The `theme-color` metas come in pairs**, one per `prefers-color-scheme`, in
-  both `index.html` and `404.html`. A single unconditional tag would paint the
-  browser chrome the wrong colour for half of all visitors.
+  both `index.html` and `404.html`, and their values are the fourth copy of the
+  palette — each equals `--bg-chrome` in its flavour. A single unconditional tag
+  would paint the browser chrome the wrong colour for half of all visitors, so
+  `scripts/check_palette.py` rejects a tag with no media attribute as well as a
+  stale hex.
 
 ## Contributing
 
@@ -122,4 +140,10 @@ because pushing to `main` publishes to the live site immediately.
 
 Branch names follow `type/tatangharyadi/short-description`.
 
-Keep `sitemap.xml` in step when adding or removing a page.
+Wait for CI to pass before merging. It is fast and it only checks mechanical
+invariants, so a failure is a real finding rather than flake — read the message
+instead of re-running it.
+
+Keep `sitemap.xml` in step when adding or removing a page. CI checks this, and
+exempts pages carrying `<meta name="robots" content="noindex">` — that is why
+`404.html` is correctly absent from the sitemap.
