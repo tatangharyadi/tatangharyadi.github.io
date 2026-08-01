@@ -8,3 +8,9 @@
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# Byte-code from the checkers in scripts/. They are run as scripts, so this only
+# ever appears when something imports one, and it must not reach the published
+# site: .nojekyll means every path here is served verbatim.
+__pycache__/
+*.pyc

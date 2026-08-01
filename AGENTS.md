@@ -176,6 +176,25 @@ Three further rules for any change:
 - **`.nojekyll` must stay.** Deleting it makes any path starting with `_` or `.`
   disappear from the published site with no build error. See
   [ARCHITECTURE.md](ARCHITECTURE.md#why-nojekyll-matters).
+- **`portfolio.html` is out of the nav on purpose, and in `sitemap.xml` on
+  purpose.** Those are not in conflict. It is a destination a visitor arrives at
+  rather than one they pick: from an Ask result, from the link under the case study
+  deck on `index.html`, from the link below the results on `ask.html`, or from a
+  search engine. Being absent from a menu costs it nothing that matters, because it
+  is still reachable by four routes and still crawlable. It is also the reason
+  nothing in its own nav carries `aria-current`.
+
+  So do not "tidy" this in either direction. Adding it back to the nav undoes a
+  deliberate decision; deleting the page because nothing in the nav points at it
+  breaks every anchor in `corpus.json`, the `<noscript>` fallback, and the only
+  crawlable copy of the detail prose.
+- **The nav is written out four times and nothing but `scripts/check_repo.py` keeps
+  them in step.** Once in each root page, because those links are content a crawler
+  should see and the site has to navigate with no JavaScript at all, and once in
+  `fragments/404-links.html`. Adding or removing an entry means editing all four.
+  The check compares the visible labels rather than the `href`s, because the hrefs
+  legitimately differ: `index.html` links Home to `#section-home`, the other pages
+  link it to `index.html`, and the 404 fragment must use root-absolute paths.
 - **The `@keyframes fromItemN` have no `to` block.** That is correct; the end state
   comes from the `:nth-child` rules. Adding one breaks the slide.
 - **`.next` and `.prev` belong on `.casestudy--list`, not on the container.** The

@@ -62,7 +62,6 @@
 
                 <ul class="nav-links--container">
                     <li><a href="index.html">Home</a></li>
-                    <li><a href="portfolio.html">Portfolio</a></li>
                     <li><a href="ask.html" aria-current="page">Ask</a></li>
                     <li><a href="index.html#section-techstack">Tech Stack</a></li>
                 </ul>
@@ -136,6 +135,15 @@
                      because announcing five full passages would be unusable. -->
                 <p class="ask--status" id="ask--status" role="status" aria-live="polite"></p>
                 <div class="ask--results" id="ask--results"></div>
+
+                <!-- Never hidden, and not inside the gate. Search is one way to read
+                     this material and it costs a 20 MB download; someone who would
+                     rather just read, or who does not want to spend that, should not
+                     have to decline a model first to find out there is a plain page.
+                     The <noscript> block below covers a different visitor: this one
+                     is for a visitor who can run the search and does not want to. -->
+                <p class="ask--straight"><a href="portfolio.html">Or read the portfolio
+                        straight through</a>, without loading anything.</p>
             </section>
 
             <section class="project" id="how-it-works">

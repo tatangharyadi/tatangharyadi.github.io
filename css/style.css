@@ -758,12 +758,14 @@ nav .logo a:hover {
 }
 
 .page--back a,
+.ask--straight a,
 .project a {
   color: var(--accent-text);
   text-decoration: underline;
 }
 
 .page--back a:focus-visible,
+.ask--straight a:focus-visible,
 .project a:focus-visible {
   outline: 2px solid var(--accent-text);
   outline-offset: 3px;
@@ -976,6 +978,16 @@ nav .logo a:hover {
   border-radius: 6px;
   line-height: 1.7;
   color: var(--text-muted);
+}
+
+/* The way out of the search, for a visitor who would rather read than query. It
+   sits below the results so it never competes with the question box, and it uses
+   --text-muted for the surrounding sentence with --accent-text on the link
+   itself, which is the pairing that keeps both above 4.5:1 on Latte. */
+.ask--straight {
+  margin: 1.5rem 0 0 0;
+  color: var(--text-muted);
+  font-size: 0.9375rem;
 }
 
 @media (width < 1200px) {
