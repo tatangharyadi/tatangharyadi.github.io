@@ -37,6 +37,12 @@ HTMX_SRI = "sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLs
 ITEM_OPEN = '<div class="casestudy--item">'
 ROTATIONS = 3
 
+# The re-entry guard. `:replace` is what makes a second press abandon the
+# in-flight request rather than queue behind it; `closest` resolves to
+# #casestudy both in index.html and in a swapped-in fragment, since the
+# fragment's arrows land inside that same container.
+ARROW_SYNC = "closest .casestudy--container:replace"
+
 problems = []
 
 
@@ -282,6 +288,25 @@ def check_arrow_targets(relpath, text, rotation):
             fail(
                 f"{relpath}'s #{which} uses the disabled property. Use hx-sync to "
                 "guard re-entry — disabling it strands keyboard focus on <body>."
+            )
+        # hx-sync is the re-entry guard that replaced the old isSliding flag.
+        # Losing it is invisible on a single click and only shows up as two
+        # slides racing, so nothing but this check would catch it.
+        if attr(tag, "hx-sync") != ARROW_SYNC:
+            fail(
+                f"{relpath}'s #{which} does not carry hx-sync=\"{ARROW_SYNC}\", "
+                "so a second press queues behind the first instead of replacing it"
+            )
+        # Keyboard operation is declared here, not in a script. A fragment that
+        # drops the keydown binding still works with a mouse, so a green page
+        # load hides it — the arrows simply stop responding to arrow keys after
+        # the first swap.
+        key = "ArrowLeft" if which == "prev" else "ArrowRight"
+        want_trigger = f"click, keydown[key=='{key}'] from:#casestudy"
+        if attr(tag, "hx-trigger") != want_trigger:
+            fail(
+                f"{relpath}'s #{which} does not carry "
+                f"hx-trigger=\"{want_trigger}\", so {key} stops working after a swap"
             )
 
 
