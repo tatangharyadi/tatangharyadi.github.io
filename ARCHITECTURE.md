@@ -35,7 +35,7 @@ request — and delay first paint.
 ## Layout
 
 ```
-index.html              home: nav + hero, case study carousel, tech stack sections
+index.html              home: nav + hero, case study carousel
 portfolio.html          case studies in full, plus now/skills/earlier; the Ask
                         source. Not in the nav: arrived at, not picked
 ask.html                browser-local semantic search over portfolio.html
@@ -316,12 +316,24 @@ sends it to `<body>` and re-enabling does not bring it back. On success the inpu
 is focused *before* the gate is hidden, so the pressed control never vanishes from
 under a live focus.
 
-## Tech stack marquee
+## The tech stack marquee, and why it is gone
 
-Seven rows of Boxicons glyphs scrolling horizontally, driven by the
-`techstack--animate1` / `techstack--animate2` keyframes. It is decoration: the
-rows are `aria-hidden="true"` as a whole, and the section is named by a
-visually-hidden `<h2>`.
+The home page used to end in seven scrolling rows of Boxicons logos. It was pure
+decoration: the rows were `aria-hidden="true"` as a whole, so they contained no
+text, contributed nothing to a screen reader, and were never eligible for
+`corpus.json` in the first place.
+
+It was removed because it disagreed with the page. The twenty-three logos were
+TypeScript, Redux, Tailwind, HTML5, CSS3, C++ and the like, while the skills
+passage the Ask page actually retrieves — `portfolio.html#skills` — leads with
+agentic AI, LangGraph, Google ADK, BigQuery and Terraform. The one section
+claiming to say what this site's author works with was the only place on the site
+that mentioned no AI at all.
+
+Its removal took `--accent` and `--text-subtle` with it. Each was referenced
+exactly once in the stylesheet, both inside the marquee rules, so both became
+dead in both flavours. See [DESIGN.md](DESIGN.md) on why `--accent` in particular
+should not come back.
 
 ## Responsive breakpoints
 
