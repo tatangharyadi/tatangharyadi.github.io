@@ -23,7 +23,7 @@ an exact version, verified by an SRI digest, and loaded the same way Boxicons is
 Nothing installs it and nothing builds against it. The rule this repo actually
 holds is *no toolchain*, and adding a library that is one URL does not breach it —
 but note the site now has a script it did not have before, and if unpkg is
-unreachable the hero tabs and the carousel stop advancing. Everything that matters
+unreachable the carousel stops advancing. Everything that matters
 for reading the page is in the initial HTML, which is why that degradation costs
 interaction and not content.
 
@@ -44,7 +44,6 @@ corpus.json             generated search index: one embedding per portfolio pass
 css/style.css           all styles, including the carousel slide animations
 js/ask.js               the only first-party script; see The Ask page
 fragments/              the HTML states htmx fetches; pieces of a page, not pages
-  hero/                 one file per hero tab, each carrying the whole tablist
   casestudy/            r{0..3}-{next,prev}.html, one per rotation and direction
   404-links.html        section shortcuts, loaded by 404.html
 vendor/transformers/    Transformers.js and the ORT WebAssembly, served from origin
@@ -109,25 +108,24 @@ every focus ring. See [DESIGN.md](DESIGN.md#the-accent-rule).
 
 ## Interaction patterns
 
-Interaction is hypermedia. Every state of the hero tabs and the case study
-carousel is a file under `fragments/`, and a control asks for the state it moves
-to. There is no client-side state to get out of step with the markup, because the
-markup *is* the state: a fragment says which tab is selected, which case studies
-are in which slot, and where each control points next.
+Interaction is hypermedia. Every state of the case study carousel is a file under
+`fragments/`, and a control asks for the state it moves to. There is no
+client-side state to get out of step with the markup, because the markup *is* the
+state: a fragment says which case studies are in which slot and where each control
+points next.
 
-The htmx examples that shape this are [tabs
-(hateoas)](https://htmx.org/examples/tabs-hateoas/) for the hero and a
-click-to-load swap for the carousel. Their documentation says the tab pattern
-"requires dynamic server-side routing", which is true of a templated server and
-not true here: each response is fixed and depends on nothing about the request, so
-a static file serves it exactly. That is the whole reason this works on GitHub
-Pages, which cannot compute a response or set a header.
+The htmx example that shapes this is a click-to-load swap for the carousel. The
+related [tabs (hateoas)](https://htmx.org/examples/tabs-hateoas/) documentation
+says that pattern "requires dynamic server-side routing", which is true of a
+templated server and not true here: each response is fixed and depends on nothing
+about the request, so a static file serves it exactly. That is the whole reason
+this works on GitHub Pages, which cannot compute a response or set a header.
 
-- **Hero tabs** ("Dear All" / "My Services" / "For Recruiters") are `<button
-  role="tab">` elements. Each response carries the entire tablist plus the panel,
-  so `aria-selected` is decided by the fragment that was served. The first state
-  is inlined in `index.html` rather than fetched on load, so the hero copy is in
-  the initial HTML for crawlers and still renders with no script at all.
+The hero used to be a second instance of this, three tabs under `fragments/hero/`.
+It was removed once the Ask page existed: two of the three panels were answers to
+questions Ask can field, and the third was the positioning statement, which was
+never one option among three. The hero is now a single paragraph in `index.html`.
+
 - **Case study carousel** swaps the whole deck. See the section below.
 - **Mobile sidebar** is still the pure-CSS checkbox hack: a single `<input
   type="checkbox">` toggles the menu, with a full-screen `<label>` as the

@@ -10,7 +10,7 @@ served by GitHub Pages from `main`. There is nothing to install and nothing to
 compile. Edit the files directly.
 
 **There is exactly one JavaScript file of our own, and it is `js/ask.js`.**
-Everything else — the hero tabs, the case study carousel — is
+Everything else — the case study carousel — is
 [htmx](https://htmx.org) asking for static HTML fragments under `fragments/` and
 swapping them in. htmx arrives from a CDN pinned by version and SRI digest, the
 same way Boxicons does. That remains the default: adding a second `js/` file is a
@@ -41,13 +41,13 @@ python3 -m http.server 8000
 ```
 
 **A file:// page cannot fetch fragments.** Opening `index.html` directly now leaves
-the tabs and the carousel inert, because htmx issues real requests and the browser
+the carousel inert, because htmx issues real requests and the browser
 blocks cross-origin `file://` reads. Serve the site for anything touching
 interaction.
 
 **Browsers cache aggressively on localhost.** If a change to `css/style.css` or to
 a file under `fragments/` appears not to have taken effect, confirm the server is
-sending the new bytes (`curl -s localhost:8000/fragments/hero/dear-all.html | head`)
+sending the new bytes (`curl -s localhost:8000/fragments/casestudy/r0-next.html | head`)
 before concluding the markup is wrong. Starting a server on a different port gives
 you a fresh cache key.
 
@@ -86,10 +86,10 @@ not pretend to cover them. **A green CI does not mean a change is verified.**
    no-op on click, not an error.
 6. Tab through the whole page. Every interactive control must be reachable and
    show a visible focus ring.
-7. Operate the carousel and the hero tabs **from the keyboard**, not just by
-   clicking. Focus the Next arrow, activate it, and check that focus is still on
-   that arrow afterwards; do the same for a hero tab. Clicking with a mouse does
-   not exercise this and will hide a regression. This is the check that catches a
+7. Operate the carousel **from the keyboard**, not just by clicking. Focus the
+   Next arrow, activate it, and check that focus is still on that arrow
+   afterwards. Clicking with a mouse does not exercise this and will hide a
+   regression. This is the check that catches a
    swapped-in control missing its `id` — see the invariant below. Press it all the
    way round the deck rather than once: an off-by-one in the arrow modulus only
    shows itself on the wrap.
@@ -116,22 +116,22 @@ Five things in this codebase look like mistakes and are load-bearing. Each has a
 inline comment; do not "clean them up".
 
 - **Every control htmx drives keeps a stable `id`, and swapped-in fragments reuse
-  the same ones.** This is the invariant the whole shape of the carousel and the
-  tabs exists to protect. After a swap htmx looks the previously focused element up
-  again by `document.getElementById`; if the incoming markup has no element with
-  that `id`, focus falls to `<body>` and a keyboard user is stranded outside the
-  component with no way back. So `#prev`, `#next` and `#hero-tab-1..3` are fixed
-  names, not decoration — renaming one, or adding a focusable control to a fragment
-  without an `id`, breaks keyboard operation while looking perfectly fine to a
-  mouse. `scripts/check_htmx.py` fails CI on an `hx-get` with no `id`, and step 7
+  the same ones.** This is the invariant the whole shape of the carousel exists to
+  protect. After a swap htmx looks the previously focused element up again by
+  `document.getElementById`; if the incoming markup has no element with that `id`,
+  focus falls to `<body>` and a keyboard user is stranded outside the component
+  with no way back. So `#prev` and `#next` are fixed names, not decoration —
+  renaming one, or adding a focusable control to a fragment without an `id`,
+  breaks keyboard operation while looking perfectly fine to a mouse. The rule
+  binds anything htmx swaps in future, not just the two arrows that happen to be
+  the only such controls today. `scripts/check_htmx.py` fails CI on an `hx-get` with no `id`, and step 7
   of "Verifying a change" is how you catch the rest.
 - **The mobile menu checkbox is visually hidden, not `display: none`.**
   `display: none` removes an element from the tab order *and* the accessibility
   tree. The sidebar is a CSS-only pattern that depends on its checkbox staying
   focusable, so hiding it that way makes the menu unopenable by keyboard and
-  invisible to screen readers. Use the `.visually-hidden` class. (The hero tabs
-  were the same pattern with radios until they became real `role="tab"` buttons;
-  the sidebar stays CSS because it has nothing to fetch.)
+  invisible to screen readers. Use the `.visually-hidden` class. (The sidebar
+  stays CSS because it has nothing to fetch.)
 - **The carousel arrows never use the `disabled` property — re-entry is guarded by
   `hx-sync`.** Disabling the element the user just pressed moves focus to `<body>`,
   which is the same failure as losing an `id`. `hx-sync="closest

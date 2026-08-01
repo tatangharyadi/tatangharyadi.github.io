@@ -2,17 +2,18 @@
 """Check the htmx wiring: fragments resolve, agree with index.html, and keep the
 invariants that make the interaction accessible.
 
-The site's interaction is hypermedia. Every state of the hero tabs and the case
-study carousel is a static file under fragments/, and the markup a fragment
-returns is the whole state — which buttons exist, which one is selected, where
-each button points next. That is what makes the pattern work without a server,
-and it is also what makes it fragile in ways a browser will not complain about:
+The site's interaction is hypermedia. Every state of the case study carousel is a
+static file under fragments/, and the markup a fragment returns is the whole
+state — which buttons exist, which one is selected, where each button points
+next. That is what makes the pattern work without a server, and it is also what
+makes it fragile in ways a browser will not complain about:
 
   * A renamed or deleted fragment is a 404 on click. The page keeps working, the
     control silently does nothing.
-  * The case studies are written out seven times (index.html plus six rotations).
-    Editing one copy and not the rest is the same class of mistake the palette's
-    four copies invite, and check_palette.py exists for exactly that reason.
+  * The case studies are written out once per rotation per direction, plus
+    index.html. Editing one copy and not the rest is the same class of mistake
+    the palette's four copies invite, and check_palette.py exists for exactly
+    that reason.
   * htmx restores focus after a swap by looking the previously focused element up
     again with document.getElementById. A control that loses its id during a swap
     drops keyboard focus onto <body>, which is the regression the carousel's
@@ -174,67 +175,6 @@ def check_htmx_script(files):
                 fail(f"{relpath} loads htmx without crossorigin, so integrity is ignored")
 
 
-def check_hero_fragments():
-    """Each hero fragment carries the whole tablist with exactly one tab selected."""
-    expected_ids = [f"hero-tab-{n}" for n in (1, 2, 3)]
-    hero = sorted((FRAGMENTS / "hero").glob("*.html"))
-    if len(hero) != 3:
-        fail(f"expected 3 hero fragments, found {len(hero)}")
-
-    for path in hero:
-        relpath = path.relative_to(ROOT).as_posix()
-        text = read(path)
-        tabs = [t for t in re.findall(r"<button\b[^>]*>", text, re.DOTALL)
-                if attr(t, "role") == "tab"]
-        ids = [attr(t, "id") for t in tabs]
-        if ids != expected_ids:
-            fail(f"{relpath} has tab ids {ids}, expected {expected_ids}")
-
-        selected = [t for t in tabs if attr(t, "aria-selected") == "true"]
-        if len(selected) != 1:
-            fail(f"{relpath} has {len(selected)} tabs with aria-selected=\"true\", expected 1")
-            continue
-
-        # The selected tab must not offer to re-fetch the state it already shows,
-        # and the panel must be labelled by it.
-        if attr(selected[0], "hx-get"):
-            fail(f"{relpath} puts hx-get on the selected tab, which would refetch itself")
-        for tab in tabs:
-            if tab is not selected[0] and not attr(tab, "hx-get"):
-                fail(f"{relpath} has an unselected tab with no hx-get: it would do nothing")
-
-        panel = next((t for t in tags_with("role", text)
-                      if attr(t, "role") == "tabpanel"), None)
-        if panel is None:
-            fail(f"{relpath} has no role=\"tabpanel\"")
-        elif attr(panel, "aria-labelledby") != attr(selected[0], "id"):
-            fail(
-                f"{relpath} labels its panel by {attr(panel, 'aria-labelledby')} "
-                f"but the selected tab is {attr(selected[0], 'id')}"
-            )
-
-
-def check_hero_inline_matches_fragment(index_text):
-    """The inlined first panel and its fragment are two copies of one thing."""
-    start = index_text.find('<div id="hero-tabs"')
-    if start == -1:
-        fail("index.html has no #hero-tabs block")
-        return
-    inline, _ = div_block(index_text, start)
-    if inline is None:
-        fail("index.html's #hero-tabs block is never closed")
-        return
-    fragment = read(FRAGMENTS / "hero" / "dear-all.html")
-    fragment = re.sub(r"<!--.*?-->", "", fragment, flags=re.DOTALL)
-    inline_tabs = [squash(t) for t in re.findall(r"<button\b[^>]*>", inline, re.DOTALL)]
-    fragment_tabs = [squash(t) for t in re.findall(r"<button\b[^>]*>", fragment, re.DOTALL)]
-    if inline_tabs != fragment_tabs:
-        fail(
-            "index.html's inlined hero tablist has drifted from "
-            "fragments/hero/dear-all.html — the two must stay identical"
-        )
-
-
 def check_casestudy_fragments(index_text):
     """One rotation per case study, each the index.html deck rotated, each
     pointing onward. Two files per rotation, one per direction of travel."""
@@ -384,8 +324,6 @@ def main():
     check_fragment_targets(files)
     check_ids_on_controls(files)
     check_htmx_script(files)
-    check_hero_fragments()
-    check_hero_inline_matches_fragment(index_text)
     check_casestudy_fragments(index_text)
     check_robots()
 

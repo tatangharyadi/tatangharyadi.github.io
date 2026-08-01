@@ -220,50 +220,12 @@ nav .logo a:hover {
   font-weight: 600;
 }
 
-.hero--options {
-  display: flex;
-  flex-wrap: wrap;
-}
-
-/* The tabs are real buttons, so selection is an attribute on the control rather
-   than a hidden radio's :checked state — the server decides which one is
-   selected and says so in the markup it returns. Only one panel is ever in the
-   document, so nothing needs hiding. */
-.hero--links[aria-selected="true"] {
-  color: var(--accent-text);
-  font-weight: 600;
-}
-
-.hero--links:focus-visible {
-  outline: 2px solid var(--accent-text);
-  outline-offset: 2px;
-  border-radius: 2px;
-}
-
-/* Strip the UA button chrome: these read as links in the design. */
-.hero--links {
-  padding: 0px 10px 10px 0px;
-  cursor: pointer;
-  background: none;
-  border: 0;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-}
-
+/* One paragraph, no longer a tab panel: no min-height reserving room for the
+   tallest of three, and no focus ring, because nothing focuses it any more. */
 .hero--txt {
   line-height: 1.5rem;
   color: var(--text-muted);
   margin-bottom: 2rem;
-  min-height: 200px;
-}
-
-/* The panel is focusable (tabindex="0") so a keyboard user lands on the content
-   that just replaced the old panel, which means it also needs a focus ring. */
-.hero--txt:focus-visible {
-  outline: 2px solid var(--accent-text);
-  outline-offset: 4px;
-  border-radius: 2px;
 }
 
 .image {

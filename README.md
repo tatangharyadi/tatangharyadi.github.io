@@ -7,9 +7,9 @@ Live at **<https://tatangharyadi.github.io/>**
 ## Stack
 
 Plain HTML and CSS with no build step and no package manager, served directly by
-GitHub Pages from `main`. Interaction is [htmx](https://htmx.org): the hero tabs
-and the case study carousel fetch static HTML fragments and swap them in, so there
-is no JavaScript of our own to maintain. Poppins, Boxicons and htmx load from a CDN
+GitHub Pages from `main`. Interaction is [htmx](https://htmx.org): the case study
+carousel fetches static HTML fragments and swaps them in, so the only JavaScript of
+our own is the Ask page's search. Poppins, Boxicons and htmx load from a CDN
 at runtime, each pinned. Keeping it build-free is deliberate: the site stays
 editable years from now without reviving a toolchain.
 
