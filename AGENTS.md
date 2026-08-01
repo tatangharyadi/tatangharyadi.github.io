@@ -148,12 +148,12 @@ inline comment; do not "clean them up".
   disabling it on press stranded a keyboard user on `<body>` for the whole
   multi-second download. If you find yourself justifying a `disabled` here, check
   when the element actually leaves the page.
-- **Decorative Boxicons glyphs carry `aria-hidden="true"`, and the tech stack
-  marquee rows are hidden as a whole.** Without this a screen reader announces
-  hundreds of meaningless list items.
-- **The case study and tech stack sections carry a `visually-hidden` `<h2>`.** Both
-  are nav destinations whose visible content is decorative or image-based. Without
-  the heading, heading navigation lands in an unnamed empty region.
+- **Decorative Boxicons glyphs carry `aria-hidden="true"`.** Without this a
+  screen reader announces a run of meaningless list items. The rule applies to
+  any block of glyphs, not only the ones present today.
+- **The case study section carries a `visually-hidden` `<h2>`.** Its visible
+  content is image-based, so without the heading, heading navigation lands in an
+  unnamed empty region.
 
 Three further rules for any change:
 

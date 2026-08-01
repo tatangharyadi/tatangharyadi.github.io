@@ -31,13 +31,11 @@ ROOT = Path(__file__).resolve().parent.parent
 # Mocha half is the same mapping with a `mocha-` prefix on the right.
 SEMANTIC = {
     "--accent-text": "primary",
-    "--accent": "accent",
     "--bg": "surface",
     "--bg-alt": "surface-alt",
     "--bg-chrome": "surface-chrome",
     "--text": "on-surface",
     "--text-muted": "on-surface-muted",
-    "--text-subtle": "on-surface-subtle",
     "--border": "border",
 }
 

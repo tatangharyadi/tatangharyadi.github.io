@@ -35,7 +35,7 @@ request — and delay first paint.
 ## Layout
 
 ```
-index.html              home: nav + hero, case study carousel, tech stack sections
+index.html              home: nav + hero, case study carousel
 portfolio.html          case studies in full, plus now/skills/earlier; the Ask
                         source. Not in the nav: arrived at, not picked
 ask.html                browser-local semantic search over portfolio.html
@@ -316,12 +316,17 @@ sends it to `<body>` and re-enabling does not bring it back. On success the inpu
 is focused *before* the gate is hidden, so the pressed control never vanishes from
 under a live focus.
 
-## Tech stack marquee
+## There is no logo marquee, on purpose
 
-Seven rows of Boxicons glyphs scrolling horizontally, driven by the
-`techstack--animate1` / `techstack--animate2` keyframes. It is decoration: the
-rows are `aria-hidden="true"` as a whole, and the section is named by a
-visually-hidden `<h2>`.
+The home page used to end in scrolling rows of Boxicons logos. It was removed
+because a wall of logos is not a skills list: being `aria-hidden` as a whole it
+carried no text, so it was never eligible for `corpus.json`, and nothing kept it
+in step with the prose. It drifted until it was the only place on the site that
+named no AI at all.
+
+**`portfolio.html#skills` is the one authoritative statement of what this site's
+author works with**, because it is prose, it is crawlable, and it is what the Ask
+page retrieves. A second, decorative copy has no way to stay true.
 
 ## Responsive breakpoints
 
