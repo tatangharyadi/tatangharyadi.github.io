@@ -86,7 +86,38 @@
             outline: 2px solid var(--accent-text);
             outline-offset: 3px;
         }
+
+        /* The section shortcuts are plain links, not the filled button above. */
+        #section-links ul {
+            list-style: none;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            justify-content: center;
+            margin-top: 2.5rem;
+        }
+
+        #section-links a {
+            padding: 0.25rem;
+            background: none;
+            color: var(--accent-text);
+            font-weight: 400;
+            text-decoration: underline;
+        }
+
+        #section-links a:hover,
+        #section-links a:focus-visible {
+            background: none;
+            color: var(--text);
+        }
     </style>
+
+    <!-- Same pinned htmx as index.html. It only fills in the section shortcuts
+         below; everything this page needs to do its job is already in the markup,
+         so a blocked CDN costs a convenience and not the page. -->
+    <script src="https://unpkg.com/htmx.org@2.0.10/dist/htmx.min.js"
+        integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
+        crossorigin="anonymous" defer></script>
 </head>
 
 <body>
@@ -94,6 +125,13 @@
         <h1>404</h1>
         <p>That page doesn't exist.</p>
         <a href="/">Back to home</a>
+
+        <!-- Fetched rather than inlined so the section list has one home instead
+             of a copy on every page. The path is root-absolute because GitHub
+             Pages serves this file at whatever URL was missed, so a relative path
+             would resolve against a directory that does not exist. -->
+        <nav id="section-links" aria-label="Site sections"
+            hx-get="/fragments/404-links.html" hx-trigger="load" hx-swap="innerHTML"></nav>
     </main>
 </body>
 

@@ -5,9 +5,17 @@ site is built and why, read [ARCHITECTURE.md](ARCHITECTURE.md) first.
 
 ## The shape of the repo
 
-A static personal site: plain HTML, CSS and vanilla JavaScript, no build step, no
-dependencies, served by GitHub Pages from `main`. There is nothing to install and
-nothing to compile. Edit the files directly.
+A static personal site: plain HTML and CSS, no build step, no package manager,
+served by GitHub Pages from `main`. There is nothing to install and nothing to
+compile. Edit the files directly.
+
+**There is no JavaScript file of our own.** The interaction — the hero tabs and the
+case study carousel — is [htmx](https://htmx.org) asking for static HTML fragments
+under `fragments/` and swapping them in. htmx arrives from a CDN pinned by version
+and SRI digest, the same way Boxicons does. Adding a `js/` file back is a real
+decision, not a shortcut: read
+[ARCHITECTURE.md](ARCHITECTURE.md#interaction-patterns) first and say in the pull
+request why markup could not carry it.
 
 Do not introduce a bundler, framework or package manager to solve a problem that a
 few lines of CSS would solve. The absence of a toolchain is a design decision, not
@@ -23,10 +31,16 @@ python3 -m http.server 8000
 # then open http://localhost:8000
 ```
 
-**Browsers cache aggressively on localhost.** If a change to `css/style.css` or
-`js/script.js` appears not to have taken effect, confirm the server is sending the
-new bytes (`curl -s localhost:8000/js/script.js | head`) before concluding the code
-is wrong. Starting a server on a different port gives you a fresh cache key.
+**A file:// page cannot fetch fragments.** Opening `index.html` directly now leaves
+the tabs and the carousel inert, because htmx issues real requests and the browser
+blocks cross-origin `file://` reads. Serve the site for anything touching
+interaction.
+
+**Browsers cache aggressively on localhost.** If a change to `css/style.css` or to
+a file under `fragments/` appears not to have taken effect, confirm the server is
+sending the new bytes (`curl -s localhost:8000/fragments/hero/dear-all.html | head`)
+before concluding the markup is wrong. Starting a server on a different port gives
+you a fresh cache key.
 
 ## Verifying a change
 
@@ -37,14 +51,20 @@ Steps marked **[CI]** also run automatically on every pull request — see
 they need a real browser and someone looking at the result, which is why CI does
 not pretend to cover them. **A green CI does not mean a change is verified.**
 
-1. **[CI]** `node --check js/script.js` if the JavaScript changed.
-2. Load the page and confirm the console is clean.
+1. **[CI]** `python3 scripts/check_htmx.py` if any markup, fragment or `hx-`
+   attribute changed. It catches the three things a green page load hides: a
+   fragment that 404s, a case study copy that drifted, and a control that lost the
+   `id` htmx re-focuses by.
+2. Load the page **from a server** and confirm the console is clean *and* that no
+   request in the network panel returned 404. A missing fragment is a silent
+   no-op on click, not an error.
 3. Tab through the whole page. Every interactive control must be reachable and
    show a visible focus ring.
-4. Operate the carousel **from the keyboard**, not just by clicking. Focus the
-   Next arrow, activate it, and check that focus is still on that arrow
-   afterwards. Clicking with a mouse does not exercise this and will hide a
-   regression.
+4. Operate the carousel and the hero tabs **from the keyboard**, not just by
+   clicking. Focus the Next arrow, activate it, and check that focus is still on
+   that arrow afterwards; do the same for a hero tab. Clicking with a mouse does
+   not exercise this and will hide a regression. This is the check that catches a
+   swapped-in control missing its `id` — see the invariant below.
 5. Check the layout at each breakpoint (1200 / 850 / 750px) and with
    `prefers-reduced-motion: reduce` enabled.
 6. **Check both colour schemes.** The site themes itself off
@@ -64,21 +84,33 @@ not pretend to cover them. **A green CI does not mean a change is verified.**
 
 ## Accessibility invariants
 
-Four things in this codebase look like mistakes and are load-bearing. Each has an
+Five things in this codebase look like mistakes and are load-bearing. Each has an
 inline comment; do not "clean them up".
 
-- **The hero tab radios and the mobile menu checkbox are visually hidden, not
-  `display: none`.** `display: none` removes an element from the tab order *and*
-  the accessibility tree. Using it here made the "My Services" and "For Recruiters"
-  panels unreachable by keyboard and invisible to screen readers, because both
-  controls are CSS-only patterns that depend on the input staying focusable. Use
-  the `.visually-hidden` class.
-- **The carousel arrows use `aria-disabled` while a slide is in flight, never the
-  `disabled` property.** Disabling the element the user just pressed moves focus to
-  `<body>`, stranding keyboard users outside the carousel with no way back. The
-  `isSliding` guard in `js/script.js` is what actually prevents re-entry;
-  `aria-disabled` only communicates the state, and a CSS opacity rule provides the
-  visual affordance.
+- **Every control htmx drives keeps a stable `id`, and swapped-in fragments reuse
+  the same ones.** This is the invariant the whole shape of the carousel and the
+  tabs exists to protect. After a swap htmx looks the previously focused element up
+  again by `document.getElementById`; if the incoming markup has no element with
+  that `id`, focus falls to `<body>` and a keyboard user is stranded outside the
+  component with no way back. So `#prev`, `#next` and `#hero-tab-1..3` are fixed
+  names, not decoration — renaming one, or adding a focusable control to a fragment
+  without an `id`, breaks keyboard operation while looking perfectly fine to a
+  mouse. `scripts/check_htmx.py` fails CI on an `hx-get` with no `id`, and step 4
+  of "Verifying a change" is how you catch the rest.
+- **The mobile menu checkbox is visually hidden, not `display: none`.**
+  `display: none` removes an element from the tab order *and* the accessibility
+  tree. The sidebar is a CSS-only pattern that depends on its checkbox staying
+  focusable, so hiding it that way makes the menu unopenable by keyboard and
+  invisible to screen readers. Use the `.visually-hidden` class. (The hero tabs
+  were the same pattern with radios until they became real `role="tab"` buttons;
+  the sidebar stays CSS because it has nothing to fetch.)
+- **The carousel arrows never use the `disabled` property — re-entry is guarded by
+  `hx-sync`.** Disabling the element the user just pressed moves focus to `<body>`,
+  which is the same failure as losing an `id`. `hx-sync="closest
+  .casestudy--container:replace"` is what actually prevents a second press from
+  queueing behind the first, and the `button.htmx-request` opacity rule provides
+  the visual affordance while the request is in flight. `aria-disabled` is
+  acceptable where a state genuinely needs announcing; `disabled` is not, ever.
 - **Decorative Boxicons glyphs carry `aria-hidden="true"`, and the tech stack
   marquee rows are hidden as a whole.** Without this a screen reader announces
   hundreds of meaningless list items.
@@ -88,9 +120,10 @@ inline comment; do not "clean them up".
 
 Three further rules for any change:
 
-- **Animations stay behind a `prefers-reduced-motion` guard.** `js/script.js`
-  checks the same media query, so removing the CSS guard alone would leave the
-  carousel arrows locked forever waiting on an animation that never runs.
+- **Animations stay behind a `prefers-reduced-motion` guard.** Nothing waits on an
+  animation to finish any more, so the old failure mode — arrows locked forever
+  because a timer never fired — is gone. The guard is now purely about honouring the
+  preference, which is reason enough: keep it.
 - **Text contrast stays at or above 4.5:1, in both flavours.** This is why
   `--accent-text` exists alongside `--accent`; do not substitute one for the other
   to "keep the colours consistent". `--accent` is `sky`, which measures 2.47:1 on
@@ -108,9 +141,30 @@ Three further rules for any change:
   [ARCHITECTURE.md](ARCHITECTURE.md#why-nojekyll-matters).
 - **`@keyframes fromItem1/2/3` have no `to` block.** That is correct; the end state
   comes from the `:nth-child` rules. Adding one breaks the slide.
-- **`void carousel.offsetWidth` is not dead code.** It forces the reflow that lets
-  the animation restart.
-- **`--casestudy-slide-duration` must stay in `ms`.** `js/script.js` parses it.
+- **`.next` and `.prev` belong on `.casestudy--list`, not on the container.** The
+  direction of travel arrives in the fragment that was served, so it is a property
+  of the incoming list. There is no longer any reflow nudge and none is needed: a
+  swap inserts freshly parsed nodes, and a new element's animations start on their
+  own.
+- **`--casestudy-slide-duration` is read only by the stylesheet.** Nothing parses it
+  any more, so the unit is free. Older comments insisting on `ms` are obsolete.
+- **The three case studies exist in seven files** — `index.html` (rotation 0) plus
+  `fragments/casestudy/r{0,1,2}-{next,prev}.html`. This is the same bargain the
+  palette makes across four files, and it has the same enforcement: `index.html` is
+  the source of truth, and `scripts/check_htmx.py` fails CI if any rotation drifts
+  from it. Edit `index.html` and propagate; do not edit the one copy you happen to
+  be looking at.
+- **Fragments carry no colour and no `<head>`.** They are pieces of a page. Putting
+  a hex value in one would escape `scripts/check_palette.py`, which reads only the
+  four files that hold the palette. `robots.txt` disallows `/fragments/` for the
+  same reason they are not pages, and they are correctly absent from `sitemap.xml`.
+- **The htmx `<script>` stays pinned by version *and* SRI digest, on every page.** A
+  CDN this site does not own must not be able to change what executes here. If you
+  bump the version you must recompute the digest and update `HTMX_SRI` in
+  `scripts/check_htmx.py`, which is what stops the two from drifting apart.
+- **`hx-get` paths in `404.html` must be root-absolute.** GitHub Pages serves that
+  file at whatever URL was missed, so a relative path resolves against a directory
+  that does not exist. CI checks this.
 - **`404.html` styles are inline on purpose.** It must render even if the
   stylesheet is what failed. Its palette is therefore a hand-kept copy of the one
   in `css/style.css` — change one and change the other.

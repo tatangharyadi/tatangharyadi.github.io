@@ -1,0 +1,80 @@
+<!-- Rotation r0, entered by moving back.
+
+     Served to the #casestudy container as innerHTML. The deck below is the three
+     case studies of index.html rotated by 0, and the .prev class on the list is
+     what triggers the entry animation in css/style.css. The arrows carry the URLs
+     for the two rotations reachable from here, so no client-side state exists.
+
+     The case studies are duplicated across these six fragments the same way the
+     palette is duplicated across four files: index.html is the source of truth
+     and scripts/check_htmx.py is what keeps them in step. Do not edit a case
+     study here without editing it in index.html. -->
+<div class="casestudy--list prev">
+    <div class="casestudy--item">
+        <div class="casestudy--intro">
+            <div class="category">Product Management</div>
+            <div class="title">Restaurant Technology Platform</div>
+            <div class="description">
+                <p>Fast-tracked PMF front and back house technology solutions for the restaurant industry:
+                    (1) Point-of-sale, kitchen display system, loyalty program and real-time analytics;
+                    (2) IoT system for temperature monitoring, energy metering and AI-on-the-edge detection;
+                    (3) Menu planning system utilizing LLM and vector search to query product mix data and
+                    infer location-specific variations.</p>
+                <div class="impact">
+                    <div>
+                        <p>From MVP to 100+ outlets in 6 months</p>
+                        <p>Increased RPR</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="casestudy--item">
+        <div class="casestudy--intro">
+            <div class="category">Technology Strategy Optimization</div>
+            <div class="title">Ghost Kitchen Startup</div>
+            <div class="description">
+                <p>Achieved sustainable scaling by refactoring the entire technology platform:
+                    (1) AWS-to-GCP migration and repurchasing cloud native ERP;
+                    (2) Introduced Github Actions, Terraform and Go and leveraged GCP technologies;
+                    (3) Developed trainee and upskilling programs.</p>
+                <div class="impact">
+                    <div>
+                        <p>Reduced 80% of ICT related expenses</p>
+                        <p>Achieved 50% faster release cycle</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="casestudy--item">
+        <div class="casestudy--intro">
+            <div class="category">Digital Transformation</div>
+            <div class="title">Multinational Retail Company</div>
+            <div class="description">
+                <p>Turned around 3 years behind schedule digital transformation:
+                    (1) New WMS implementation;
+                    (2) Refactored distributor point-of-sale system;
+                    (3) Seamless omnichannel UX across e-commerce, point-of-sales and loyalty systems.</p>
+                <div class="impact">
+                    <div>
+                        <p>Completed in 9 months</p>
+                        <p>Realized the USD 3 millions ROI</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="casestudy--arrows" role="group" aria-label="Case study navigation">
+    <button type="button" id="prev" aria-label="Previous case study"
+        hx-get="fragments/casestudy/r2-prev.html"
+        hx-trigger="click, keydown[key=='ArrowLeft'] from:#casestudy"
+        hx-sync="closest .casestudy--container:replace">&lt;</button>
+    <button type="button" id="next" aria-label="Next case study"
+        hx-get="fragments/casestudy/r1-next.html"
+        hx-trigger="click, keydown[key=='ArrowRight'] from:#casestudy"
+        hx-sync="closest .casestudy--container:replace">&gt;</button>
+</div>

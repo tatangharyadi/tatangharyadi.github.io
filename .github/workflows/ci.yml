@@ -27,14 +27,19 @@ jobs:
       - uses: actions/checkout@v5
 
       # No `cache:` key — there is no package.json to cache against, and naming
-      # one fails the step. Node is here only for `node --check` and the one-off
-      # design.md linter; it is not a dependency of the site.
+      # one fails the step. Node is here only for the one-off design.md linter;
+      # it is not a dependency of the site.
       - uses: actions/setup-node@v5
         with:
           node-version: 22
 
-      - name: Syntax-check the JavaScript
-        run: node --check js/script.js
+      # Replaces the old `node --check js/script.js`: there is no JavaScript file
+      # left to syntax-check. The interaction is htmx fetching static fragments,
+      # and the failure modes moved with it — a fragment that 404s, a copy of the
+      # case studies that drifted, a control that loses the id htmx re-focuses by.
+      # A browser reports none of those as an error.
+      - name: htmx fragments resolve and agree with index.html
+        run: python3 scripts/check_htmx.py
 
       - name: Palette is in step across all four copies
         run: python3 scripts/check_palette.py
