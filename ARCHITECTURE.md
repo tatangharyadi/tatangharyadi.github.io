@@ -253,17 +253,35 @@ library and the ORT WebAssembly; `assets/models/all-MiniLM-L6-v2/` holds the
 weights and tokenizer. `env.allowRemoteModels` is `false` and
 `env.backends.onnx.wasm.wasmPaths` is overridden, because the library's default is
 to fetch both from third-party CDNs at runtime. Leaving that default would mean
-pinning htmx by SRI digest in one file while pulling 35 MB of unpinned executable
+pinning htmx by SRI digest in one file while pulling 20 MB of unpinned executable
 WebAssembly from someone else's CDN in another — the same integrity problem, an
 order of magnitude larger. The cost is repository size; the benefit is a page that
 makes zero third-party requests, which is verifiable in a network panel rather
 than merely asserted here.
 
-**The model loads on a click, never on page load.** The weights are 22 MB and do
-not compress — measured: gzip returns them at 21.91 MB, byte for byte — while the
-runtime compresses about five-fold. Since the incompressible part dominates,
-gating it behind an explicit button is the entire optimisation and no amount of
-shaving the runtime would matter.
+**The model loads on a click, never on page load.** Measured against the deployed
+URLs, `Accept-Encoding: gzip`:
+
+| Asset               | On disk   | Transferred | Saved |
+| ------------------- | --------- | ----------- | ----- |
+| Quantised weights   | 22.97 MB  | 16.22 MB    | 29%   |
+| ORT WebAssembly     | 12.94 MB  | 3.35 MB     | 74%   |
+| Tokenizer, JS, corpus | 1.41 MB | 0.43 MB    | 70%   |
+| **Total**           | 37.32 MB  | **20.00 MB** | 46%   |
+
+Pages serves gzip and not brotli: asking for `br` alone returns the file
+unencoded. The weights are the part that resists compression, at 29% against the
+runtime's 74%, so they end up **81% of the transfer** despite being under two
+thirds of the bytes on disk. Gating the download behind an explicit button is
+therefore the entire optimisation, and shaving the runtime would not matter.
+
+Quote the transferred column, never the on-disk one, and re-measure rather than
+recomputing by hand:
+
+```sh
+curl -s -H 'Accept-Encoding: gzip' -o /dev/null -w '%{size_download}\n' \
+  https://tatangharyadi.github.io/assets/models/all-MiniLM-L6-v2/onnx/model_quantized.onnx
+```
 
 **Retrieval is an exhaustive scan, deliberately.** A few dozen passages at 384
 dimensions is under ten thousand multiply-accumulates per query: microseconds, and
