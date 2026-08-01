@@ -53,8 +53,8 @@
     }
     </script>
 
-    <!-- Interaction runs on htmx. The hero tabs and the case study carousel ask
-         for static HTML fragments under /fragments/ and swap them in, so the
+    <!-- Interaction runs on htmx. The case study carousel asks
+         for static HTML fragments under /fragments/ and swaps them in, so the
          markup the server sends is the whole application state. Pinned by
          version and SRI digest for the same reason Boxicons is: a CDN this site
          does not own must not be able to change what executes here. -->
@@ -97,32 +97,19 @@
                 <h1 class="hero--title">
                     I'm <span>Tatang Haryadi</span>
                 </h1>
-                <!-- htmx "tabs-hateoas" pattern: each response carries the whole
-                     tablist, so which tab is selected is decided by the fragment
-                     that was served rather than by client-side state. The first
-                     panel is inlined rather than fetched with hx-trigger="load"
-                     so the hero copy is in the initial HTML for crawlers and
-                     still renders if the CDN is unreachable. It is a copy of
-                     fragments/hero/dear-all.html; scripts/check_htmx.py holds the
-                     two tablists in step so the copy cannot drift. -->
-                <div id="hero-tabs" hx-target="#hero-tabs" hx-swap="innerHTML">
-                    <div class="hero--options" role="tablist" aria-label="About Tatang Haryadi">
-                        <button type="button" role="tab" id="hero-tab-1" class="hero--links"
-                            aria-selected="true" aria-controls="hero-panel">Dear All</button>
-                        <button type="button" role="tab" id="hero-tab-2" class="hero--links"
-                            aria-selected="false" aria-controls="hero-panel"
-                            hx-get="fragments/hero/my-services.html">My Services</button>
-                        <button type="button" role="tab" id="hero-tab-3" class="hero--links"
-                            aria-selected="false" aria-controls="hero-panel"
-                            hx-get="fragments/hero/for-recruiters.html">For Recruiters</button>
-                    </div>
-                    <div class="hero--txt" id="hero-panel" role="tabpanel" tabindex="0"
-                        aria-labelledby="hero-tab-1">
-                        I'm a CTO with a career in accelerating digital transformations and product innovation.
-                        I have launched a portfolio of products for travel, retail and F&B industries.
-                        I led a global Technology team of up to 50.
-                    </div>
-                </div>
+                <!-- Plain prose, not a tab panel. This was three htmx tabs — Dear
+                     All, My Services, For Recruiters — until the Ask page made two
+                     of them redundant: the fractional CTO copy is on
+                     portfolio.html#now and therefore in corpus.json, and the
+                     recruiter tab was a link to the LinkedIn icon three inches
+                     below it. What is left is the positioning statement, which
+                     was never a choice among three and should not have looked
+                     like one. -->
+                <p class="hero--txt">
+                    I'm a CTO with a career in accelerating digital transformations and product innovation.
+                    I have launched a portfolio of products for travel, retail and F&B industries.
+                    I led a global Technology team of up to 50.
+                </p>
             </div>
 
             <div class="image">

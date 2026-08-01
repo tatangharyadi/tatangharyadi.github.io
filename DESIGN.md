@@ -59,14 +59,6 @@ typography:
     fontFamily: Poppins
     fontSize: 15px
     fontWeight: 400
-  label:
-    fontFamily: Poppins
-    fontSize: 1rem
-    fontWeight: 400
-  label-active:
-    fontFamily: Poppins
-    fontSize: 1rem
-    fontWeight: 600
   label-caps:
     fontFamily: Poppins
     fontSize: 1rem
@@ -74,7 +66,6 @@ typography:
     letterSpacing: 2px
 
 rounded:
-  xs: 2px
   full: 9999px
 
 spacing:
@@ -95,14 +86,10 @@ components:
     backgroundColor: "{colors.surface-chrome}"
     textColor: "{colors.on-surface}"
     typography: "{typography.logo}"
-  hero-tab:
+  hero-lede:
     backgroundColor: "{colors.surface-alt}"
     textColor: "{colors.on-surface-muted}"
-    typography: "{typography.label}"
-  hero-tab-active:
-    backgroundColor: "{colors.surface-alt}"
-    textColor: "{colors.primary}"
-    typography: "{typography.label-active}"
+    typography: "{typography.body-md}"
   social-pill:
     backgroundColor: "{colors.surface-chrome}"
     textColor: "{colors.on-surface}"
@@ -122,19 +109,15 @@ components:
     textColor: "{colors.accent}"
   focus-ring:
     textColor: "{colors.primary}"
-    rounded: "{rounded.xs}"
   page-dark:
     backgroundColor: "{colors.mocha-surface}"
     textColor: "{colors.mocha-on-surface}"
   nav-dark:
     backgroundColor: "{colors.mocha-surface-chrome}"
     textColor: "{colors.mocha-on-surface}"
-  hero-tab-dark:
+  hero-lede-dark:
     backgroundColor: "{colors.mocha-surface-alt}"
     textColor: "{colors.mocha-on-surface-muted}"
-  hero-tab-active-dark:
-    backgroundColor: "{colors.mocha-surface-alt}"
-    textColor: "{colors.mocha-primary}"
   social-pill-dark:
     backgroundColor: "{colors.mocha-surface-chrome}"
     textColor: "{colors.mocha-on-surface}"
@@ -251,7 +234,7 @@ every component that names a colour.
 This is not just a workaround. Because each `mocha-*` pair is reachable through a
 component, the linter's WCAG check runs over the dark flavour too; a single set of
 light-only tokens would leave half the system unverified by tooling. Verified by
-deliberately breaking `hero-tab-dark` and confirming the rule fires.
+deliberately breaking a `-dark` component and confirming the rule fires.
 
 Upstream is moving towards inline per-token modes
 ([issue #13](https://github.com/google-labs-code/design.md/issues/13),
@@ -376,13 +359,14 @@ active tab label — with 500 appearing once on the case study card title.
   purely for brand presence.
 - **`body-md`** / **`body-sm`** — page copy, and the denser copy inside a case
   study card.
-- **`label`** / **`label-active`** — the hero tab labels, inactive and active.
 - **`label-caps`** — the hero subtitle, letterspaced at 2px.
 
-The active hero tab is marked by **both** `primary` and the heavier
-`label-active` weight. That redundancy is deliberate: WCAG 1.4.1 forbids
-signalling state by colour alone, and it also means the tab state survives in
-Latte where the accent is less vivid than the old bright cyan.
+There is no `label` pair any more. It described the hero tab labels, inactive and
+active, and the tabs are gone: the hero is one paragraph now, set in `body-md`.
+The principle they demonstrated still binds anything that replaces them, though.
+State was signalled by **both** `primary` and a heavier weight, never colour
+alone, because WCAG 1.4.1 forbids the second and because a weight change survives
+in Latte where the accent is less vivid than the old bright cyan.
 
 ## Layout
 
@@ -439,15 +423,17 @@ the `border-left` its links appear to float on the page rather than sit in a men
 ## Shapes
 
 Almost nothing is rounded. The site's shape language is squared-off rectangular
-bands, with roundness reserved for two things:
+bands, with roundness reserved for one thing:
 
 - **Circles**, for anything that reads as a token or a control rather than a
   region: the profile photo, the four social pills and the two carousel arrows.
   These are literally `border-radius: 50%` (`100%` on the photo) in the CSS;
   `rounded.full` is the token equivalent, since `Dimension` cannot express a
   percentage.
-- **`rounded.xs` (2px)**, used only to soften the focus ring on the hero tab
-  labels so the outline does not read as a hard box around text.
+Nothing else. There was a `rounded.xs` (2px), softening the focus ring on the
+hero tab labels so the outline did not read as a hard box around text; it left
+with the tabs. Every remaining focus ring sits on a control with its own shape,
+so the ring follows that shape and needs no radius of its own.
 
 Section bands, cards and the nav have no radius at all. Do not add one to a
 rectangular container to "modernise" it; the flat bands are what the hairlines in
@@ -462,9 +448,10 @@ of them; several look like mistakes and are load-bearing.
 
 - **`nav`** — fixed band on `surface-chrome`, wordmark in `primary`, links in
   `on-surface`. Carries a `border` hairline on its bottom edge.
-- **`hero-tab`** / **`hero-tab-active`** — the *My Services* / *For Recruiters*
-  panel switcher. The radios are visually hidden but **focusable**; the active
-  label changes both colour and weight.
+- **`hero-lede`** — the positioning paragraph under the hero title, in
+  `on-surface-muted` on the `surface-alt` hero band. Plain prose, not a control:
+  it replaced a three-tab panel switcher once the Ask page could answer the
+  questions the other two tabs were standing in for.
 - **`social-pill`** — 40px circle, `surface-chrome` fill, icon in `on-surface`.
   The fill is ornament; the icon carries the accessible name.
 - **`carousel-arrow`** — 40px circle, same fill, plus a 1px `on-surface` border
@@ -484,7 +471,7 @@ One schema gap to read past: component properties cover fill and text, but there
 is no stroke or `borderColor`. `focus-ring` therefore carries its *outline* colour
 in `textColor` — that is the only colour slot available, so read it as a stroke,
 not a label. Its `2px` width and 2–4px offset have no schema home at all and live
-only in this prose; `rounded.xs` is the ring's corner radius. `carousel-arrow` is
+only in this prose. `carousel-arrow` is
 luckier: its `textColor` really is a glyph colour, because the arrow is a
 monospace `<` / `>` character, and its border happens to be that same
 `on-surface` — so nothing is lost there, but nothing records the border either.
