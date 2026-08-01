@@ -33,7 +33,7 @@ assets/favicon.svg      favicon
 assets/images/          profile photo (webp) and the 1200x630 social share card
 .nojekyll               opt out of Jekyll processing (see Deployment)
 robots.txt, sitemap.xml crawler hints
-.github/workflows/ci.yml  the invariant checks (see Continuous integration)
+.github/workflows/      ci.yml, the invariant checks (see Continuous integration)
 scripts/                stdlib-Python checkers run by CI; not a build step
 ARCHITECTURE.md         this file
 DESIGN.md               the Catppuccin palette, semantic tokens and contrast floors

@@ -62,7 +62,7 @@ def read(relpath):
     return path.read_text(encoding="utf-8")
 
 
-def colour_vars(css, label):
+def colour_vars(css):
     """Every --token: #hex; declaration in a chunk of CSS, lowercased."""
     return {name: value.lower() for name, value in HEX.findall(css)}
 
@@ -164,8 +164,8 @@ def main():
     )
     if light_css is None:
         return report()
-    light = colour_vars(light_css, "css/style.css :root")
-    dark = colour_vars(dark_css, "css/style.css dark block")
+    light = colour_vars(light_css)
+    dark = colour_vars(dark_css)
 
     for token in SEMANTIC:
         if token not in light:
@@ -181,8 +181,8 @@ def main():
         notfound, "404.html", "@media (prefers-color-scheme: dark)"
     )
     if light_404 is not None:
-        compare("404.html light", light, colour_vars(light_404, "404.html"), SUBSET_404)
-        compare("404.html dark", dark, colour_vars(dark_404, "404.html"), SUBSET_404)
+        compare("404.html light", light, colour_vars(light_404), SUBSET_404)
+        compare("404.html dark", dark, colour_vars(dark_404), SUBSET_404)
 
     # 3. DESIGN.md's front matter, under its semantic names.
     tokens = front_matter_colours(design)
