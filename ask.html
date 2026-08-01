@@ -87,8 +87,14 @@
                      be shown a button that cannot do anything; what they get instead
                      is the fallback at the bottom of the page. -->
                 <div class="ask--gate" id="ask--gate" hidden>
-                    <p>The model is <strong>22 MB</strong> and the WebAssembly runtime
-                        <strong>13 MB</strong>, so neither loads until you ask for it.
+                    <!-- Transfer sizes, not the sizes on disk. The server compresses
+                         both, and the runtime compresses nearly fourfold, so quoting
+                         the uncompressed 22 MB and 13 MB overstated the download by
+                         three quarters of the runtime. Measure before changing these:
+                         curl -H 'Accept-Encoding: br, gzip' -o /dev/null
+                         -w '%{size_download}' against the deployed URL. -->
+                    <p>The model is <strong>16 MB</strong> and the WebAssembly runtime
+                        <strong>3 MB</strong>, so neither loads until you ask for it.
                         Your browser caches both, so this is a one-time cost. The
                         passages are already indexed; the model is here to read your
                         question, not this site.</p>
@@ -98,7 +104,7 @@
 
                     <div class="ask--progress-wrap" id="ask--progress-wrap" hidden>
                         <!-- Determinate, with a real value. See the note in ask.js:
-                             a spinner in front of a 35 MB download says nothing
+                             a spinner in front of a 20 MB download says nothing
                              about whether it is working. -->
                         <label class="visually-hidden" for="ask--progress">Loading progress</label>
                         <progress id="ask--progress" max="100" value="0"></progress>

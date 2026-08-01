@@ -146,7 +146,7 @@
             if (!passages.length) throw new Error('the corpus came back empty');
             log(`${passages.length} passages`);
 
-            log('Loading the model (22 MB, first time only)…');
+            log('Loading the model (16 MB, first time only)…');
             const extractor = await loadModel();
 
             // Batched for the same reason ask.js batches: one call with everything

@@ -111,7 +111,7 @@ async function loadModel() {
   // transformers.js defaults env.backends.onnx.wasm.wasmPaths to a
   // cdn.jsdelivr.net URL and will happily pull the model from huggingface.co, so
   // leaving these at their defaults would mean a third party serving executable
-  // WebAssembly and 22 MB of weights into this page on every visit. That is the
+  // WebAssembly and 16 MB of weights into this page on every visit. That is the
   // same objection AGENTS.md raises against an unpinned CDN script, an order of
   // magnitude larger, and it would make the page's central claim — that the
   // question never leaves the browser — depend on someone else's server. Both
@@ -263,7 +263,7 @@ function render(hits, query) {
 /* Wiring                                                                     */
 /* -------------------------------------------------------------------------- */
 
-// The model is 22 MB and the runtime 13 MB, so it loads when someone asks for it
+// The model is 16 MB over the wire and the runtime 3 MB, so it loads when someone asks for it
 // and never on page load. Charging every visitor tens of megabytes to read a
 // page they might not interact with would be the wrong default no matter how
 // good the feature is.
