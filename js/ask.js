@@ -1,4 +1,4 @@
-// Semantic search over this site's own case studies, running entirely in the
+// Semantic search over this site's own portfolio, running entirely in the
 // browser: a sentence-transformer embeds the question, and the answer is the
 // passage whose meaning is closest to it.
 //
@@ -16,16 +16,26 @@
 
 const MODEL_ID = 'all-MiniLM-L6-v2';
 
-// Where the corpus comes from. Deliberately not a generated JSON file committed
-// beside the page: the portfolio page IS the corpus, parsed at runtime. A
-// build step that emitted embeddings would be a second copy of the prose that
-// could drift from the first, and this repository already carries four copies of
-// the palette and eight of the case study deck precisely because that bargain is
-// sometimes unavoidable. Here it is avoidable, so the drift is designed out
-// rather than policed by another checker.
-const SOURCES = [
-  { url: 'portfolio.html', label: 'Portfolio' },
-];
+// Where the corpus comes from: a generated file, not the portfolio page parsed at
+// runtime.
+//
+// The earlier version fetched portfolio.html, split it on class names and embedded
+// the result on every visit, on the argument that a generated index would be a
+// second copy of the prose free to drift from the first. That argument was real
+// but it was paying for the wrong thing. It cost every visitor several seconds of
+// WebAssembly inference to recompute a value that is identical for all of them,
+// and it made five CSS class names — .project, .project--category,
+// .project--impact, .skills--list, .history--list — a load-bearing interface
+// between the stylesheet and the search, where a rename silently dropped a whole
+// section from retrieval and reported a healthy-looking count anyway.
+//
+// So this repository takes the same bargain it takes for the palette and the case
+// study deck: one source of truth, a generator, and a checker that fails CI when a
+// copy drifts. portfolio.html is the truth, scripts/build-corpus.html regenerates
+// this file from it, and scripts/check_corpus.py asserts every indexed passage is
+// still on the page. Editing corpus.json by hand is never the answer; edit the
+// portfolio and re-run the generator.
+const CORPUS_URL = 'corpus.json';
 
 const TOP_K = 5;
 
@@ -55,49 +65,29 @@ let corpus = [];
 /* Corpus                                                                     */
 /* -------------------------------------------------------------------------- */
 
-// Split the portfolio page into passages. Each passage keeps the heading it
-// sat under, because a paragraph about "the rescue turned on scope" means very
-// little on its own and a great deal under "Multinational Retail Company". The
-// heading is prepended for embedding and shown separately in the result, so the
-// user sees where an answer came from.
-function chunk(doc, sourceUrl, sourceLabel) {
-  const out = [];
-  for (const section of doc.querySelectorAll('.project')) {
-    const heading = section.querySelector('h2')?.textContent.trim() ?? sourceLabel;
-    const anchor = section.id ? `${sourceUrl}#${section.id}` : sourceUrl;
-    const category = section.querySelector('.project--category')?.textContent.trim() ?? '';
-
-    for (const p of section.querySelectorAll('p')) {
-      if (p.classList.contains('project--meta')) continue;
-      const text = p.textContent.replace(/\s+/g, ' ').trim();
-      if (text.length < 40) continue;
-      out.push({ heading, category, anchor, text });
-    }
-
-    // The impact bullets and the skills list are the highest-signal, lowest-word
-    // content on the page. Embedded one bullet at a time they are too short to
-    // carry meaning, so each list becomes a single passage.
-    for (const list of section.querySelectorAll('.project--impact, .skills--list, .history--list')) {
-      const items = [...list.children]
-        .map((n) => n.textContent.replace(/\s+/g, ' ').trim())
-        .filter(Boolean);
-      if (!items.length) continue;
-      out.push({ heading, category, anchor, text: items.join('. ') });
-    }
-  }
-  return out;
-}
-
+// Each passage carries the heading it sat under, because a paragraph about "the
+// rescue turned on scope" means very little on its own and a great deal under
+// "Multinational Retail Company". The heading was prepended before the passage was
+// embedded and is shown separately in the result, so the reader sees where an
+// answer came from. What counts as a passage is decided in
+// scripts/build-corpus.html and nowhere else.
 async function loadCorpus() {
-  const all = [];
-  for (const src of SOURCES) {
-    const res = await fetch(src.url);
-    if (!res.ok) throw new Error(`could not read ${src.url} (${res.status})`);
-    const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
-    all.push(...chunk(doc, src.url, src.label));
+  const res = await fetch(CORPUS_URL);
+  if (!res.ok) throw new Error(`could not read ${CORPUS_URL} (${res.status})`);
+  const data = await res.json();
+
+  // A corpus built against a different model would load without complaint and
+  // retrieve nonsense: the vectors are the right shape, they just do not live in
+  // the same space as the query. Checking is two lines and the alternative is a
+  // failure with no symptom.
+  if (data.model !== MODEL_ID) {
+    throw new Error(`${CORPUS_URL} was built for ${data.model}, not ${MODEL_ID}`);
   }
-  if (!all.length) throw new Error('the corpus came back empty');
-  return all;
+  if (!data.passages?.length) throw new Error('the corpus came back empty');
+  if (data.passages.some((p) => p.vector?.length !== data.dims)) {
+    throw new Error(`${CORPUS_URL} holds a passage that is not ${data.dims}-dimensional`);
+  }
+  return data.passages;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -171,9 +161,10 @@ async function loadModel() {
   });
 }
 
-// Embed in batches. One call with every passage would pad them all to the
-// longest sequence in the set and waste most of the multiply; batching keeps the
-// padding local to similar-length neighbours.
+// Only ever called with the one question the visitor typed, now that the passage
+// vectors arrive precomputed. The batching survives because it costs nothing and
+// scripts/build-corpus.html needs the same loop: a single call with every passage
+// would pad them all to the longest sequence in the set.
 async function embed(texts, batchSize = 16, onBatch = null) {
   const vectors = [];
   for (let i = 0; i < texts.length; i += batchSize) {
@@ -193,8 +184,8 @@ async function embed(texts, batchSize = 16, onBatch = null) {
 // a dot product and there is nothing to divide by.
 //
 // This is a linear scan, and that is the right answer at this size rather than a
-// concession. The corpus is a few dozen passages of 384 floats — 22 at the time
-// of writing, so under 10k multiply-accumulates per query, which is microseconds
+// concession. The corpus is a few dozen passages of 384 floats, so
+// under 10k multiply-accumulates per query, which is microseconds
 // and is dwarfed by the ~25ms spent embedding the question. An approximate
 // index — HNSW, IVF, a vector database — exists to avoid a scan that has become
 // expensive, and buys that with build time, memory, tuning and recall you can no
@@ -219,7 +210,7 @@ function render(hits, query) {
     const p = document.createElement('p');
     p.className = 'ask--empty';
     p.textContent =
-      'Nothing in the case studies is close enough to that to be worth showing. ' +
+      'Nothing in the portfolio is close enough to that to be worth showing. ' +
       'This searches what is written on this site, so questions about anything ' +
       'else will come back empty.';
     els.results.append(p);
@@ -295,17 +286,14 @@ async function start() {
   setProgress(0, 'Fetching the runtime…');
 
   try {
-    const [model, chunks] = await Promise.all([loadModel(), loadCorpus()]);
+    const [model, passages] = await Promise.all([loadModel(), loadCorpus()]);
     extractor = model;
-    corpus = chunks;
+    corpus = passages;
 
-    setProgress(null, `Embedding ${corpus.length} passages…`);
-    const vectors = await embed(
-      corpus.map((c) => `${c.heading}. ${c.text}`),
-      16,
-      (done, total) => setProgress(done / total, `Embedding passages — ${done} of ${total}`)
-    );
-    corpus.forEach((c, i) => { c.vector = vectors[i]; });
+    // Nothing to embed here any more. The passage vectors were computed once by
+    // scripts/build-corpus.html and shipped in corpus.json; the model is loaded
+    // only to embed the question, which is the one vector that cannot be
+    // precomputed because it does not exist until someone types it.
 
     // Focus is moved to the input below *before* the gate is hidden, so the
     // button the user pressed never disappears from under a live focus.
@@ -369,5 +357,5 @@ els.examples.addEventListener('click', (e) => {
 
 // The gate is the only thing a no-JS visitor would see stuck, so it starts
 // hidden in the markup and is revealed here. If this script never runs, the
-// static fallback below it is what remains — the full case studies, linked.
+// static fallback below it is what remains — the full portfolio, linked.
 els.gate.hidden = false;

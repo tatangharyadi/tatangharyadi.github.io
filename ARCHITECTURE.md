@@ -36,8 +36,9 @@ request — and delay first paint.
 
 ```
 index.html              home: nav + hero, case study carousel, tech stack sections
-portfolio.html          case studies in full, plus now/skills/earlier; the Ask corpus
+portfolio.html          case studies in full, plus now/skills/earlier; the Ask source
 ask.html                browser-local semantic search over portfolio.html
+corpus.json             generated search index: one embedding per portfolio passage
 404.html                self-contained not-found page
 css/style.css           all styles, including the carousel slide animations
 js/ask.js               the only first-party script; see The Ask page
@@ -53,6 +54,8 @@ assets/images/          profile photo (webp) and the 1200x630 social share card
 robots.txt, sitemap.xml crawler hints
 .github/workflows/      ci.yml, the invariant checks (see Continuous integration)
 scripts/                stdlib-Python checkers run by CI; not a build step
+  build-corpus.html     the exception: a page, because generating corpus.json needs
+                        a browser. Run by hand, not by CI. See The Ask page
 ARCHITECTURE.md         this file
 DESIGN.md               the Catppuccin palette, semantic tokens and contrast floors
                         (in the google-labs-code/design.md format)
@@ -214,9 +217,9 @@ but structurally impossible.
 
 ## The Ask page
 
-`ask.html` runs semantic search over the case studies without a server. The
-visitor's question is embedded by a sentence-transformer executing in their own
-tab and compared against passages parsed out of `portfolio.html`. Nothing is sent
+`ask.html` runs semantic search over the portfolio without a server. The visitor's
+question is embedded by a sentence-transformer executing in their own tab and
+compared against a precomputed index of `portfolio.html`. Nothing is sent
 anywhere, because there is nowhere to send it.
 
 **The stack is [Transformers.js](https://huggingface.co/docs/transformers.js/index)
@@ -256,14 +259,43 @@ four orders of magnitude below the ~100,000-vector scale where an approximate
 index like HNSW starts to earn its build time, memory and recall loss. The
 reported query time is almost entirely the model embedding the question.
 
-**The corpus is parsed at runtime, not precomputed.** `js/ask.js` fetches
-`portfolio.html` and chunks it on `.project` sections. A committed embeddings file
-would be a second copy of the prose, free to drift from the first — the problem
-this repo already pays a CI checker to manage in two other places. Here it is
-avoidable, so it is avoided. The tradeoff is that the class names in
-`portfolio.html` are now an interface: rename one and the section contributes no
-passages while the page still looks healthy. The check for that is human — load
-the page and confirm the passage count moved.
+**The corpus is precomputed and committed, not parsed at runtime.** `js/ask.js`
+fetches `corpus.json`: one entry per passage, each carrying its heading, its
+anchor, its text and a 384-float vector. The model still loads, but only to embed
+the question, which is the one vector that cannot be precomputed because it does
+not exist until someone types it.
+
+An earlier version did the opposite. It fetched `portfolio.html`, chunked it on
+`.project` sections and embedded the result on every visit, on the argument that a
+committed index would be a second copy of the prose free to drift from the first.
+That argument was real and it was answered in the wrong currency. It charged every
+visitor several seconds of WebAssembly inference to recompute a value identical for
+all of them, and it quietly made five class names an interface: rename `.project`
+or `.project--impact` and a whole section contributed nothing to retrieval while
+the status line still reported a healthy-looking count. So the page now takes the
+bargain this repository already takes for the palette and the case study deck. One
+source of truth, a generator, and a checker that fails CI when a copy drifts.
+
+**The generator is a page, and that is forced rather than chosen.**
+`scripts/build-corpus.html` runs in a browser because that is the only place the
+vectors can be produced by the same engine that will later compare them. Node was
+tried and cannot do it: the vendored `transformers.min.js` is the web build, so
+`env.backends.onnx` is an empty object outside a browser and the model loader
+resolves paths through `fetch()`, which throws on a filesystem path. A Python
+generator would need `onnxruntime`, a dependency the no-build-step stance rules
+out. Running it in the browser gives vector parity by construction: same library,
+same quantised weights, same runtime. It carries `<base href="../" />` for the same
+reason, so its model configuration can be a verbatim copy of the shipped one rather
+than the same thing rewritten with `../` in front of every path.
+
+**CI checks the meaning, not the model.** `scripts/check_corpus.py` cannot recompute
+an embedding, so it asserts that the text each embedding describes is still on
+`portfolio.html`, that each anchor still resolves to a real `id`, that every vector
+is 384-dimensional and unit-length, and that the corpus names the model `js/ask.js`
+expects. What it cannot catch is prose *added* to the portfolio and never indexed,
+because an unindexed paragraph is indistinguishable from one the generator was
+never meant to see. That half stays human: load `ask.html` and confirm the passage
+count went up.
 
 **Neither button uses the `disabled` property.** `#ask--load` and `#ask--submit`
 set `aria-disabled` and guard re-entry with a flag, for the same reason the
@@ -329,6 +361,7 @@ than loud.
 | ----- | ------------------------------- |
 | `scripts/check_htmx.py` | A renamed fragment 404s in silence; a drifted rotation looks fine; a control without an `id` strands focus on `<body>`; a carousel slot with no CSS tokens breaks the layout with no error |
 | `scripts/propagate_casestudy.py --check` | Proves the fragments are still what the generator emits, so a drift is fixed by regenerating rather than by hand-patching one copy |
+| `scripts/check_corpus.py` | A stale embedding does not raise, it just retrieves worse; a dead anchor sends a result nowhere; a corpus built for another model is the right shape in the wrong space |
 | `scripts/check_palette.py` | The palette exists in four copies (below) |
 | `scripts/check_repo.py` | Deleting `.nojekyll` breaks paths with no build error; `sitemap.xml` drifts silently |
 | `npx @google/design.md lint DESIGN.md` | Holds the file at 0 errors and 0 warnings |

@@ -48,6 +48,14 @@ jobs:
       - name: Case study fragments are freshly generated
         run: python3 scripts/propagate_casestudy.py --check
 
+      # The same bargain again, for the Ask page's search index. The embeddings
+      # cannot be recomputed here — that needs the model and a browser — so this
+      # checks that the text they describe is still the text on portfolio.html. It
+      # cannot see prose that was added and never indexed; step 4 of "Verifying a
+      # change" in AGENTS.md is what covers that.
+      - name: Search index still matches portfolio.html
+        run: python3 scripts/check_corpus.py
+
       - name: Palette is in step across all four copies
         run: python3 scripts/check_palette.py
 
@@ -72,7 +80,7 @@ jobs:
           errors, warnings = summary.get("errors", 0), summary.get("warnings", 0)
           if errors or warnings:
               print(f"\nDESIGN.md lint: {errors} error(s), {warnings} warning(s).")
-              print("AGENTS.md holds this file at 0 and 0 — see step 8.")
+              print("AGENTS.md holds this file at 0 and 0 — see step 11.")
               sys.exit(1)
           print("\nDESIGN.md lint: clean.")
           PY

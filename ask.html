@@ -91,9 +91,11 @@
                 <div class="ask--gate" id="ask--gate" hidden>
                     <p>The model is <strong>22 MB</strong> and the WebAssembly runtime
                         <strong>13 MB</strong>, so neither loads until you ask for it.
-                        Your browser caches both, so this is a one-time cost.</p>
+                        Your browser caches both, so this is a one-time cost. The
+                        passages are already indexed; the model is here to read your
+                        question, not this site.</p>
                     <button type="button" class="ask--load" id="ask--load">
-                        Load the model and index this site
+                        Load the model
                     </button>
 
                     <div class="ask--progress-wrap" id="ask--progress-wrap" hidden>
@@ -181,14 +183,20 @@
                     second question is asking for a judgement and this only knows how
                     to find the nearest paragraph.</p>
 
-                <p><strong>The corpus is this site.</strong> The passages are parsed
-                    out of the portfolio page when you press the button, rather
-                    than precomputed into a JSON file. A generated index would be a
-                    second copy of the prose, free to drift from the first — and this
-                    repository already keeps four copies of the colour palette and
-                    eight of the carousel deck, each with a CI check holding it
-                    together, because sometimes that is unavoidable. Here it is
-                    avoidable, so the drift is designed out instead of policed.</p>
+                <p><strong>The corpus is this site.</strong> Every passage is
+                    generated from the portfolio page, embedded once, and committed
+                    as a JSON file next to it. The first version of this page did the
+                    opposite: it fetched the portfolio, split it up and ran the model
+                    over all of it in your browser, to avoid keeping a second copy of
+                    the prose that could drift from the first. That was a real
+                    concern answered in the wrong currency. It charged every visitor
+                    seconds of WebAssembly inference to recompute a value that is the
+                    same for everyone, and it quietly made five CSS class names an
+                    interface, so renaming one would drop a whole section out of the
+                    search while the count still looked healthy. Precomputing turns a
+                    silent failure into a loud one: the generator is the only thing
+                    that writes the index, and CI fails if a passage in it is no
+                    longer on the page.</p>
             </section>
 
             <!-- What remains when the module does not run: no dead controls, and the
