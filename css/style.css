@@ -41,6 +41,18 @@
   --casestudy-item3-filter: blur(30px);
   --casestudy-item3-zindex: 7;
   --casestudy-item3-opacity: 1;
+
+  /* Slot 4: the reserve. Only three slots are ever visible — off-screen left,
+     active, and the blurred peek on the right — so a fourth card waits at
+     opacity 0 further out along the same arc the peek travels. Adding a second
+     visible peek would crowd the active card at every breakpoint; keeping the
+     reserve invisible means the deck grew from three studies to four without the
+     layout changing at all. Its z-index sits just under slot 3 so that if the
+     opacity is ever raised it stacks behind the peek rather than through it. */
+  --casestudy-item4-transform: translate(150%, 30%) scale(0.3);
+  --casestudy-item4-filter: blur(30px);
+  --casestudy-item4-zindex: 6;
+  --casestudy-item4-opacity: 0;
 }
 
 /* Catppuccin Mocha. Only the colour tokens are overridden — layout, animation
@@ -383,6 +395,16 @@ nav .logo a:hover {
   opacity: var(--casestudy-item3-opacity);
 }
 
+/* pointer-events: none for the same reason slot 1 has it — an invisible card
+   must not intercept clicks aimed at what is behind it. */
+.casestudy--item:nth-child(4) {
+  transform: var(--casestudy-item4-transform);
+  filter: var(--casestudy-item4-filter);
+  z-index: var(--casestudy-item4-zindex);
+  opacity: var(--casestudy-item4-opacity);
+  pointer-events: none;
+}
+
 .casestudy--arrows {
   position: absolute;
   bottom: 40px;
@@ -472,6 +494,19 @@ nav .logo a:hover {
   animation: fromItem2 var(--casestudy-slide-duration) ease-in-out 1 forwards;
 }
 
+/* The fourth slot completes both chains. Moving forward, the card now in slot 3
+   is the one that was waiting in slot 4, so it animates in from there; moving
+   back, the card now in slot 4 is the one that was the peek in slot 3. Without
+   these two rules a four-card deck still works but one card in each direction
+   snaps into place while the others slide. */
+.casestudy--list.next .casestudy--item:nth-child(3) {
+  animation: fromItem4 var(--casestudy-slide-duration) ease-in-out 1 forwards;
+}
+
+.casestudy--list.prev .casestudy--item:nth-child(4) {
+  animation: fromItem3 var(--casestudy-slide-duration) ease-in-out 1 forwards;
+}
+
 @keyframes fromItem1 {
   from {
     transform: var(--casestudy-item1-transform);
@@ -496,6 +531,17 @@ nav .logo a:hover {
     filter: var(--casestudy-item3-filter);
     z-index: var(--casestudy-item3-zindex);
     opacity: var(--casestudy-item3-opacity);
+  }
+}
+
+/* No `to` block here either — see the note above fromItem1. The end state is
+   whatever the :nth-child rule assigns. */
+@keyframes fromItem4 {
+  from {
+    transform: var(--casestudy-item4-transform);
+    filter: var(--casestudy-item4-filter);
+    z-index: var(--casestudy-item4-zindex);
+    opacity: var(--casestudy-item4-opacity);
   }
 }
 
@@ -723,6 +769,211 @@ nav .logo a:hover {
   outline-offset: 3px;
 }
 
+/* ---------------------------------------------------------------------------
+   Ask page — the browser-local semantic search.
+
+   Every colour here is an existing token. This page introduces the site's first
+   asynchronous, indeterminate-duration interaction, so most of what follows is
+   about making waiting and failing legible rather than about decoration.
+   --------------------------------------------------------------------------- */
+
+.ask {
+  padding-bottom: 3rem;
+}
+
+.ask--gate {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.ask--gate p {
+  margin: 0 0 1rem 0;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+/* The site's only primary action button. It borrows the carousel arrows' colour
+   relationship rather than inventing one: --accent-text on --bg, because
+   --accent is 2.47:1 on Latte and illegal anywhere text sits on it. */
+.ask--load,
+.ask--form button {
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--accent-text);
+  border: 2px solid var(--accent-text);
+  border-radius: 6px;
+  padding: 0.75rem 1.25rem;
+  cursor: pointer;
+}
+
+.ask--load:hover,
+.ask--form button:hover {
+  color: var(--accent-text);
+  background: transparent;
+}
+
+.ask--load:focus-visible,
+.ask--form button:focus-visible,
+.ask--examples button:focus-visible,
+.ask--input:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 3px;
+}
+
+/* Disabled is safe here in a way it is never safe on the carousel arrows: this
+   button is removed from the flow entirely once the model is loaded, so there is
+   no case where focus lands on it and then has nowhere to go. The arrows stay on
+   screen, which is exactly why they use hx-sync instead. */
+.ask--load:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.ask--progress-wrap {
+  margin-top: 1.25rem;
+}
+
+.ask--progress-wrap progress {
+  width: 100%;
+  height: 0.5rem;
+}
+
+.ask--progress-label {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  /* The label changes several times a second during download. Reserving the line
+     stops the panel below it from jittering as the text length changes. */
+  min-height: 1.25rem;
+}
+
+.ask--form label,
+.ask--examples p {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.ask--field {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ask--form input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem;
+}
+
+.ask--examples {
+  margin-top: 1.5rem;
+}
+
+.ask--examples ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ask--examples button {
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--accent-text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
+.ask--examples button:hover {
+  border-color: var(--accent-text);
+}
+
+/* The live region. It carries text at all times once the page is working, so it
+   is styled as content rather than hidden — a status a sighted user cannot see
+   is a status only half the audience gets. */
+.ask--status {
+  margin: 1.5rem 0 0 0;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  min-height: 1.4rem;
+}
+
+.ask--hits {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.ask--hit {
+  background: var(--bg-alt);
+  border-left: 3px solid var(--accent-text);
+  border-radius: 0 6px 6px 0;
+  padding: 1rem 1.25rem;
+}
+
+.ask--hit-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.ask--hit-head a {
+  font-weight: 600;
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+
+.ask--hit-category {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+/* The similarity score, pushed to the end of the row. It is the number the whole
+   page is really about, so it is shown rather than translated into a vague
+   "relevance" bar. */
+.ask--hit-score {
+  margin-left: auto;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+}
+
+.ask--hit-text {
+  margin: 0;
+  line-height: 1.7;
+}
+
+.ask--empty {
+  margin: 1rem 0 0 0;
+  padding: 1rem 1.25rem;
+  background: var(--bg-alt);
+  border-radius: 6px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
 @media (width < 1200px) {
   .casestudy--list {
     left: 0%;
@@ -828,6 +1079,24 @@ nav .logo a:hover {
 
   .skills--list dd {
     margin-bottom: 0.5rem;
+  }
+
+  /* The search field and its button stop fitting side by side well before the
+     input reaches a usable width, so they stack and the button goes full-bleed
+     rather than shrinking into a tap target that misses. */
+  .ask--field {
+    flex-direction: column;
+  }
+
+  .ask--field button {
+    width: 100%;
+  }
+
+  /* The score pill is pushed to the end of the heading row by margin-left:auto,
+     which at this width can leave it alone on a line below the title. Dropping
+     the auto margin lets it sit next to the category instead. */
+  .ask--hit-score {
+    margin-left: 0;
   }
 
   .page--header h1 {

@@ -79,6 +79,7 @@
                     <li><a href="#section-home">Home</a></li>
                     <li><a href="#section-casestudy">Portfolio</a></li>
                     <li><a href="projects.html">Case Studies</a></li>
+                    <li><a href="ask.html">Ask</a></li>
                     <li><a href="#section-techstack">Tech Stack</a></li>
                 </ul>
             </div>
@@ -204,6 +205,28 @@
                                 <div>
                                     <p>Completed in 9 months</p>
                                     <p>Realized the USD 3 millions ROI</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="casestudy--item">
+                    <div class="casestudy--intro">
+                        <div class="category">Applied AI</div>
+                        <div class="title">Browser-Local Semantic Search</div>
+                        <div class="description">
+                            <p>Built the search on this site to run entirely in the visitor's browser, with no
+                                inference server:
+                                (1) all-MiniLM-L6-v2 quantised to 8-bit, executed by ONNX Runtime on WebAssembly;
+                                (2) Transformers.js embedding the question client-side, with the model, runtime and
+                                weights all served from origin so nothing is fetched from a model hub at runtime;
+                                (3) Exhaustive cosine search rather than an approximate index, which at this corpus
+                                size costs more than it saves.</p>
+                            <div class="impact">
+                                <div>
+                                    <p>No API key, no inference cost, no data leaves the tab</p>
+                                    <p>Answers in ~25ms after a one-time load</p>
                                 </div>
                             </div>
                         </div>

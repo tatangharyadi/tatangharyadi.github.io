@@ -41,6 +41,13 @@ jobs:
       - name: htmx fragments resolve and agree with index.html
         run: python3 scripts/check_htmx.py
 
+      # The check above proves the fragments agree with index.html. This one
+      # proves they are still exactly what the generator produces — so the way to
+      # fix a drift is to re-run the generator, not to hand-patch the copy that
+      # CI happened to name.
+      - name: Case study fragments are freshly generated
+        run: python3 scripts/propagate_casestudy.py --check
+
       - name: Palette is in step across all four copies
         run: python3 scripts/check_palette.py
 
