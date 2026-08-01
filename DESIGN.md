@@ -246,22 +246,11 @@ counting as a defined colour. Do not adopt it early. The format is version
 **Every accent on this site — text of any size, and every focus ring — is
 `primary`. Catppuccin `sky` is not in the token set at all.**
 
-There used to be a second token, `accent`, holding Latte `sky` `#04a5e5` for
-decoration only. It was legal because it was never read or aimed at: its one
-remaining use was the hover colour of the tech stack marquee glyphs, which were
-`aria-hidden` as a whole. When that marquee was removed the token had no lawful
-home left anywhere on the site, so it went with it. A decoration-only colour with
-no decoration to sit on is a trap for whoever reaches for it next, and the rule
-governing it can be dropped now that the colour is gone.
-
-The rule was stricter than the usual "large text may be lighter" allowance,
-because Latte `sky` fails even the **3:1** large-text and UI-component floor, not
-just the 4.5:1 small-text one. There is no size at which it becomes legal. The
-404 page's `<h1>` is the case that proves it — at `clamp(3rem, 12vw, 6rem)` it is
-the largest type on the site, and it still uses `primary`.
-
-If a decorative accent is ever wanted again, reintroduce the token deliberately
-and re-read this section first. Do not reach for `sky` because it is the
+There is no decoration-only accent, and adding one back is a decision, not a
+tidy-up. Latte `sky` fails even the **3:1** large-text and UI-component floor,
+not just the 4.5:1 small-text one, so there is no size at which it becomes legal:
+the 404 page's `<h1>` at `clamp(3rem, 12vw, 6rem)` is the largest type on the
+site and it still uses `primary`. Do not reach for `sky` because it is the
 Catppuccin-looking choice.
 
 The split exists because Catppuccin Latte's entire cyan family is too light to
