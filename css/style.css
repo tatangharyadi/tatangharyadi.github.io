@@ -1,17 +1,32 @@
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
+/* Poppins is loaded via <link rel="preconnect"> + <link rel="stylesheet"> in index.html.
+   Using @import here would serialize the request chain and delay first paint. */
 
+/* Colour comes from Catppuccin: Latte in light mode, Mocha in dark. Rules below
+   only ever reference the semantic tokens, never a palette name, so a flavour
+   swap is a change to these two blocks and nothing else. See DESIGN.md. */
 :root {
-  --primary-color: #00abf0;
-  --primary-color-dark: #ededed;
-  --secondary-color: #ededed;
-  --text-dark: #1f2937;
-  --text-light: #6b7280;
-  --extra-light: #faf5ff;
+  /* Tells the browser to render native controls and scrollbars for the active
+     scheme. Without it they stay light-mode under Mocha. */
+  color-scheme: light dark;
 
-  --primary-background-color: #081b29;
-  --secondary-background-color: #0c2c42;
+  /* Catppuccin Latte */
+  --bg: #eff1f5; /* base */
+  --bg-alt: #e6e9ef; /* mantle */
+  --bg-chrome: #dce0e8; /* crust */
+  --border: #acb0be; /* surface2 */
+  --text: #4c4f69; /* text */
+  --text-muted: #5c5f77; /* subtext1 — subtext0 is 4.37:1 here, just under AA */
+  --text-subtle: #acb0be; /* surface2, decorative glyphs only */
+  --accent: #04a5e5; /* sky — decoration only, 2.47:1 is unreadable as text */
+  /* Latte sky deepened to 60% lightness, hue and saturation preserved. The one
+     non-Catppuccin value in the system: no Latte cyan reaches 4.5:1 as text.
+     Do not "correct" this back to sky — it is also every focus ring. */
+  --accent-text: #026389;
 
   --max-width: 1200px;
+
+  /* Longest carousel slide animation. js/script.js reads this value, so keep it in ms. */
+  --casestudy-slide-duration: 700ms;
 
   --casestudy-item1-transform: translate(-100%, -5%) scale(1.5);
   --casestudy-item1-filter: blur(30px);
@@ -27,26 +42,57 @@
   --casestudy-item3-opacity: 1;
 }
 
+/* Catppuccin Mocha. Only the colour tokens are overridden — layout, animation
+   state and --casestudy-slide-duration are flavour-independent. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e2e; /* base */
+    --bg-alt: #181825; /* mantle */
+    --bg-chrome: #11111b; /* crust */
+    --border: #585b70; /* surface2 */
+    --text: #cdd6f4; /* text */
+    --text-muted: #a6adc8; /* subtext0 */
+    --text-subtle: #585b70; /* surface2, decorative glyphs only */
+    --accent: #89dceb; /* sky */
+    /* Mocha's sky clears 4.5:1 on every surface, so no deepened variant is
+       needed here — the two accent tokens collapse to one value. */
+    --accent-text: #89dceb;
+  }
+}
+
 * {
   padding: 0;
   margin: 0;
   box-sizing: border-box;
+}
+
+html {
   scroll-behavior: smooth;
+}
+
+body {
   font-family: "Poppins", sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
 }
 
 a {
   text-decoration: none;
 }
 
-.more-btn {
-  display: inline-block;
-  padding: 8px 16px;
-  background: var(--primary-color);
-  color: var(--text-dark);
-  text-decoration: none;
-  border-radius: 4px;
-  margin-top: 16px;
+/* Keeps an element operable by keyboard and announced by screen readers while
+   hiding it visually. `display: none` would remove it from the tab order and
+   the accessibility tree entirely. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 nav {
@@ -54,7 +100,11 @@ nav {
   position: fixed;
   top: 0;
   left: 0;
-  background-color: var(--primary-background-color);
+  background-color: var(--bg-chrome);
+  /* Catppuccin's darkest and second-darkest surfaces sit close together in both
+     flavours (crust vs base is 1.17:1 in Latte, 1.14:1 in Mocha), so tone alone
+     does not separate this band from the page. The hairline does. */
+  border-bottom: 1px solid var(--border);
   z-index: 99;
 }
 
@@ -70,14 +120,17 @@ nav {
 nav .logo a {
   font-size: 1.5rem;
   font-weight: 600;
-  color: var(--primary-color);
+  color: var(--accent-text);
   align-self: flex-start;
 }
 
 nav .logo a:hover {
-  color: var(--primary-color-dark);
+  color: var(--text);
 }
 
+/* Desktop: the nav links are always visible, so the toggle is genuinely
+   irrelevant and should not become a phantom tab stop. It is made
+   visually-hidden (but focusable) inside the mobile media query below. */
 #sidebar-toggle {
   display: none;
 }
@@ -88,8 +141,13 @@ nav .logo a:hover {
 
 .sidebar-checkbox i {
   font-size: 2rem;
-  color: var(--primary-color);
+  color: var(--accent-text);
   cursor: pointer;
+}
+
+#sidebar-toggle:focus-visible + .sidebar-checkbox {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 4px;
 }
 
 .nav-links--container {
@@ -103,19 +161,19 @@ nav .logo a:hover {
   padding: 0.5rem 1rem;
   text-decoration: none;
   font-weight: 600;
-  color: var(--secondary-color);
+  color: var(--text);
 }
 
 .nav-links--container li a:hover {
-  color: var(--primary-color);
+  color: var(--accent-text);
 }
 
 .home {
-  background-color: var(--extra-light);
+  background-color: var(--bg-alt);
 }
 
 .home--container {
-  min-height: 100vh;
+  min-height: 100dvh;
   max-width: var(--max-width);
   margin: auto;
   padding: 1rem;
@@ -132,7 +190,7 @@ nav .logo a:hover {
 
 .hero--subtitle {
   letter-spacing: 2px;
-  color: var(--text-light);
+  color: var(--text-muted);
   font-weight: 600;
   margin-bottom: 0.5rem;
 }
@@ -141,7 +199,7 @@ nav .logo a:hover {
   font-size: 2.5rem;
   font-weight: 400;
   line-height: 3rem;
-  color: var(--text-dark);
+  color: var(--text);
   margin-bottom: 1rem;
 }
 
@@ -154,12 +212,28 @@ nav .logo a:hover {
   flex-wrap: wrap;
 }
 
+/* Visually hidden rather than display:none so the tabs stay keyboard-reachable
+   (native radio group: arrow keys switch panels) and screen-reader accessible. */
 .hero--options input {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 .hero--options input:checked + .hero--links {
-  color: var(--primary-color);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.hero--options input:focus-visible + .hero--links {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .hero--options input:checked + label + .hero--txt {
@@ -174,7 +248,7 @@ nav .logo a:hover {
 .hero--txt {
   order: 1;
   line-height: 1.5rem;
-  color: var(--text-light);
+  color: var(--text-muted);
   margin-bottom: 2rem;
   min-height: 200px;
   display: none;
@@ -187,6 +261,7 @@ nav .logo a:hover {
 
 .image img {
   width: min(25rem, 90%);
+  height: auto;
   border-radius: 100%;
 }
 
@@ -204,58 +279,28 @@ nav .logo a:hover {
   align-items: center;
   width: 40px;
   height: 40px;
-  background: var(--primary-background-color);
+  background: var(--bg-chrome);
   border-radius: 50%;
   font-size: 1.5rem;
-  color: var(--secondary-color);
+  color: var(--text);
   text-decoration: none;
   overflow: hidden;
 }
 
-.portfolio {
-  background-color: var(--primary-background-color);
-  color: var(--primary-color);
+.hero-socials a:hover,
+.hero-socials a:focus-visible {
+  color: var(--accent-text);
 }
 
-.portfolio--container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.portfolio--detail {
-  width: 325px;
-  height: 700px;
-  border-radius: 8px;
-  overflow: hidden;
-  margin: 20px;
-}
-
-.portfolio--detail img {
-  width: 100%;
-  height: auto;
-}
-
-.portfolio--content {
-  padding: 16px;
-}
-
-.portfolio--content h3 {
-  font-size: 28px;
-  margin-bottom: 8px;
-}
-
-.portfolio--content p {
-  font-size: 16px;
-  line-height: 1.3;
+/* Colour alone is not a sufficient focus indicator (WCAG 1.4.11). */
+.hero-socials a:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 3px;
 }
 
 .casestudy--container {
   position: relative;
-  /* margin-top: 50px; */
-  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -276,14 +321,7 @@ nav .logo a:hover {
   width: 70%;
   height: 100%;
   font-size: 15px;
-}
-
-.casestudy--item img {
-  width: 50%;
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  transition: opacity 2s;
 }
 
 .casestudy--intro {
@@ -313,7 +351,7 @@ nav .logo a:hover {
 .casestudy--intro .summary {
   gap: 10px;
   width: 100%;
-  border-top: 1px solid #555;
+  border-top: 1px solid var(--border);
   margin-top: 20px;
 }
 
@@ -321,11 +359,6 @@ nav .logo a:hover {
   opacity: 1;
   pointer-events: auto;
   transition: opacity 0.5s;
-}
-
-.casestudy-item:nth-child(n + 3) {
-  opacity: 0;
-  pointer-events: none;
 }
 
 .casestudy--item:nth-child(2) {
@@ -345,7 +378,7 @@ nav .logo a:hover {
 
 .casestudy--item:nth-child(3) {
   transform: var(--casestudy-item3-transform);
-  filter: var(--casestudy-item1-filter);
+  filter: var(--casestudy-item3-filter);
   z-index: var(--casestudy-item3-zindex);
   opacity: var(--casestudy-item3-opacity);
 }
@@ -370,7 +403,22 @@ nav .logo a:hover {
   font-family: monospace;
   font-size: large;
   font-weight: bold;
-  border: 1px solid #555;
+  background-color: var(--bg-chrome);
+  color: var(--text);
+  border: 1px solid var(--text);
+  cursor: pointer;
+}
+
+.casestudy--arrows button:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 3px;
+}
+
+/* Set by js/script.js while a slide is in flight. Purely an affordance — the
+   click guard lives in JavaScript so that focus is never taken away. */
+.casestudy--arrows button[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .casestudy--item:nth-child(2) .casestudy--intro .category,
@@ -399,24 +447,45 @@ nav .logo a:hover {
   animation-delay: 0.7s;
 }
 
+/* Slide transitions.
+   js/script.js reorders the DOM, then adds .next or .prev to the container.
+   Each keyframe declares only a `from` block, so an item animates out of the
+   slot it just left and into the slot its :nth-child rule already assigns. */
 .casestudy--container.next .casestudy--item:nth-child(1) {
-  animation: positionItem2 0.5s ease-in-out 1 forwards;
+  animation: fromItem2 var(--casestudy-slide-duration) ease-in-out 1 forwards;
 }
 
-@keyframes positionItem2 {
+.casestudy--container.next .casestudy--item:nth-child(2) {
+  animation: fromItem3 var(--casestudy-slide-duration) ease-in-out 1 forwards;
+}
+
+.casestudy--container.prev .casestudy--item:nth-child(2) {
+  animation: fromItem1 var(--casestudy-slide-duration) ease-in-out 1 forwards;
+}
+
+.casestudy--container.prev .casestudy--item:nth-child(3) {
+  animation: fromItem2 var(--casestudy-slide-duration) ease-in-out 1 forwards;
+}
+
+@keyframes fromItem1 {
+  from {
+    transform: var(--casestudy-item1-transform);
+    filter: var(--casestudy-item1-filter);
+    z-index: var(--casestudy-item1-zindex);
+    opacity: var(--casestudy-item1-opacity);
+  }
+}
+
+@keyframes fromItem2 {
   from {
     transform: var(--casestudy-item2-transform);
     filter: var(--casestudy-item2-filter);
     z-index: var(--casestudy-item2-zindex);
-    opacity: 1;
+    opacity: var(--casestudy-item2-opacity);
   }
 }
 
-.casestudy--container.next .casestudy--item:nth-child(3) {
-  animation: positionItem3 0.7s ease-in-out 1 forwards;
-}
-
-@keyframes positionItem3 {
+@keyframes fromItem3 {
   from {
     transform: var(--casestudy-item3-transform);
     filter: var(--casestudy-item3-filter);
@@ -425,18 +494,15 @@ nav .logo a:hover {
   }
 }
 
-.casestudy--item {
-  transition: opacity 2s;
-}
-
 .techstack {
-  background-color: var(--primary-background-color);
+  background-color: var(--bg-chrome);
+  border-top: 1px solid var(--border);
 }
 
 .techstack--container {
   position: relative;
   width: 100%;
-  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -454,7 +520,7 @@ nav .logo a:hover {
 }
 
 .techstack--detail i {
-  color: var(--text-dark);
+  color: var(--text-subtle);
   transition: 1s;
   padding: 0 5px;
   user-select: none;
@@ -462,7 +528,7 @@ nav .logo a:hover {
 }
 
 .techstack--detail i:hover {
-  color: var(--primary-color);
+  color: var(--accent);
   transition: 0s;
 }
 
@@ -491,56 +557,6 @@ nav .logo a:hover {
   }
   100% {
     transform: translateX(0%);
-  }
-}
-
-@media (width < 750px) {
-  .sidebar-checkbox {
-    display: block;
-  }
-
-  .nav-links--container {
-    position: fixed;
-    top: 85px;
-    right: -100%;
-    height: calc(100vh - 85px);
-    width: 300px;
-
-    background-color: var(--secondary-background-color);
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
-    padding: 3rem;
-
-    transition: 0.3s ease-out;
-    z-index: 10;
-  }
-
-  #sidebar-toggle:checked ~ .nav-links--container {
-    right: 0;
-  }
-
-  #sidebar-toggle:checked ~ #overlay {
-    height: 100%;
-    width: 100%;
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 9;
-  }
-
-  .nav-links--container li a {
-    font-size: 1.25rem;
-  }
-
-  .home--container {
-    padding: 10rem 1rem 5rem 1rem;
-    grid-template-columns: repeat(1, 1fr);
-  }
-
-  .image {
-    display: none;
-    /*grid-area: 1/1/2/2;*/
   }
 }
 
@@ -577,5 +593,100 @@ nav .logo a:hover {
     top: 15%;
     left: 65%;
     width: 80%;
+  }
+}
+
+@media (width < 750px) {
+  /* Mobile: the toggle drives the slide-out menu, so it must be focusable. */
+  #sidebar-toggle {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .sidebar-checkbox {
+    display: block;
+  }
+
+  .nav-links--container {
+    position: fixed;
+    top: 85px;
+    right: -100%;
+    height: calc(100dvh - 85px);
+    width: 300px;
+
+    background-color: var(--bg-alt);
+    /* Same reason as the hairline on nav: mantle is only ~1.08:1 against base in
+       both flavours, so without an edge this panel has no visible boundary and
+       the links read as floating on the page. */
+    border-left: 1px solid var(--border);
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 3rem;
+
+    transition: 0.3s ease-out;
+    z-index: 10;
+  }
+
+  #sidebar-toggle:checked ~ .nav-links--container {
+    right: 0;
+  }
+
+  #sidebar-toggle:checked ~ #overlay {
+    height: 100%;
+    width: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9;
+  }
+
+  .nav-links--container li a {
+    font-size: 1.25rem;
+  }
+
+  .home--container {
+    padding: 10rem 1rem 5rem 1rem;
+    grid-template-columns: repeat(1, 1fr);
+  }
+
+  .image {
+    display: none;
+  }
+}
+
+/* WCAG 2.3.3 - respect an OS-level request for reduced motion.
+   The marquees stop, the carousel becomes an instant cut, and blur/opacity
+   transitions are removed. js/script.js checks the same media query so the
+   arrow buttons do not stay locked waiting for an animation that never runs. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .techstack--detail div {
+    animation: none;
+  }
+
+  .casestudy--item:nth-child(2) .casestudy--intro .category,
+  .casestudy--item:nth-child(2) .casestudy--intro .title,
+  .casestudy--item:nth-child(2) .casestudy--intro .description {
+    opacity: 1;
+    animation: none;
   }
 }

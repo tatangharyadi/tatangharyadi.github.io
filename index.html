@@ -3,23 +3,66 @@
 
 <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tatang Haryadi | CTO</title>
     <meta name="description" content="Tatang Haryadi. A CTO with a career in accelerating digital transformations and product innovation." />
     <meta name="google-site-verification" content="vDsGU0qgKGAePTmZvoJturlzNm57tdt-G8hGfJXNAuk" />
+    <!-- Matches --bg-chrome (Catppuccin crust) in each flavour, so the browser
+         chrome continues the nav band rather than fighting it. -->
+    <meta name="theme-color" content="#dce0e8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#11111b" media="(prefers-color-scheme: dark)" />
+    <link rel="canonical" href="https://tatangharyadi.github.io/" />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+
+    <!-- Open Graph / Twitter: controls how the link renders when shared -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Tatang Haryadi" />
+    <meta property="og:url" content="https://tatangharyadi.github.io/" />
+    <meta property="og:title" content="Tatang Haryadi | CTO" />
+    <meta property="og:description" content="A CTO with a career in accelerating digital transformations and product innovation. Fractional CTO services available." />
+    <meta property="og:image" content="https://tatangharyadi.github.io/assets/images/og-card.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Portrait of Tatang Haryadi" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Tatang Haryadi | CTO" />
+    <meta name="twitter:description" content="A CTO with a career in accelerating digital transformations and product innovation. Fractional CTO services available." />
+    <meta name="twitter:image" content="https://tatangharyadi.github.io/assets/images/og-card.jpg" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="css/style.css" />
-    <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
+
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Person",
+        "name": "Tatang Haryadi",
+        "url": "https://tatangharyadi.github.io/",
+        "image": "https://tatangharyadi.github.io/assets/images/tatangharyadi.webp",
+        "jobTitle": "Chief Technology Officer",
+        "description": "A CTO with a career in accelerating digital transformations and product innovation.",
+        "sameAs": [
+            "https://www.linkedin.com/in/tatangharyadi/",
+            "https://github.com/tatangharyadi",
+            "https://medium.com/@tatangharyadi"
+        ]
+    }
+    </script>
 </head>
 
 <body>
     <nav>
         <div class="nav--container">
-            <div class="logo"><a href="#">Tatang.</a></div>
+            <div class="logo"><a href="#section-home">Tatang.</a></div>
             <div class="nav-content">
                 <input type="checkbox" id="sidebar-toggle" />
                 <label for="sidebar-toggle" class="sidebar-checkbox">
-                    <i class="bx bx-menu"></i>
+                    <i class="bx bx-menu" aria-hidden="true"></i>
+                    <span class="visually-hidden">Menu</span>
                 </label>
                 <label id="overlay" for="sidebar-toggle"></label>
 
@@ -32,31 +75,32 @@
         </div>
     </nav>
 
+    <main>
     <section id="section-home" class="home">
         <div class="home--container">
             <div class="home--content">
                 <p class="hero--subtitle">HELLO THERE</p>
                 <h1 class="hero--title">
-                    I'm <span>Tatang Haryadi
+                    I'm <span>Tatang Haryadi</span>
                 </h1>
                 <div class="hero--options">
-                    <input type="radio" name="hero-options" id="1" checked/>
-                    <label for="1" class="hero--links">Dear All</label>
+                    <input type="radio" name="hero-options" id="hero-tab-1" class="visually-hidden" checked/>
+                    <label for="hero-tab-1" class="hero--links">Dear All</label>
                     <div class="hero--txt">
                         I'm a CTO with a career in accelerating digital transformations and product innovation.
                         I have launched a portfolio of products for travel, retail and F&B industries.
                         I led a global Technology team of up to 50.
                     </div>
-                    <input type="radio" name="hero-options" id="2"/>
-                    <label for="2" class="hero--links">My Services</label>
+                    <input type="radio" name="hero-options" id="hero-tab-2" class="visually-hidden" />
+                    <label for="hero-tab-2" class="hero--links">My Services</label>
                     <div class="hero--txt">
                         Fractional CTO Service
                         <p>Access expertise of seasoned technology leader on a flexible, as-needed basis.
                             From developing technology strategies, turning around at-risk projects to TCO optimization.
                             Gain an unbiased perspective on technology.</p>
                     </div>
-                    <input type="radio" name="hero-options" id="3"/>
-                    <label for="3" class="hero--links">For Recruiters</label>
+                    <input type="radio" name="hero-options" id="hero-tab-3" class="visually-hidden" />
+                    <label for="hero-tab-3" class="hero--links">For Recruiters</label>
                     <div class="hero--txt">
                         <p>I am open to new opportunities. Please 
                         <a href="https://www.linkedin.com/in/tatangharyadi/">view my Linkedin</a>
@@ -66,19 +110,24 @@
             </div>
 
             <div class="image">
-                <img src="assets/images/tatangharyadi.png" alt="profile" />
+                <img src="assets/images/tatangharyadi.webp" width="567" height="565"
+                    alt="Portrait of Tatang Haryadi" />
             </div>
 
             <div class="hero-socials">
-                <a href="https://www.linkedin.com/in/tatangharyadi/"><i class='bx bxl-linkedin'></i></a>
-                <a href="https://github.com/tatangharyadi"><i class='bx bxl-github'></i></a>
-                <a href="https://medium.com/@tatangharyadi"><i class='bx bxl-medium'></i></a>
+                <a href="https://www.linkedin.com/in/tatangharyadi/" aria-label="LinkedIn profile"
+                    rel="me noopener" target="_blank"><i class='bx bxl-linkedin' aria-hidden="true"></i></a>
+                <a href="https://github.com/tatangharyadi" aria-label="GitHub profile"
+                    rel="me noopener" target="_blank"><i class='bx bxl-github' aria-hidden="true"></i></a>
+                <a href="https://medium.com/@tatangharyadi" aria-label="Medium articles"
+                    rel="me noopener" target="_blank"><i class='bx bxl-medium' aria-hidden="true"></i></a>
             </div>
 
         </div>
     </section>
 
     <section id="section-casestudy" class="casestudy">
+        <h2 class="visually-hidden">Case studies</h2>
         <div class="casestudy--container">
             <div class="casestudy--list">
 
@@ -141,16 +190,17 @@
                 </div>
 
             </div>
-            <div class="casestudy--arrows">
-                <button id="prev"><</button>
-                <button id="next">></button>
+            <div class="casestudy--arrows" role="group" aria-label="Case study navigation">
+                <button type="button" id="prev" aria-label="Previous case study">&lt;</button>
+                <button type="button" id="next" aria-label="Next case study">&gt;</button>
             </div>
         </div>
     </section>
 
     <section id="section-techstack" class="techstack">
+        <h2 class="visually-hidden">Tech stack</h2>
         <div class="techstack--container">
-            <div class="techstack--detail">
+            <div class="techstack--detail" aria-hidden="true">
                 <div>
                     <i class='bx bxl-typescript'></i>
                     <i class='bx bxl-graphql'></i>
@@ -202,7 +252,7 @@
                     <i class='bx bxl-c-plus-plus'></i>
                 </div>
             </div>
-            <div class="techstack--detail">
+            <div class="techstack--detail" aria-hidden="true">
                 <div>
                     <i class='bx bxl-typescript'></i>
                     <i class='bx bxl-graphql'></i>
@@ -254,7 +304,7 @@
                     <i class='bx bxl-c-plus-plus'></i>
                 </div>
             </div>
-            <div class="techstack--detail">
+            <div class="techstack--detail" aria-hidden="true">
                 <div>
                     <i class='bx bxl-typescript'></i>
                     <i class='bx bxl-graphql'></i>
@@ -306,7 +356,7 @@
                     <i class='bx bxl-c-plus-plus'></i>
                 </div>
             </div>
-            <div class="techstack--detail">
+            <div class="techstack--detail" aria-hidden="true">
                 <div>
                     <i class='bx bxl-typescript'></i>
                     <i class='bx bxl-graphql'></i>
@@ -358,7 +408,7 @@
                     <i class='bx bxl-c-plus-plus'></i>
                 </div>
             </div>
-            <div class="techstack--detail">
+            <div class="techstack--detail" aria-hidden="true">
                 <div>
                     <i class='bx bxl-typescript'></i>
                     <i class='bx bxl-graphql'></i>
@@ -410,7 +460,7 @@
                     <i class='bx bxl-c-plus-plus'></i>
                 </div>
             </div>
-            <div class="techstack--detail">
+            <div class="techstack--detail" aria-hidden="true">
                 <div>
                     <i class='bx bxl-typescript'></i>
                     <i class='bx bxl-graphql'></i>
@@ -462,7 +512,7 @@
                     <i class='bx bxl-c-plus-plus'></i>
                 </div>
             </div>
-            <div class="techstack--detail">
+            <div class="techstack--detail" aria-hidden="true">
                 <div>
                     <i class='bx bxl-typescript'></i>
                     <i class='bx bxl-graphql'></i>
@@ -518,7 +568,9 @@
 
     </section>
 
-    <script src="js/script.js"></script>
+    </main>
+
+    <script src="js/script.js" defer></script>
 </body>
 
 </html>

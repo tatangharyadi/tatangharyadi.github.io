@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Page not found | Tatang Haryadi</title>
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#dce0e8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#11111b" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <!-- Styles are inline on purpose: this page has to render even when
+         css/style.css is the thing that failed to load. That means the
+         Catppuccin values are duplicated here rather than imported. Keep them
+         in step with the :root block in css/style.css. -->
+    <style>
+        :root {
+            color-scheme: light dark;
+
+            /* Catppuccin Latte */
+            --bg: #eff1f5;
+            --text: #4c4f69;
+            --text-muted: #5c5f77;
+            /* Latte sky deepened for contrast — see DESIGN.md */
+            --accent-text: #026389;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                /* Catppuccin Mocha */
+                --bg: #1e1e2e;
+                --text: #cdd6f4;
+                --text-muted: #a6adc8;
+                --accent-text: #89dceb;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100dvh;
+            display: grid;
+            place-items: center;
+            padding: 2rem;
+            text-align: center;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: "Poppins", Helvetica, Arial, sans-serif;
+        }
+
+        h1 {
+            font-size: clamp(3rem, 12vw, 6rem);
+            /* --accent would be 2.47:1 against Latte base, below even the 3:1
+               large-text floor. Display type still needs the deepened cyan. */
+            color: var(--accent-text);
+            line-height: 1;
+        }
+
+        p {
+            margin: 1rem 0 2rem;
+            color: var(--text-muted);
+        }
+
+        a {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            background: var(--accent-text);
+            color: var(--bg);
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        a:hover,
+        a:focus-visible {
+            background: var(--text);
+        }
+
+        /* A background swap alone is not a focus indicator — hover uses the same
+           one, so a keyboard user gets no distinct signal without this. */
+        a:focus-visible {
+            outline: 2px solid var(--accent-text);
+            outline-offset: 3px;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <h1>404</h1>
+        <p>That page doesn't exist.</p>
+        <a href="/">Back to home</a>
+    </main>
+</body>
+
+</html>
