@@ -68,6 +68,29 @@
         CI then fails the build if any committed passage stops appearing on
         this page.</p>
 
+    <p><strong>Where this approach stops working, which is the part worth
+        knowing.</strong> It is bounded by the download, not by the search.
+        Twenty megabytes is a defensible one-time cost on a page someone chose
+        to interrogate, and it would be indefensible on a page that had to
+        answer before the visitor asked for anything. The linear scan holds to
+        a few thousand passages on this hardware; past that the crossover with
+        an approximate index finally arrives and the honest move is to take the
+        dependency I argued against above. And a 384-dimension general-purpose
+        embedding retrieves topics well and proper nouns poorly, so a question
+        naming one specific system is better served by find-in-page on the
+        portfolio. Knowing which of those limits is nearest is the difference
+        between shipping this here and shipping it everywhere.</p>
+
+    <p><strong>The accessibility constraints shaped the code more than the
+        model did.</strong> The load button cannot use the disabled property,
+        because disabling the control somebody just pressed moves keyboard
+        focus to the document body, and here it would strand them there for the
+        length of a multi-second download. It sets an ARIA state and guards
+        re-entry with a flag instead. Results are announced through a live
+        region, because focus deliberately stays where the visitor put it.
+        These are the decisions that never show up in a demo and entirely
+        decide whether anyone can use the thing.</p>
+
     <ul class="project--impact" role="list">
         <li><strong>No inference cost and no data egress</strong> — the
             question never leaves the tab</li>
