@@ -701,6 +701,15 @@ nav .logo a:hover {
   color: var(--text-muted);
 }
 
+/* The download size sits after the button and reads as a caveat rather than a
+   warning. It carries no colour of its own: inheriting --text-muted from the
+   rule above is what keeps it inside the contrast budget that colour was
+   checked against. Subordinate by size and position only. */
+.ask--gate-cost {
+  margin: 0.75rem 0 0 0;
+  font-size: 0.9375rem;
+}
+
 /* The site's only primary action buttons, and the only filled surfaces on the
    page: --accent-text on --bg, never --accent, which is 2.47:1 on Latte and
    illegal anywhere text sits on it. */

@@ -158,31 +158,45 @@
         <section class="ask" id="ask" aria-labelledby="ask--heading">
             <div class="ask--container">
                 <h2 id="ask--heading">Ask</h2>
-                <p class="section--lead">Semantic search over my portfolio, running
-                    entirely in this tab. A sentence-transformer turns your question into
-                    a vector, compares it against the passages on this site, and shows
-                    the closest ones. Nothing is sent anywhere, because there is no
-                    server to send it to. How it works, and what it deliberately is not,
-                    is in the <a href="#colophon">colophon</a>.</p>
+                <!-- Says what a visitor gets before it says how it is built. The
+                     mechanism used to be spelled out here as well, which put 114
+                     words between arriving and being able to press anything; it is
+                     one link away in the colophon, where the audience that wants it
+                     already is. -->
+                <p class="section--lead">Ask a question about my work and get the
+                    passages that answer it, ranked. Nothing you type leaves this tab,
+                    because there is no server to send it to. How it works, and what it
+                    deliberately is not, is in the <a href="#colophon">colophon</a>.</p>
 
                 <!-- Hidden until js/ask.js reveals it. A no-JS visitor should never
                      be shown a button that cannot do anything; what they get instead
                      is the fallback at the bottom of this section. -->
                 <div class="ask--gate" id="ask--gate" hidden>
+                    <!-- The size of the download goes after the button, not before it.
+                         An earlier version opened with "The model is 16 MB and the
+                         WebAssembly runtime 3 MB" and never said anywhere what
+                         pressing the button gave you, which framed the only
+                         interaction on this page that matters as a bill. The cost is
+                         still stated, in full and unrounded downwards, because hiding
+                         it would be worse than leading with it. -->
+                    <p>The passages are already indexed. What loads is the
+                        sentence-transformer that reads your question, not this site.</p>
+                    <button type="button" class="ask--load" id="ask--load">
+                        Load the search
+                    </button>
+
                     <!-- Transfer sizes, not the sizes on disk. The server compresses
                          both, and the runtime compresses nearly fourfold, so quoting
                          the uncompressed 22 MB and 13 MB overstated the download by
-                         three quarters of the runtime. Measure before changing these:
-                         curl -H 'Accept-Encoding: br, gzip' -o /dev/null
+                         three quarters of the runtime. The total is stated as well as
+                         the parts, because 16 and 3 read as 19 while the colophon
+                         measures 20.0: the difference is the tokenizer, the corpus and
+                         the module. Measure before changing these:
+                         curl -H 'Accept-Encoding: gzip' -o /dev/null
                          -w '%{size_download}' against the deployed URL. -->
-                    <p>The model is <strong>16 MB</strong> and the WebAssembly runtime
-                        <strong>3 MB</strong>, so neither loads until you ask for it.
-                        Your browser caches both, so this is a one-time cost. The
-                        passages are already indexed; the model is here to read your
-                        question, not this site.</p>
-                    <button type="button" class="ask--load" id="ask--load">
-                        Load the model
-                    </button>
+                    <p class="ask--gate-cost">A one-time download of about
+                        <strong>20 MB</strong>, cached by your browser afterwards: 16 MB
+                        of model weights and 3 MB of WebAssembly runtime.</p>
 
                     <div class="ask--progress-wrap" id="ask--progress-wrap" hidden>
                         <!-- Determinate, with a real value. See the note in ask.js:
