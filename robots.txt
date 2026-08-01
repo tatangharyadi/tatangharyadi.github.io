@@ -5,4 +5,8 @@ Allow: /
 # Indexed on their own they would be thin content competing with the real page.
 Disallow: /fragments/
 
+# A development tool, not a page: it regenerates corpus.json and is only useful
+# against a local server. See AGENTS.md.
+Disallow: /scripts/
+
 Sitemap: https://tatangharyadi.github.io/sitemap.xml

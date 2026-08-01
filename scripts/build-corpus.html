@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Build corpus.json</title>
+
+    <!-- Load-bearing, not tidiness. Every path below now resolves from the site
+         root exactly as it does on ask.html, so the model configuration in this
+         file can be a verbatim copy of the one in js/ask.js rather than the same
+         thing rewritten with ../ in front of it. An earlier version did the
+         rewriting and an absolute localModelPath made transformers.js skip loading
+         the tokenizer altogether — no request, no error, and a pipeline that threw
+         "this.tokenizer is not a function" only at inference. Paths that differ from
+         the shipped ones are exactly the class of difference this generator exists
+         to avoid. -->
+    <base href="../" />
+
+    <!-- A development tool, not a page. It is published along with everything else
+         because GitHub Pages serves the whole repository, so it says so out loud
+         rather than relying on nobody finding it. It is absent from sitemap.xml,
+         from every nav and from robots.txt's allowed paths, and scripts/ is outside
+         the *.html globs that check_repo.py and check_htmx.py walk. -->
+    <meta name="robots" content="noindex, nofollow" />
+
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 52rem; padding: 0 1rem; line-height: 1.5; }
+        textarea { width: 100%; height: 22rem; font-family: ui-monospace, monospace; font-size: 0.75rem; }
+        button { font: inherit; padding: 0.5rem 1rem; }
+        .log { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 0.8rem; }
+    </style>
+</head>
+
+<body>
+    <h1>Build <code>corpus.json</code></h1>
+
+    <p>Regenerates the search index for <a href="ask.html">the Ask page</a> from
+        <a href="portfolio.html">portfolio.html</a>. Serve the repository
+        (<code>python3 -m http.server 8000</code>) and open this at
+        <code>/scripts/build-corpus.html</code> — it needs real HTTP, because the
+        model files are fetched.</p>
+
+    <p><strong>Why this is a page and not a script.</strong> The embeddings have to
+        be the ones the shipped code would have produced; a vector that differs from
+        what the browser computes does not raise an error, it just retrieves worse.
+        Running the generator in the same engine, against the same vendored
+        WebAssembly runtime and the same quantised weights, makes that true by
+        construction rather than by comparison. Node was tried first and cannot do
+        it: the vendored build is the web build, its ONNX backend registry is empty
+        outside a browser and its loader resolves model paths through
+        <code>fetch()</code>. A Python generator would need onnxruntime, and
+        AGENTS.md is explicit that this repository does not take on a toolchain.</p>
+
+    <p>Press the button, wait for the model to download, then save the JSON over
+        <code>corpus.json</code> at the repository root and commit it.</p>
+
+    <p><button type="button" id="go">Build</button>
+        <button type="button" id="save" hidden>Download corpus.json</button></p>
+
+    <p class="log" id="log"></p>
+    <textarea id="out" readonly hidden></textarea>
+
+    <script type="module">
+        // Must match js/ask.js. MODEL_ID and dtype decide the vectors; anything else
+        // here only decides where the bytes come from.
+        const MODEL_ID = 'all-MiniLM-L6-v2';
+        const DTYPE = 'q8';
+        const DIMS = 384;
+
+        // Resolved against <base>, so this is both where the page is read from and
+        // the anchor prefix ask.html will resolve at the site root.
+        const SOURCE_URL = 'portfolio.html';
+        const SOURCE_LABEL = 'Portfolio';
+
+        // Six decimal places. A component of a unit vector rounded this far is off by
+        // at most 5e-7, so a 384-term dot product moves by under 2e-4 — four orders
+        // of magnitude below the 0.25 score floor and invisible at the two decimals
+        // the page displays. Full float64 repr would triple the file for no
+        // difference anyone can observe.
+        const PRECISION = 6;
+
+        const log = (m) => { document.getElementById('log').textContent += m + '\n'; };
+
+        // The single definition of what a passage is. This used to live in js/ask.js
+        // and run on every visit; it now runs here, once, and ask.js reads the
+        // result. scripts/check_corpus.py is what notices when the prose moves on
+        // without the index.
+        //
+        // Each passage keeps the heading it sat under, because a paragraph about
+        // "the rescue turned on scope" means very little alone and a great deal
+        // under "Multinational Retail Company".
+        function chunk(doc) {
+            const out = [];
+            for (const section of doc.querySelectorAll('.project')) {
+                const heading = section.querySelector('h2')?.textContent.trim() ?? SOURCE_LABEL;
+                const anchor = section.id ? `${SOURCE_URL}#${section.id}` : SOURCE_URL;
+                const category = section.querySelector('.project--category')?.textContent.trim() ?? '';
+
+                for (const p of section.querySelectorAll('p')) {
+                    if (p.classList.contains('project--meta')) continue;
+                    const text = p.textContent.replace(/\s+/g, ' ').trim();
+                    if (text.length < 40) continue;
+                    out.push({ heading, category, anchor, text });
+                }
+
+                // The impact bullets and the skills list are the highest-signal,
+                // lowest-word content on the page. Embedded one bullet at a time they
+                // are too short to carry meaning, so each list becomes one passage.
+                for (const list of section.querySelectorAll('.project--impact, .skills--list, .history--list')) {
+                    const items = [...list.children]
+                        .map((n) => n.textContent.replace(/\s+/g, ' ').trim())
+                        .filter(Boolean);
+                    if (!items.length) continue;
+                    // `parts` is carried so scripts/check_corpus.py can verify a list
+                    // passage against the page. The joined `text` is what was
+                    // embedded, but the ". " between items exists only here — it is
+                    // not on the page, so the joined string is not something the
+                    // checker could look for.
+                    out.push({ heading, category, anchor, text: items.join('. '), parts: items });
+                }
+            }
+            return out;
+        }
+
+        async function loadModel() {
+            const { pipeline, env } = await import(new URL('vendor/transformers/transformers.min.js', document.baseURI).href);
+            env.allowRemoteModels = false;
+            env.allowLocalModels = true;
+            env.localModelPath = 'assets/models/';
+            env.backends.onnx.wasm.wasmPaths = {
+                mjs: new URL('vendor/transformers/ort-wasm-simd-threaded.mjs', document.baseURI).href,
+                wasm: new URL('vendor/transformers/ort-wasm-simd-threaded.wasm', document.baseURI).href,
+            };
+            env.backends.onnx.wasm.numThreads = 1;
+            env.backends.onnx.wasm.proxy = false;
+            return pipeline('feature-extraction', MODEL_ID, { dtype: DTYPE, device: 'wasm' });
+        }
+
+        async function build() {
+            log('Fetching ' + SOURCE_URL);
+            const res = await fetch(SOURCE_URL);
+            if (!res.ok) throw new Error(`could not read ${SOURCE_URL} (${res.status})`);
+            const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+            const passages = chunk(doc);
+            if (!passages.length) throw new Error('the corpus came back empty');
+            log(`${passages.length} passages`);
+
+            log('Loading the model (22 MB, first time only)…');
+            const extractor = await loadModel();
+
+            // Batched for the same reason ask.js batches: one call with everything
+            // pads every passage to the longest in the set.
+            const texts = passages.map((p) => `${p.heading}. ${p.text}`);
+            const vectors = [];
+            for (let i = 0; i < texts.length; i += 16) {
+                const out = await extractor(texts.slice(i, i + 16), { pooling: 'mean', normalize: true });
+                vectors.push(...out.tolist());
+                log(`embedded ${Math.min(i + 16, texts.length)} of ${texts.length}`);
+            }
+
+            passages.forEach((p, i) => {
+                if (vectors[i].length !== DIMS) throw new Error(`expected ${DIMS} dimensions, got ${vectors[i].length}`);
+                p.vector = vectors[i].map((x) => Number(x.toFixed(PRECISION)));
+            });
+
+            return {
+                model: MODEL_ID,
+                dtype: DTYPE,
+                dims: DIMS,
+                // Recorded because it is not recoverable from the vectors and it has
+                // to match js/ask.js: the query is embedded bare, the passages are
+                // embedded with their heading prepended.
+                embedding_input: '{heading}. {text}',
+                source: SOURCE_URL,
+                generator: 'scripts/build-corpus.html',
+                passages,
+            };
+        }
+
+        document.getElementById('go').addEventListener('click', async () => {
+            document.getElementById('go').setAttribute('aria-disabled', 'true');
+            try {
+                const corpus = await build();
+                // One passage per line: a diff on this file should show which passage
+                // changed, not one 100 KB line that changed.
+                const json = '{\n' +
+                    Object.entries(corpus).filter(([k]) => k !== 'passages')
+                        .map(([k, v]) => `  ${JSON.stringify(k)}: ${JSON.stringify(v)},`).join('\n') +
+                    '\n  "passages": [\n' +
+                    corpus.passages.map((p) => '    ' + JSON.stringify(p)).join(',\n') +
+                    '\n  ]\n}\n';
+                const out = document.getElementById('out');
+                out.hidden = false;
+                out.value = json;
+                window.__corpusJson = json;
+                const save = document.getElementById('save');
+                save.hidden = false;
+                save.addEventListener('click', () => {
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+                    a.download = 'corpus.json';
+                    a.click();
+                });
+                log(`Done. ${corpus.passages.length} passages, ${(json.length / 1024).toFixed(0)} KB.`);
+            } catch (err) {
+                log('FAILED: ' + err.message);
+                console.error(err);
+                document.getElementById('go').removeAttribute('aria-disabled');
+            }
+        });
+    </script>
+</body>
+
+</html>

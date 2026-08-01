@@ -1,14 +1,16 @@
 <!-- Rotation r0, entered by moving back.
 
-     Served to the #casestudy container as innerHTML. The deck below is the three
-     case studies of index.html rotated by 0, and the .prev class on the list is
-     what triggers the entry animation in css/style.css. The arrows carry the URLs
-     for the two rotations reachable from here, so no client-side state exists.
+     Served to the #casestudy container as innerHTML. The deck below is the 4
+     case studies of index.html rotated by 0, and the .prev class on the list
+     is what triggers the entry animation in css/style.css. The arrows carry the
+     URLs for the two rotations reachable from here, so no client-side state
+     exists.
 
-     The case studies are duplicated across these six fragments the same way the
-     palette is duplicated across four files: index.html is the source of truth
-     and scripts/check_htmx.py is what keeps them in step. Do not edit a case
-     study here without editing it in index.html. -->
+     GENERATED FILE — do not edit. The case studies are duplicated across these
+     8 fragments the same way the palette is duplicated across four files:
+     index.html is the source of truth, scripts/propagate_casestudy.py rewrites
+     these from it, and scripts/check_htmx.py fails CI if they drift. To change a
+     case study, edit index.html and re-run the propagate script. -->
 <div class="casestudy--list prev">
     <div class="casestudy--item">
         <div class="casestudy--intro">
@@ -67,10 +69,32 @@
             </div>
         </div>
     </div>
+
+    <div class="casestudy--item">
+        <div class="casestudy--intro">
+            <div class="category">Applied AI</div>
+            <div class="title">Browser-Local Semantic Search</div>
+            <div class="description">
+                <p>Built the search on this site to run entirely in the visitor's browser, with no
+                    inference server:
+                    (1) all-MiniLM-L6-v2 quantised to 8-bit, executed by ONNX Runtime on WebAssembly;
+                    (2) Transformers.js embedding the question client-side, with the model, runtime and
+                    weights all served from origin so nothing is fetched from a model hub at runtime;
+                    (3) Exhaustive cosine search rather than an approximate index, which at this corpus
+                    size costs more than it saves.</p>
+                <div class="impact">
+                    <div>
+                        <p>No API key, no inference cost, no data leaves the tab</p>
+                        <p>Answers in ~25ms after a one-time load</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 <div class="casestudy--arrows" role="group" aria-label="Case study navigation">
     <button type="button" id="prev" aria-label="Previous case study"
-        hx-get="fragments/casestudy/r2-prev.html"
+        hx-get="fragments/casestudy/r3-prev.html"
         hx-trigger="click, keydown[key=='ArrowLeft'] from:#casestudy"
         hx-sync="closest .casestudy--container:replace">&lt;</button>
     <button type="button" id="next" aria-label="Next case study"

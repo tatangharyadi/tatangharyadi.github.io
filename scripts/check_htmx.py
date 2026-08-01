@@ -35,7 +35,12 @@ HTMX_VERSION = "2.0.10"
 HTMX_SRI = "sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
 
 ITEM_OPEN = '<div class="casestudy--item">'
-ROTATIONS = 3
+
+# How many case studies there are is not written down anywhere as a number. It is
+# however many .casestudy--item blocks index.html holds, and everything else — the
+# count of fragments, the modulus the arrows wrap by, the slot rules in the
+# stylesheet — is checked against that. A constant here would be a fifth place to
+# remember to update, which is the class of bug this file exists to catch.
 
 # The re-entry guard. `:replace` is what makes a second press abandon the
 # in-flight request rather than queue behind it; `closest` resolves to
@@ -231,13 +236,29 @@ def check_hero_inline_matches_fragment(index_text):
 
 
 def check_casestudy_fragments(index_text):
-    """Six rotations, each the index.html deck rotated, each pointing onward."""
+    """One rotation per case study, each the index.html deck rotated, each
+    pointing onward. Two files per rotation, one per direction of travel."""
     deck = casestudy_items(index_text)
-    if len(deck) != ROTATIONS:
-        fail(f"index.html has {len(deck)} case studies, expected {ROTATIONS}")
+    if not deck:
+        fail("index.html holds no .casestudy--item blocks")
         return
+    rotations = len(deck)
 
-    for rotation in range(ROTATIONS):
+    stale = sorted(
+        p.name for p in (FRAGMENTS / "casestudy").glob("r*.html")
+        if not re.fullmatch(r"r(\d+)-(next|prev)\.html", p.name)
+        or int(re.match(r"r(\d+)", p.name).group(1)) >= rotations
+    )
+    if stale:
+        # A case study removed from index.html leaves its fragments behind, and
+        # nothing else would notice: they resolve, so no link 404s, but they serve
+        # a deck that no longer exists and arrows that wrap past the end.
+        fail(
+            f"index.html has {rotations} case studies, so rotations r0..r{rotations - 1} "
+            f"are the only valid ones; these are left over: {', '.join(stale)}"
+        )
+
+    for rotation in range(rotations):
         expected_items = deck[rotation:] + deck[:rotation]
         for direction in ("next", "prev"):
             name = f"r{rotation}-{direction}.html"
@@ -265,14 +286,40 @@ def check_casestudy_fragments(index_text):
                     "animation for this direction never runs"
                 )
 
-            check_arrow_targets(relpath, text, rotation)
+            check_arrow_targets(relpath, text, rotation, rotations)
+
+    check_casestudy_slots(rotations)
 
 
-def check_arrow_targets(relpath, text, rotation):
+def check_casestudy_slots(rotations):
+    """Every case study needs a slot in the stylesheet to be shown in.
+
+    The deck is positioned by :nth-child, so adding a case study to index.html
+    without adding its slot leaves the new item stacked at the default position —
+    visible, wrong, and reported by no other check. The @keyframes is what the
+    .next / .prev rules animate from; a missing one silently disables the slide.
+    """
+    css = read(ROOT / "css" / "style.css")
+    for slot in range(1, rotations + 1):
+        for token in ("transform", "zindex"):
+            name = f"--casestudy-item{slot}-{token}"
+            if name not in css:
+                fail(
+                    f"css/style.css has no {name}, but index.html has {rotations} "
+                    f"case studies so slot {slot} needs one"
+                )
+        if f"@keyframes fromItem{slot}" not in css:
+            fail(
+                f"css/style.css has no @keyframes fromItem{slot}, so the case study "
+                f"entering slot {slot} would jump rather than slide"
+            )
+
+
+def check_arrow_targets(relpath, text, rotation, rotations):
     """From rotation r, prev goes to r-1 and next to r+1, both wrapping."""
     expected = {
-        "prev": f"fragments/casestudy/r{(rotation - 1) % ROTATIONS}-prev.html",
-        "next": f"fragments/casestudy/r{(rotation + 1) % ROTATIONS}-next.html",
+        "prev": f"fragments/casestudy/r{(rotation - 1) % rotations}-prev.html",
+        "next": f"fragments/casestudy/r{(rotation + 1) % rotations}-next.html",
     }
     for which, want in expected.items():
         tag = next((t for t in re.findall(r"<button\b[^>]*>", text, re.DOTALL)

@@ -9,13 +9,22 @@ A static personal site: plain HTML and CSS, no build step, no package manager,
 served by GitHub Pages from `main`. There is nothing to install and nothing to
 compile. Edit the files directly.
 
-**There is no JavaScript file of our own.** The interaction — the hero tabs and the
-case study carousel — is [htmx](https://htmx.org) asking for static HTML fragments
-under `fragments/` and swapping them in. htmx arrives from a CDN pinned by version
-and SRI digest, the same way Boxicons does. Adding a `js/` file back is a real
-decision, not a shortcut: read
+**There is exactly one JavaScript file of our own, and it is `js/ask.js`.**
+Everything else — the hero tabs, the case study carousel — is
+[htmx](https://htmx.org) asking for static HTML fragments under `fragments/` and
+swapping them in. htmx arrives from a CDN pinned by version and SRI digest, the
+same way Boxicons does. That remains the default: adding a second `js/` file is a
+real decision, not a shortcut. Read
 [ARCHITECTURE.md](ARCHITECTURE.md#interaction-patterns) first and say in the pull
 request why markup could not carry it.
+
+`js/ask.js` earns its exception because the Ask page is the one interaction that
+is not a request for HTML. Every htmx swap on this site fetches markup a server
+already holds; the Ask page multiplies a question against 384-dimensional vectors
+that exist only in the visitor's tab. No endpoint could answer it without being
+sent the question, which is precisely the property the page exists to avoid. It is
+a plain ES module with no bundler and no package manager, consistent with
+everything else here.
 
 Do not introduce a bundler, framework or package manager to solve a problem that a
 few lines of CSS would solve. The absence of a toolchain is a design decision, not
@@ -54,33 +63,52 @@ not pretend to cover them. **A green CI does not mean a change is verified.**
 1. **[CI]** `python3 scripts/check_htmx.py` if any markup, fragment or `hx-`
    attribute changed. It catches the three things a green page load hides: a
    fragment that 404s, a case study copy that drifted, and a control that lost the
-   `id` htmx re-focuses by.
-2. Load the page **from a server** and confirm the console is clean *and* that no
+   `id` htmx re-focuses by. It also checks that every carousel slot the deck needs
+   has its CSS tokens and keyframes, which is the one drift that is silent in CI
+   and glaringly visible on the page.
+2. **[CI]** `python3 scripts/propagate_casestudy.py --check` if you touched a case
+   study. It is the other half of step 1: that check proves the fragments agree
+   with `index.html`, this one proves they are still exactly what the generator
+   emits. When it fails, re-run the generator — do not hand-patch the file it
+   named.
+3. **[CI]** `python3 scripts/check_corpus.py` if you touched `portfolio.html`. The
+   Ask page searches `corpus.json`, a generated index of that page; this asserts
+   every passage in it is still on the page. Regenerate with
+   `scripts/build-corpus.html` — see the bullet under "Other things not to break".
+4. If you **added** prose to `portfolio.html`, regenerate the corpus, then load
+   `ask.html`, press the load button and confirm the **passage count went up**.
+   This is the one half of the bargain CI cannot hold up: text that was never
+   indexed looks exactly like text the generator was never meant to see, so
+   nothing static can tell the difference. Step 3 catches prose that changed;
+   only this catches prose that is missing.
+5. Load the page **from a server** and confirm the console is clean *and* that no
    request in the network panel returned 404. A missing fragment is a silent
    no-op on click, not an error.
-3. Tab through the whole page. Every interactive control must be reachable and
+6. Tab through the whole page. Every interactive control must be reachable and
    show a visible focus ring.
-4. Operate the carousel and the hero tabs **from the keyboard**, not just by
+7. Operate the carousel and the hero tabs **from the keyboard**, not just by
    clicking. Focus the Next arrow, activate it, and check that focus is still on
    that arrow afterwards; do the same for a hero tab. Clicking with a mouse does
    not exercise this and will hide a regression. This is the check that catches a
-   swapped-in control missing its `id` — see the invariant below.
-5. Check the layout at each breakpoint (1200 / 850 / 750px) and with
+   swapped-in control missing its `id` — see the invariant below. Press it all the
+   way round the deck rather than once: an off-by-one in the arrow modulus only
+   shows itself on the wrap.
+8. Check the layout at each breakpoint (1200 / 850 / 750px) and with
    `prefers-reduced-motion: reduce` enabled.
-6. **Check both colour schemes.** The site themes itself off
+9. **Check both colour schemes.** The site themes itself off
    `prefers-color-scheme`, so every visual change has two results. A
    default-scheme-only check leaves half the work unverified.
-7. For anything touching markup, metadata or colour, run a Lighthouse navigation
+10. For anything touching markup, metadata or colour, run a Lighthouse navigation
    audit — **once per scheme**. Accessibility, Best Practices and SEO are all at
    100 in both; keep them there.
-8. **[CI]** If `DESIGN.md` changed, `npx @google/design.md lint DESIGN.md`. It is
-   at **0 errors and 0 warnings**; keep it there. Note the linter exits `0` on
-   warnings, so read the summary rather than the exit code — CI gates on the JSON
-   for that reason. This is a one-off command, not a dependency — the repo still
-   has no `package.json`.
-9. **[CI]** If any colour changed, `python3 scripts/check_palette.py`. The palette
-   is written out in **four** places and nothing but this script keeps them in
-   step; see the bullet under "Other things not to break".
+11. **[CI]** If `DESIGN.md` changed, `npx @google/design.md lint DESIGN.md`. It is
+    at **0 errors and 0 warnings**; keep it there. Note the linter exits `0` on
+    warnings, so read the summary rather than the exit code — CI gates on the JSON
+    for that reason. This is a one-off command, not a dependency — the repo still
+    has no `package.json`.
+12. **[CI]** If any colour changed, `python3 scripts/check_palette.py`. The palette
+    is written out in **four** places and nothing but this script keeps them in
+    step; see the bullet under "Other things not to break".
 
 ## Accessibility invariants
 
@@ -95,7 +123,7 @@ inline comment; do not "clean them up".
   component with no way back. So `#prev`, `#next` and `#hero-tab-1..3` are fixed
   names, not decoration — renaming one, or adding a focusable control to a fragment
   without an `id`, breaks keyboard operation while looking perfectly fine to a
-  mouse. `scripts/check_htmx.py` fails CI on an `hx-get` with no `id`, and step 4
+  mouse. `scripts/check_htmx.py` fails CI on an `hx-get` with no `id`, and step 7
   of "Verifying a change" is how you catch the rest.
 - **The mobile menu checkbox is visually hidden, not `display: none`.**
   `display: none` removes an element from the tab order *and* the accessibility
@@ -111,6 +139,15 @@ inline comment; do not "clean them up".
   queueing behind the first, and the `button.htmx-request` opacity rule provides
   the visual affordance while the request is in flight. `aria-disabled` is
   acceptable where a state genuinely needs announcing; `disabled` is not, ever.
+
+  This holds outside the carousel too. The two buttons on the Ask page —
+  `#ask--load` and `#ask--submit` — set `aria-disabled` and guard re-entry with a
+  plain flag in `js/ask.js`, for exactly the same reason. An earlier version used
+  `disabled` on the load button, reasoning that it is removed from the flow once
+  the model has loaded. That is true, but it is removed when the load *finishes*:
+  disabling it on press stranded a keyboard user on `<body>` for the whole
+  multi-second download. If you find yourself justifying a `disabled` here, check
+  when the element actually leaves the page.
 - **Decorative Boxicons glyphs carry `aria-hidden="true"`, and the tech stack
   marquee rows are hidden as a whole.** Without this a screen reader announces
   hundreds of meaningless list items.
@@ -139,7 +176,7 @@ Three further rules for any change:
 - **`.nojekyll` must stay.** Deleting it makes any path starting with `_` or `.`
   disappear from the published site with no build error. See
   [ARCHITECTURE.md](ARCHITECTURE.md#why-nojekyll-matters).
-- **`@keyframes fromItem1/2/3` have no `to` block.** That is correct; the end state
+- **The `@keyframes fromItemN` have no `to` block.** That is correct; the end state
   comes from the `:nth-child` rules. Adding one breaks the slide.
 - **`.next` and `.prev` belong on `.casestudy--list`, not on the container.** The
   direction of travel arrives in the fragment that was served, so it is a property
@@ -148,12 +185,44 @@ Three further rules for any change:
   own.
 - **`--casestudy-slide-duration` is read only by the stylesheet.** Nothing parses it
   any more, so the unit is free. Older comments insisting on `ms` are obsolete.
-- **The three case studies exist in seven files** — `index.html` (rotation 0) plus
-  `fragments/casestudy/r{0,1,2}-{next,prev}.html`. This is the same bargain the
-  palette makes across four files, and it has the same enforcement: `index.html` is
-  the source of truth, and `scripts/check_htmx.py` fails CI if any rotation drifts
-  from it. Edit `index.html` and propagate; do not edit the one copy you happen to
-  be looking at.
+- **The case studies exist once per rotation per direction, plus `index.html`** —
+  four case studies currently, so `index.html` (rotation 0) plus the eight
+  `fragments/casestudy/r{0..3}-{next,prev}.html`. This is the same bargain the
+  palette makes across four files, with better enforcement: `index.html` is the
+  source of truth, `scripts/propagate_casestudy.py` regenerates every fragment
+  from it, and `scripts/check_htmx.py` plus `propagate_casestudy.py --check` both
+  fail CI if a copy drifts. **Never edit a fragment.** Edit `index.html`, run the
+  generator, commit what it wrote.
+
+  How many case studies there are is deliberately not written down as a number
+  anywhere. It is however many `.casestudy--item` blocks `index.html` holds, and
+  the fragment count, the arrow modulus and the CSS slot checks are all derived
+  from that. Adding a fifth is therefore mostly automatic — but not entirely: the
+  stylesheet still needs `--casestudy-item5-transform`, `--casestudy-item5-zindex`,
+  a `:nth-child(5)` rule and `@keyframes fromItem5` written by hand. Nothing can
+  infer those, which is why `check_htmx.py` fails loudly when they are missing.
+- **`corpus.json` is generated; never hand-edit it.** It is the Ask page's search
+  index: one entry per passage of `portfolio.html`, each carrying the
+  384-dimensional embedding of that passage. `portfolio.html` is the source of
+  truth and `scripts/build-corpus.html` is the only thing that writes the index.
+  Regenerate it by serving the repository, opening
+  `/scripts/build-corpus.html`, pressing the button and saving the result over
+  `corpus.json`.
+
+  It is a page rather than a Python script for one reason: the vectors have to be
+  the ones the shipped code would have produced, and a vector that differs does
+  not raise an error, it just retrieves worse. Running the generator in the same
+  browser, against the same vendored runtime and weights, makes that true by
+  construction. Node cannot do it — the vendored build is the web build, its ONNX
+  backend registry is empty outside a browser — and a Python generator would mean
+  taking on `onnxruntime`, which the no-toolchain stance rules out. The page
+  carries `noindex`, is absent from `sitemap.xml` and sits under `scripts/`, which
+  is outside the `*.html` globs `check_repo.py` and `check_htmx.py` walk.
+
+  Editing the text in `corpus.json` without re-running the generator leaves the
+  passage describing one thing and its vector describing another, which is exactly
+  the silent failure `scripts/check_corpus.py` exists to catch.
+
 - **Fragments carry no colour and no `<head>`.** They are pieces of a page. Putting
   a hex value in one would escape `scripts/check_palette.py`, which reads only the
   four files that hold the palette. `robots.txt` disallows `/fragments/` for the
