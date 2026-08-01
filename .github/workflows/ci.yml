@@ -24,12 +24,12 @@ jobs:
     name: Check invariants
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # No `cache:` key — there is no package.json to cache against, and naming
       # one fails the step. Node is here only for `node --check` and the one-off
       # design.md linter; it is not a dependency of the site.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
