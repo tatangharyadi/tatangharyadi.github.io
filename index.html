@@ -78,6 +78,7 @@
                 <ul class="nav-links--container">
                     <li><a href="#section-home">Home</a></li>
                     <li><a href="#section-casestudy">Portfolio</a></li>
+                    <li><a href="projects.html">Case Studies</a></li>
                     <li><a href="#section-techstack">Tech Stack</a></li>
                 </ul>
             </div>
@@ -221,6 +222,11 @@
                     hx-sync="closest .casestudy--container:replace">&gt;</button>
             </div>
         </div>
+        <!-- Deliberately outside #casestudy. A focusable control inside the
+             swapped region would need a stable id in all seven copies of the
+             deck, or htmx's post-swap focus lookup strands the user on <body>.
+             This link never moves, so it never needs one. -->
+        <p class="casestudy--more"><a href="projects.html">Read the case studies in full</a></p>
     </section>
 
     <section id="section-techstack" class="techstack">

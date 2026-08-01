@@ -565,6 +565,164 @@ nav .logo a:hover {
   }
 }
 
+/* The one piece of running text on the home page's case study section: the way
+   out to the long-form versions. */
+.casestudy--more {
+  text-align: center;
+  padding: 0 1rem 4rem 1rem;
+}
+
+.casestudy--more a {
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+
+.casestudy--more a:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 3px;
+}
+
+/* Prose pages (projects.html). The home page is a full-bleed layout built out of
+   grids and absolute positioning; this is the opposite — one measure-limited
+   column of running text. It shares the palette, the nav and the focus rules and
+   nothing else, so it gets its own block rather than reusing home page classes
+   that would have to be fought at every breakpoint. */
+.page {
+  /* The nav is fixed, so the first line of content would otherwise start
+     underneath it. Home solves this with its own hero padding. */
+  padding: 8rem 1rem 5rem 1rem;
+}
+
+.page--container {
+  /* 65ch, not --max-width. Line length is a legibility constraint measured in
+     characters, and 1200px of Poppins is roughly twice the comfortable measure.
+     The home page is wide because it is mostly not text. */
+  max-width: 65ch;
+  margin: 0 auto;
+}
+
+.page--header {
+  margin-bottom: 4rem;
+}
+
+.page--header h1 {
+  font-size: 2.5rem;
+  line-height: 1.2;
+  margin-bottom: 1.5rem;
+}
+
+.page--lead {
+  font-size: 1.125rem;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.project {
+  /* A hairline rather than extra whitespace: at this measure, the gap needed to
+     separate two long articles unambiguously is large enough to read as an
+     accidental hole in the page. */
+  border-top: 1px solid var(--border);
+  padding-top: 3rem;
+  margin-bottom: 3.5rem;
+}
+
+.project h2 {
+  font-size: 1.75rem;
+  line-height: 1.3;
+  margin-bottom: 0.75rem;
+}
+
+.project p {
+  line-height: 1.75;
+  margin-bottom: 1.25rem;
+}
+
+.project--meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+}
+
+.project--category {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+/* Impact figures. Deliberately not a bare list: these are the claims a reader
+   scans for, so they get a tinted panel and no bullets. */
+.project--impact {
+  list-style: none;
+  background-color: var(--bg-alt);
+  border-left: 3px solid var(--accent-text);
+  padding: 1.25rem 1.5rem;
+  margin-top: 2rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.project--impact li {
+  line-height: 1.6;
+}
+
+.skills--list {
+  display: grid;
+  /* Label column sized to the longest label, content takes the rest. Collapses
+     to one column under 750px, below. */
+  grid-template-columns: minmax(8rem, 12rem) 1fr;
+  gap: 0.75rem 1.5rem;
+  line-height: 1.6;
+}
+
+.skills--list dt {
+  font-weight: 600;
+}
+
+.skills--list dd {
+  color: var(--text-muted);
+}
+
+.history--list {
+  list-style: none;
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+/* Role and employer stack, with no date column. Years are deliberately absent
+   from this page — see the note in projects.html — so there is nothing to set
+   opposite the role and the row is a single column by design. */
+.history--list li {
+  display: grid;
+  gap: 0.15rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--bg-alt);
+  line-height: 1.5;
+}
+
+.history--list li span:first-child {
+  font-weight: 600;
+}
+
+.history--list li span:last-child {
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+}
+
+.page--back a,
+.project a {
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+
+.page--back a:focus-visible,
+.project a:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 3px;
+}
+
 @media (width < 1200px) {
   .casestudy--list {
     left: 0%;
@@ -660,6 +818,20 @@ nav .logo a:hover {
   .home--container {
     padding: 10rem 1rem 5rem 1rem;
     grid-template-columns: repeat(1, 1fr);
+  }
+
+  /* The two-column definition list has no room left at this width; stacking
+     keeps the measure readable instead of hyphenating a label column. */
+  .skills--list {
+    grid-template-columns: 1fr;
+  }
+
+  .skills--list dd {
+    margin-bottom: 0.5rem;
+  }
+
+  .page--header h1 {
+    font-size: 2rem;
   }
 
   .image {

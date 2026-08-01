@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Case Studies | Tatang Haryadi</title>
+    <meta name="description" content="Case studies from a CTO career: restaurant technology, ghost kitchen platform economics and a multinational retail turnaround." />
+    <!-- Matches --bg-chrome (Catppuccin crust) in each flavour, so the browser
+         chrome continues the nav band rather than fighting it. -->
+    <meta name="theme-color" content="#dce0e8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#11111b" media="(prefers-color-scheme: dark)" />
+    <link rel="canonical" href="https://tatangharyadi.github.io/projects.html" />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Tatang Haryadi" />
+    <meta property="og:url" content="https://tatangharyadi.github.io/projects.html" />
+    <meta property="og:title" content="Case Studies | Tatang Haryadi" />
+    <meta property="og:description" content="What the problem was, what I decided, and what it cost — three engagements in detail." />
+    <meta property="og:image" content="https://tatangharyadi.github.io/assets/images/og-card.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Portrait of Tatang Haryadi" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Case Studies | Tatang Haryadi" />
+    <meta name="twitter:description" content="What the problem was, what I decided, and what it cost — three engagements in detail." />
+    <meta name="twitter:image" content="https://tatangharyadi.github.io/assets/images/og-card.jpg" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" />
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
+
+    <!-- This page has no interaction of its own yet, but htmx is loaded here for
+         the same reason it is loaded everywhere else: the invariant is that no
+         page may reach a CDN unpinned, and scripts/check_htmx.py enforces that
+         on every page rather than on a list of pages that happen to need it.
+         It is already in cache from the home page, so the cost is a cache hit. -->
+    <script src="https://unpkg.com/htmx.org@2.0.10/dist/htmx.min.js"
+        integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
+        crossorigin="anonymous" defer></script>
+</head>
+
+<body>
+    <nav>
+        <div class="nav--container">
+            <div class="logo"><a href="index.html">Tatang.</a></div>
+            <div class="nav-content">
+                <input type="checkbox" id="sidebar-toggle" />
+                <label for="sidebar-toggle" class="sidebar-checkbox">
+                    <i class="bx bx-menu" aria-hidden="true"></i>
+                    <span class="visually-hidden">Menu</span>
+                </label>
+                <label id="overlay" for="sidebar-toggle"></label>
+
+                <ul class="nav-links--container">
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="projects.html" aria-current="page">Case Studies</a></li>
+                    <li><a href="index.html#section-techstack">Tech Stack</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="page">
+        <div class="page--container">
+
+            <!-- No years, anywhere on this page: no date ranges beside a role, no
+                 "thirty years of", no graduation year. Ageism in hiring is real and a
+                 date range is what makes a CV screenable for it, while adding nothing
+                 to the argument the page is actually making — the decisions and the
+                 numbers carry that. If you are adding a section here, do not
+                 reintroduce a date column; the CSS no longer has one. -->
+            <header class="page--header">
+                <h1>Case studies</h1>
+                <p class="page--lead">Building and fixing technology organisations, from
+                    writing the code myself to leading a global team of fifty. Three
+                    engagements below, in the detail the home page carousel has no room
+                    for: what the problem actually was, what I decided, and what it
+                    cost.</p>
+            </header>
+
+            <article class="project" id="restaurant-technology-platform">
+                <h2>Restaurant Technology Platform</h2>
+                <p class="project--meta">
+                    <span class="project--category">Product Management</span>
+                    <span class="project--role">Director of Engineering, Yummy Corp</span>
+                </p>
+
+                <p>Fast-tracked product–market fit for front and back of house technology
+                    in the restaurant industry. Three systems, built in the order that
+                    let each one pay for the next.</p>
+
+                <p><strong>Front of house</strong> came first: point-of-sale, kitchen
+                    display system, loyalty programme and real-time analytics. Getting the
+                    transaction layer right early meant every later system had trustworthy
+                    data to read from, rather than a reporting pipeline bolted on after the
+                    fact.</p>
+
+                <p><strong>The IoT layer</strong> was built with Operations rather than for
+                    them, because the waste it targeted was operational, not technical. An
+                    ESP32-based system handled temperature monitoring, energy metering and
+                    AI-on-the-edge detection, with EMQX as the broker. Inference runs on
+                    the device: a kitchen with intermittent connectivity still needs its
+                    cold storage watched, and paying to stream raw sensor data to the cloud
+                    to answer a question the device can answer itself is a cost with no
+                    matching benefit.</p>
+
+                <p><strong>Menu planning</strong> was the piece that needed AI to be worth
+                    anything. It uses an LLM with vector search to query product mix data
+                    and infer location-specific variations — the same dish sells
+                    differently two kilometres apart, and the interesting signal is in that
+                    variation rather than in the aggregate. Retrieval over real product mix
+                    data, not a model asked to guess at a menu.</p>
+
+                <p>I also took ownership of product management directly, driving the
+                    roadmap for B2B value-added services and loyalty features.</p>
+
+                <ul class="project--impact">
+                    <li>From MVP to <strong>100+ outlets in 6 months</strong></li>
+                    <li><strong>Increased RPR</strong></li>
+                </ul>
+            </article>
+
+            <article class="project" id="ghost-kitchen-startup">
+                <h2>Ghost Kitchen Startup</h2>
+                <p class="project--meta">
+                    <span class="project--category">Technology Strategy Optimization</span>
+                    <span class="project--role">Director of Engineering, Yummy Corp</span>
+                </p>
+
+                <p>The platform worked but the unit economics did not scale: cost per
+                    outlet was not falling as outlets were added. Refactoring the entire
+                    technology platform was the only way to change that shape, so it was a
+                    cost-structure problem before it was an engineering one.</p>
+
+                <p><strong>Migrating AWS to GCP and repurchasing cloud-native ERP.</strong>
+                    Repurchasing rather than migrating the existing ERP was the harder call
+                    and the right one — carrying a self-managed system into a new
+                    environment would have moved the licence and operational burden intact
+                    rather than removing it.</p>
+
+                <p><strong>Then developer experience, treated as a cost lever rather than a
+                    perk.</strong> GitHub Actions, Terraform and Go, leaning on managed GCP
+                    services wherever running something ourselves earned nothing. Release
+                    cycle time is the metric that compounds: everything downstream of it
+                    gets cheaper when it drops.</p>
+
+                <p><strong>And the org chart, because the expense line is mostly
+                    people.</strong> Trainee and upskilling programmes to build capability
+                    in-house, with outsourcing reserved for genuinely specialised work.
+                    Buying permanent headcount for a temporary specialism is how technology
+                    budgets quietly ratchet upward.</p>
+
+                <ul class="project--impact">
+                    <li><strong>80% reduction</strong> in ICT-related expenses</li>
+                    <li><strong>50% faster</strong> release cycle</li>
+                </ul>
+            </article>
+
+            <article class="project" id="multinational-retail-company">
+                <h2>Multinational Retail Company</h2>
+                <p class="project--meta">
+                    <span class="project--category">Digital Transformation</span>
+                    <span class="project--role">Chief Technology Officer, Sophie Paris Indonesia</span>
+                </p>
+
+                <p>A B2B2C e-commerce transformation three years behind schedule, and a
+                    USD 3 million ERP and WMS migration that was not going to land. The
+                    first job was triage.</p>
+
+                <p><strong>The rescue turned on scope, not delivery speed.</strong> The
+                    programme was replacing ERP and WMS together. I implemented the new WMS
+                    and kept the legacy ERP for financials and manufacturing — the
+                    warehouse was where the pain and the return actually were, and the
+                    financial modules were working. That split is what realised the ROI on
+                    a project already written off, and it is the decision I would point to
+                    first: the fastest way to finish was to stop doing part of it.</p>
+
+                <p><strong>The transformation then completed in nine months</strong> after
+                    three years of not completing, on an IT function re-engineered to
+                    deliver rather than a longer timeline.</p>
+
+                <p>From there the work was compounding rather than corrective: refactoring
+                    the distributor point-of-sale system; seamless omnichannel UX across
+                    e-commerce, point-of-sale and loyalty, which is what moved customer
+                    lifetime value; and consolidating disparate sales, stock and assortment
+                    data into PowerBI dashboards to give a distributor 360 view — the
+                    reporting nobody could assemble while the data sat in separate systems.</p>
+
+                <p>Finally, harmonising IT systems across affiliates in Vietnam, Malaysia
+                    and the Philippines with a global cross-functional team, so regional
+                    expansion had something to expand onto. Social commerce across
+                    Indonesia, Vietnam and the Philippines scaled to 1.5 million monthly
+                    active users.</p>
+
+                <ul class="project--impact">
+                    <li>Completed in <strong>9 months</strong>, after three years behind schedule</li>
+                    <li>Realised the <strong>USD 3 million ROI</strong></li>
+                    <li>Scaled to <strong>1.5 million MAU</strong> across three markets</li>
+                </ul>
+            </article>
+
+            <article class="project" id="now">
+                <h2>Now</h2>
+                <p class="project--meta">
+                    <span class="project--category">Fractional CTO</span>
+                </p>
+
+                <p>Launching a portfolio of products across FinOps, F&amp;B and retail, and
+                    fast-tracking product–market fit from agentic AI and SaaS through to
+                    IoT.</p>
+
+                <p>Also available for fractional CTO work: technology strategy, turning
+                    around at-risk projects, and total-cost-of-ownership optimisation —
+                    technology leadership on an as-needed basis, and an unbiased outside
+                    perspective.</p>
+            </article>
+
+            <section class="project" id="skills">
+                <h2>Skills</h2>
+
+                <dl class="skills--list">
+                    <dt>Product Management</dt>
+                    <dd>Agile, DORA</dd>
+
+                    <dt>AI &amp; Data</dt>
+                    <dd>Agentic AI (LangGraph, Google ADK, n8n), Python, BigQuery</dd>
+
+                    <dt>Engineering</dt>
+                    <dd>Go (microservices), TypeScript (React, Next.js, Playwright),
+                        Flutter (Firebase), SQL</dd>
+
+                    <dt>DevOps</dt>
+                    <dd>GitHub Actions, Terraform, GCP (Cloud Run, Pub/Sub, PostgreSQL), Redis</dd>
+
+                    <dt>ERP</dt>
+                    <dd>Financial, Order and Supply Chain — inventory, warehouse and manufacturing</dd>
+                </dl>
+            </section>
+
+            <section class="project" id="earlier">
+                <h2>Earlier</h2>
+                <p>Before the CTO roles: leading IT functions, delivering projects and
+                    writing code, including building offshore IT services startups.</p>
+
+                <ul class="history--list">
+                    <li><span>Head of Information Technology</span>
+                        <span>Panorama Transportasi Tbk</span></li>
+                    <li><span>IT Manager</span>
+                        <span>Panorama Sentrawisata Tbk</span></li>
+                    <li><span>Project Manager</span>
+                        <span>GlobalTech Computer Konsultindo</span></li>
+                    <li><span>System Analyst</span>
+                        <span>Robat in&rsquo;t Veld Formatie bv</span></li>
+                    <li><span>Computer Programmer</span>
+                        <span>Stuppa Indonesia</span></li>
+                </ul>
+            </section>
+
+            <p class="page--back"><a href="index.html">&larr; Back to home</a></p>
+
+        </div>
+    </main>
+</body>
+
+</html>
