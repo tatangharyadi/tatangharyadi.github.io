@@ -1,4 +1,8 @@
 User-agent: *
 Allow: /
 
+# Fragments are pieces of a page, not pages: no <head>, no title, no styles.
+# Indexed on their own they would be thin content competing with the real page.
+Disallow: /fragments/
+
 Sitemap: https://tatangharyadi.github.io/sitemap.xml

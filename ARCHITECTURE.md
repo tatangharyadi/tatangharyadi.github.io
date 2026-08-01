@@ -5,17 +5,27 @@ How this site is put together, and why. For the rules that keep it working, see
 
 ## No build step
 
-Plain HTML, CSS and vanilla JavaScript, served directly by GitHub Pages from
+Plain HTML and CSS plus one runtime library, served directly by GitHub Pages from
 `main`. There is no bundler, no package manager, and no lockfile.
 
 This is deliberate rather than incidental. The site is a personal homepage whose
 content changes a few times a year; a toolchain would need reviving every time,
 and a dependency tree would need patching in between. The tradeoff accepted in
 exchange is that shared values live in CSS custom properties instead of build-time
-constants, and the two external resources load from a CDN at runtime:
+constants, and the three external resources load from a CDN at runtime:
 
 - [Poppins](https://fonts.google.com/specimen/Poppins) via Google Fonts
 - [Boxicons](https://boxicons.com/) 2.1.4 via unpkg
+- [htmx](https://htmx.org/) 2.0.10 via unpkg
+
+htmx is a `<script>` tag, not a dependency in the package-manager sense: pinned to
+an exact version, verified by an SRI digest, and loaded the same way Boxicons is.
+Nothing installs it and nothing builds against it. The rule this repo actually
+holds is *no toolchain*, and adding a library that is one URL does not breach it —
+but note the site now has a script it did not have before, and if unpkg is
+unreachable the hero tabs and the carousel stop advancing. Everything that matters
+for reading the page is in the initial HTML, which is why that degradation costs
+interaction and not content.
 
 Fonts are loaded with `<link rel="preconnect">` plus `<link rel="stylesheet">` in
 `index.html`, **not** `@import` in the stylesheet. An `@import` would serialize the
@@ -28,7 +38,10 @@ request — and delay first paint.
 index.html              single page: nav + home, case study, tech stack sections
 404.html                self-contained not-found page
 css/style.css           all styles, including the carousel slide animations
-js/script.js            carousel controller (the only JavaScript)
+fragments/              the HTML states htmx fetches; pieces of a page, not pages
+  hero/                 one file per hero tab, each carrying the whole tablist
+  casestudy/            r{0,1,2}-{next,prev}.html, one per rotation and direction
+  404-links.html        section shortcuts, loaded by 404.html
 assets/favicon.svg      favicon
 assets/images/          profile photo (webp) and the 1200x630 social share card
 .nojekyll               opt out of Jekyll processing (see Deployment)
@@ -58,8 +71,9 @@ Mocha in dark. **[DESIGN.md](DESIGN.md) is the reference for which token to reac
 for and what contrast each one is verified at**; the rules below are the
 constraints that are not about colour at all:
 
-- `--casestudy-slide-duration` is read by `js/script.js`, so it must stay in
-  milliseconds. See the carousel section below.
+- `--casestudy-slide-duration` drives the slide animations and nothing else reads
+  it any more, so its unit is now free. It used to be parsed by JavaScript, which
+  is why older comments insisted on milliseconds.
 - The `--casestudy-item1/2/3-*` tokens are not styling knobs — they are animation
   state, and they are deliberately *not* duplicated in the dark block because they
   are flavour-independent. See below.
@@ -73,22 +87,42 @@ every focus ring. See [DESIGN.md](DESIGN.md#the-accent-rule).
 
 ## Interaction patterns
 
-Two interactive controls are pure CSS, with no JavaScript involved:
+Interaction is hypermedia. Every state of the hero tabs and the case study
+carousel is a file under `fragments/`, and a control asks for the state it moves
+to. There is no client-side state to get out of step with the markup, because the
+markup *is* the state: a fragment says which tab is selected, which case studies
+are in which slot, and where each control points next.
 
-- **Hero tabs** ("Dear All" / "My Services" / "For Recruiters") are three
-  `<input type="radio">` elements, each followed by its `<label>` and its panel.
-  The `input:checked + label + div` sibling chain reveals the matching panel.
-- **Mobile sidebar** is the checkbox hack: a single `<input type="checkbox">`
-  toggles the menu, with a full-screen `<label>` acting as the click-away overlay.
+The htmx examples that shape this are [tabs
+(hateoas)](https://htmx.org/examples/tabs-hateoas/) for the hero and a
+click-to-load swap for the carousel. Their documentation says the tab pattern
+"requires dynamic server-side routing", which is true of a templated server and
+not true here: each response is fixed and depends on nothing about the request, so
+a static file serves it exactly. That is the whole reason this works on GitHub
+Pages, which cannot compute a response or set a header.
 
-Both rely on the input being *focusable*, which is why they are visually hidden
-rather than `display: none`. That constraint is documented in
-[AGENTS.md](AGENTS.md#accessibility-invariants).
+- **Hero tabs** ("Dear All" / "My Services" / "For Recruiters") are `<button
+  role="tab">` elements. Each response carries the entire tablist plus the panel,
+  so `aria-selected` is decided by the fragment that was served. The first state
+  is inlined in `index.html` rather than fetched on load, so the hero copy is in
+  the initial HTML for crawlers and still renders with no script at all.
+- **Case study carousel** swaps the whole deck. See the section below.
+- **Mobile sidebar** is still the pure-CSS checkbox hack: a single `<input
+  type="checkbox">` toggles the menu, with a full-screen `<label>` as the
+  click-away overlay. It stays CSS because it has nothing to fetch — there is no
+  state to get from a server, and htmx would only add a network round trip to
+  something that already works offline.
+
+One constraint runs through all of it. **Every control htmx can swap away needs a
+stable `id`.** After a swap htmx looks the previously focused element up again by
+`document.getElementById`; a control that arrives back without the same id leaves
+keyboard focus on `<body>`, stranded outside the widget. `scripts/check_htmx.py`
+enforces this, and [AGENTS.md](AGENTS.md#accessibility-invariants) explains why it
+is the same failure the arrows were already shaped to avoid.
 
 ## The case study carousel
 
-The only JavaScript in the site. The mechanism is unusual enough to be worth
-spelling out.
+The mechanism is unusual enough to be worth spelling out.
 
 **Position comes from DOM order.** Three `.casestudy--item` elements are styled by
 `:nth-child`, and each slot has a fixed role:
@@ -99,11 +133,19 @@ spelling out.
 | `:nth-child(2)`   | centre     | visible, unblurred, the only slot whose text is readable  |
 | `:nth-child(3)`   | on deck    | visible but small and blurred, offset to the right        |
 
-Advancing the carousel does not change any styles — it moves a node.
-`showSlider('next')` appends the first item to the end of the list, so the centre
-card slides out to slot 1 and the on-deck card is promoted into the centre.
-`'prev'` prepends the last item instead, running the same shuffle backwards. The
-`:nth-child` rules then re-apply themselves to whatever now sits in each slot.
+Advancing the carousel does not change any styles — it changes which item sits in
+which slot. Pressing an arrow fetches the fragment for the rotation it moves to,
+and that fragment contains the same three case studies written out in the new
+order. The `:nth-child` rules then re-apply themselves to whatever now sits in
+each slot. There are six fragments, one per rotation and direction of travel:
+`fragments/casestudy/r{0,1,2}-{next,prev}.html`. `index.html` holds rotation 0.
+
+**The rotations are copies, and a script keeps them honest.** Seven files contain
+the same three case studies. That is the identical bargain the palette makes
+across four files, and it is accepted for the same reason — the alternative is a
+build step. `index.html` is the source of truth and `scripts/check_htmx.py` fails
+CI if any rotation drifts from it, so editing one copy is a caught error rather
+than a silent one.
 
 **The animation runs backwards.** Because the new layout is already correct the
 instant the DOM changes, the slide has to animate *out of* the slot each element
@@ -114,20 +156,29 @@ override it and break the effect. The `--casestudy-item1/2/3-*` custom propertie
 hold those starting positions, which is why they read as animation state rather
 than theme values.
 
-**Restarting requires a reflow.** Re-adding the same class does not replay a CSS
-animation, so `js/script.js` removes the class, forces layout with
-`void carousel.offsetWidth`, then adds it back.
+**Direction travels in the markup.** Each fragment carries `.next` or `.prev` on
+the list, which is what selects the animation for the way the deck just moved.
+Previously a script added that class to the container; the CSS selectors moved from
+`.casestudy--container.next` to `.casestudy--list.next` accordingly.
 
-**Duration has one source of truth.** `--casestudy-slide-duration` (700ms) drives
-the CSS animations, and `js/script.js` reads the computed value to decide how long
-to keep the arrows locked. Changing the CSS value alone is sufficient and cannot
-drift out of sync — hence the millisecond requirement, since the parser only
-handles `ms` and `s`.
+**Restarting no longer requires a reflow.** The old script had to remove the class,
+force layout with `void carousel.offsetWidth` and add it back, because re-adding
+the same class does not replay a CSS animation. Every item in a swapped fragment is
+a freshly parsed node, and a new element's animations start on their own, so that
+whole dance is gone. This is the one place the conversion genuinely removed
+complexity rather than relocating it.
 
-**Reduced motion short-circuits the whole thing.** Under
-`prefers-reduced-motion: reduce` the CSS animations are off, so the JavaScript
-skips straight to its settled state instead of waiting on an animation that will
-never fire.
+**Nothing is timed against the animation.** `--casestudy-slide-duration` (700ms)
+drives the CSS and is no longer read by anything else. The arrows used to be locked
+for exactly that long by a timer; now re-entry is handled declaratively by
+`hx-sync`, so a second press replaces the in-flight request instead of queueing
+behind it.
+
+**Reduced motion needs no special case.** Under `prefers-reduced-motion: reduce`
+the durations collapse and the slide becomes an instant cut. There is no longer any
+code waiting on an animation to finish, so the failure this used to risk — a
+control left disabled forever because the event never fired — is not merely handled
+but structurally impossible.
 
 ## Tech stack marquee
 
@@ -184,7 +235,7 @@ than loud.
 
 | Check | Why it cannot be left to review |
 | ----- | ------------------------------- |
-| `node --check js/script.js` | A syntax error ships a dead carousel with a clean-looking diff |
+| `scripts/check_htmx.py` | A renamed fragment 404s in silence; a drifted rotation looks fine; a control without an `id` strands focus on `<body>` |
 | `scripts/check_palette.py` | The palette exists in four copies (below) |
 | `scripts/check_repo.py` | Deleting `.nojekyll` breaks paths with no build error; `sitemap.xml` drifts silently |
 | `npx @google/design.md lint DESIGN.md` | Holds the file at 0 errors and 0 warnings |

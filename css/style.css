@@ -25,7 +25,8 @@
 
   --max-width: 1200px;
 
-  /* Longest carousel slide animation. js/script.js reads this value, so keep it in ms. */
+  /* Longest carousel slide animation. Nothing outside this stylesheet reads it
+     any more — the swap is not timed against it — so the unit is free. */
   --casestudy-slide-duration: 700ms;
 
   --casestudy-item1-transform: translate(-100%, -5%) scale(1.5);
@@ -212,46 +213,45 @@ nav .logo a:hover {
   flex-wrap: wrap;
 }
 
-/* Visually hidden rather than display:none so the tabs stay keyboard-reachable
-   (native radio group: arrow keys switch panels) and screen-reader accessible. */
-.hero--options input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-  border: 0;
-}
-
-.hero--options input:checked + .hero--links {
+/* The tabs are real buttons, so selection is an attribute on the control rather
+   than a hidden radio's :checked state — the server decides which one is
+   selected and says so in the markup it returns. Only one panel is ever in the
+   document, so nothing needs hiding. */
+.hero--links[aria-selected="true"] {
   color: var(--accent-text);
   font-weight: 600;
 }
 
-.hero--options input:focus-visible + .hero--links {
+.hero--links:focus-visible {
   outline: 2px solid var(--accent-text);
   outline-offset: 2px;
   border-radius: 2px;
 }
 
-.hero--options input:checked + label + .hero--txt {
-  display: initial;
-}
-
+/* Strip the UA button chrome: these read as links in the design. */
 .hero--links {
   padding: 0px 10px 10px 0px;
   cursor: pointer;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
 }
 
 .hero--txt {
-  order: 1;
   line-height: 1.5rem;
   color: var(--text-muted);
   margin-bottom: 2rem;
   min-height: 200px;
-  display: none;
+}
+
+/* The panel is focusable (tabindex="0") so a keyboard user lands on the content
+   that just replaced the old panel, which means it also needs a focus ring. */
+.hero--txt:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 4px;
+  border-radius: 2px;
 }
 
 .image {
@@ -414,9 +414,11 @@ nav .logo a:hover {
   outline-offset: 3px;
 }
 
-/* Set by js/script.js while a slide is in flight. Purely an affordance — the
-   click guard lives in JavaScript so that focus is never taken away. */
-.casestudy--arrows button[aria-disabled="true"] {
+/* htmx puts .htmx-request on the button while its fragment is in flight. Purely
+   an affordance: re-entry is handled by hx-sync, and the disabled property is
+   still forbidden here because disabling the control the user just pressed moves
+   focus to <body> and strands keyboard users outside the carousel. */
+.casestudy--arrows button.htmx-request {
   opacity: 0.5;
   cursor: default;
 }
@@ -448,22 +450,25 @@ nav .logo a:hover {
 }
 
 /* Slide transitions.
-   js/script.js reorders the DOM, then adds .next or .prev to the container.
+   The fragment htmx swaps in arrives already reordered and already carrying
+   .next or .prev on the list, so the direction of travel is part of the markup.
    Each keyframe declares only a `from` block, so an item animates out of the
-   slot it just left and into the slot its :nth-child rule already assigns. */
-.casestudy--container.next .casestudy--item:nth-child(1) {
+   slot it just left and into the slot its :nth-child rule already assigns.
+   Because every item is a freshly parsed node, the animations start on their own
+   — the reflow nudge the old script needed to restart them is gone. */
+.casestudy--list.next .casestudy--item:nth-child(1) {
   animation: fromItem2 var(--casestudy-slide-duration) ease-in-out 1 forwards;
 }
 
-.casestudy--container.next .casestudy--item:nth-child(2) {
+.casestudy--list.next .casestudy--item:nth-child(2) {
   animation: fromItem3 var(--casestudy-slide-duration) ease-in-out 1 forwards;
 }
 
-.casestudy--container.prev .casestudy--item:nth-child(2) {
+.casestudy--list.prev .casestudy--item:nth-child(2) {
   animation: fromItem1 var(--casestudy-slide-duration) ease-in-out 1 forwards;
 }
 
-.casestudy--container.prev .casestudy--item:nth-child(3) {
+.casestudy--list.prev .casestudy--item:nth-child(3) {
   animation: fromItem2 var(--casestudy-slide-duration) ease-in-out 1 forwards;
 }
 
@@ -664,8 +669,9 @@ nav .logo a:hover {
 
 /* WCAG 2.3.3 - respect an OS-level request for reduced motion.
    The marquees stop, the carousel becomes an instant cut, and blur/opacity
-   transitions are removed. js/script.js checks the same media query so the
-   arrow buttons do not stay locked waiting for an animation that never runs. */
+   transitions are removed. Nothing waits on these animations any more: the
+   arrows are released by the fragment arriving, not by an animation ending, so
+   collapsing the durations here cannot leave a control stuck. */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
