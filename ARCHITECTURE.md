@@ -316,24 +316,17 @@ sends it to `<body>` and re-enabling does not bring it back. On success the inpu
 is focused *before* the gate is hidden, so the pressed control never vanishes from
 under a live focus.
 
-## The tech stack marquee, and why it is gone
+## There is no logo marquee, on purpose
 
-The home page used to end in seven scrolling rows of Boxicons logos. It was pure
-decoration: the rows were `aria-hidden="true"` as a whole, so they contained no
-text, contributed nothing to a screen reader, and were never eligible for
-`corpus.json` in the first place.
+The home page used to end in scrolling rows of Boxicons logos. It was removed
+because a wall of logos is not a skills list: being `aria-hidden` as a whole it
+carried no text, so it was never eligible for `corpus.json`, and nothing kept it
+in step with the prose. It drifted until it was the only place on the site that
+named no AI at all.
 
-It was removed because it disagreed with the page. The twenty-three logos were
-TypeScript, Redux, Tailwind, HTML5, CSS3, C++ and the like, while the skills
-passage the Ask page actually retrieves — `portfolio.html#skills` — leads with
-agentic AI, LangGraph, Google ADK, BigQuery and Terraform. The one section
-claiming to say what this site's author works with was the only place on the site
-that mentioned no AI at all.
-
-Its removal took `--accent` and `--text-subtle` with it. Each was referenced
-exactly once in the stylesheet, both inside the marquee rules, so both became
-dead in both flavours. See [DESIGN.md](DESIGN.md) on why `--accent` in particular
-should not come back.
+**`portfolio.html#skills` is the one authoritative statement of what this site's
+author works with**, because it is prose, it is crawlable, and it is what the Ask
+page retrieves. A second, decorative copy has no way to stay true.
 
 ## Responsive breakpoints
 
