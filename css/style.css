@@ -824,11 +824,15 @@ nav .logo a:hover {
   outline-offset: 3px;
 }
 
-/* Disabled is safe here in a way it is never safe on the carousel arrows: this
-   button is removed from the flow entirely once the model is loaded, so there is
-   no case where focus lands on it and then has nowhere to go. The arrows stay on
-   screen, which is exactly why they use hx-sync instead. */
-.ask--load:disabled {
+/* aria-disabled, never the disabled property — the same invariant the carousel
+   arrows keep, and for the same reason. An earlier version of this rule used
+   :disabled on the argument that the button is removed from the flow anyway once
+   the model has loaded. That was wrong about the timing: it is removed when the
+   load *finishes*, so disabling it on press stranded a keyboard user on <body>
+   for the whole multi-second download. js/ask.js now guards re-entry with a flag
+   and moves focus to the input before hiding the gate. */
+.ask--load[aria-disabled='true'],
+#ask--submit[aria-disabled='true'] {
   cursor: progress;
   opacity: 0.6;
 }

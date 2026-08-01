@@ -35,13 +35,18 @@ request — and delay first paint.
 ## Layout
 
 ```
-index.html              single page: nav + home, case study, tech stack sections
+index.html              home: nav + hero, case study carousel, tech stack sections
+projects.html           the case studies in full; also the Ask page's corpus
+ask.html                browser-local semantic search over projects.html
 404.html                self-contained not-found page
 css/style.css           all styles, including the carousel slide animations
+js/ask.js               the only first-party script; see The Ask page
 fragments/              the HTML states htmx fetches; pieces of a page, not pages
   hero/                 one file per hero tab, each carrying the whole tablist
-  casestudy/            r{0,1,2}-{next,prev}.html, one per rotation and direction
+  casestudy/            r{0..3}-{next,prev}.html, one per rotation and direction
   404-links.html        section shortcuts, loaded by 404.html
+vendor/transformers/    Transformers.js and the ORT WebAssembly, served from origin
+assets/models/          all-MiniLM-L6-v2 weights and tokenizer, likewise
 assets/favicon.svg      favicon
 assets/images/          profile photo (webp) and the 1200x630 social share card
 .nojekyll               opt out of Jekyll processing (see Deployment)
@@ -112,6 +117,15 @@ Pages, which cannot compute a response or set a header.
   click-away overlay. It stays CSS because it has nothing to fetch — there is no
   state to get from a server, and htmx would only add a network round trip to
   something that already works offline.
+- **The Ask page is the one exception**, and it is worth being precise about why.
+  Every pattern above works because the state being requested is markup that
+  already exists somewhere. Semantic search has no such file: the answer is a
+  matrix multiply against 384-dimensional vectors computed in the visitor's tab
+  from a model running there. Serving it as a fragment would mean sending the
+  question to a server, which is the exact property the page is built to avoid. So
+  `js/ask.js` is a plain ES module — no bundler, no package manager, consistent
+  with the rest of the repo — and it is the only first-party script on the site.
+  See [the Ask page](#the-ask-page) below.
 
 One constraint runs through all of it. **Every control htmx can swap away needs a
 stable `id`.** After a swap htmx looks the previously focused element up again by
@@ -137,24 +151,42 @@ Advancing the carousel does not change any styles — it changes which item sits
 which slot. Pressing an arrow fetches the fragment for the rotation it moves to,
 and that fragment contains the same three case studies written out in the new
 order. The `:nth-child` rules then re-apply themselves to whatever now sits in
-each slot. There are six fragments, one per rotation and direction of travel:
-`fragments/casestudy/r{0,1,2}-{next,prev}.html`. `index.html` holds rotation 0.
+each slot. There is one fragment per rotation and direction of travel —
+`fragments/casestudy/r{0..3}-{next,prev}.html`, eight for the four case studies
+there are now. `index.html` holds rotation 0.
 
-**The rotations are copies, and a script keeps them honest.** Seven files contain
-the same three case studies. That is the identical bargain the palette makes
-across four files, and it is accepted for the same reason — the alternative is a
-build step. `index.html` is the source of truth and `scripts/check_htmx.py` fails
-CI if any rotation drifts from it, so editing one copy is a caught error rather
-than a silent one.
+**The rotations are copies, and two scripts keep them honest.** Nine files contain
+the same four case studies. That is the identical bargain the palette makes across
+four files, and it is accepted for the same reason — the alternative is a build
+step. `index.html` is the source of truth;
+`scripts/propagate_casestudy.py` regenerates every fragment from it and
+`scripts/check_htmx.py` fails CI if any rotation drifts, so editing one copy is a
+caught error rather than a silent one.
+
+The generator is what makes the duplication cheap enough to keep. Before it, the
+checker could tell you the copies disagreed but you still reconciled them by hand,
+which is the part that goes wrong. Now `--check` runs in CI as well, so a drifted
+fragment fails with an instruction to re-run the generator rather than an
+invitation to patch whichever file the error happened to name. The count of case
+studies is derived from `index.html` throughout — no script holds it as a
+constant — but the stylesheet cannot be derived, so adding a case study still
+means writing its slot tokens, `:nth-child` rule and keyframes by hand.
+`check_htmx.py` verifies they exist rather than trusting that someone remembered.
 
 **The animation runs backwards.** Because the new layout is already correct the
 instant the DOM changes, the slide has to animate *out of* the slot each element
-just left, *into* the one it now occupies. That is why `@keyframes fromItem1`,
-`fromItem2` and `fromItem3` each contain **only a `from` block and no `to`**. The
-end state is whatever the `:nth-child` rule assigns — writing a `to` block would
-override it and break the effect. The `--casestudy-item1/2/3-*` custom properties
-hold those starting positions, which is why they read as animation state rather
-than theme values.
+just left, *into* the one it now occupies. That is why every `@keyframes fromItemN`
+contains **only a `from` block and no `to`**. The end state is whatever the
+`:nth-child` rule assigns — writing a `to` block would override it and break the
+effect. The `--casestudy-itemN-*` custom properties hold those starting positions,
+which is why they read as animation state rather than theme values.
+
+Slot 4 is not a visible position. Slots 1 to 3 are off-screen-left, active and
+blurred peek; the fourth is an off-screen reserve at `opacity: 0` with
+`pointer-events: none`, so a deck longer than three has somewhere to keep the
+items not currently in play. Its contents stay in the accessibility tree, which
+matches slot 1's long-standing behaviour and means a screen reader still meets
+every case study rather than three of them.
 
 **Direction travels in the markup.** Each fragment carries `.next` or `.prev` on
 the list, which is what selects the animation for the way the deck just moved.
@@ -179,6 +211,66 @@ the durations collapse and the slide becomes an instant cut. There is no longer 
 code waiting on an animation to finish, so the failure this used to risk — a
 control left disabled forever because the event never fired — is not merely handled
 but structurally impossible.
+
+## The Ask page
+
+`ask.html` runs semantic search over the case studies without a server. The
+visitor's question is embedded by a sentence-transformer executing in their own
+tab and compared against passages parsed out of `projects.html`. Nothing is sent
+anywhere, because there is nowhere to send it.
+
+**The stack is [Transformers.js](https://huggingface.co/docs/transformers.js/index)
+running all-MiniLM-L6-v2 quantised to 8-bit on ONNX Runtime for WebAssembly.**
+Two details of that choice are not obvious:
+
+- The self-contained `transformers.min.js` build is required, not the smaller
+  `transformers.web.min.js`. The latter is 0.12 MB lighter but ships bare import
+  specifiers (`from "onnxruntime-web/webgpu"`) that only a bundler can resolve,
+  and this repo does not have one and is not getting one.
+- It runs single-threaded, and that is not tunable. Multi-threaded ORT needs
+  `SharedArrayBuffer`, which needs cross-origin isolation, which needs COOP and
+  COEP response headers that GitHub Pages cannot set. `crossOriginIsolated` is
+  `false` on the deployed page — measured, not assumed — so `numThreads` is
+  pinned to 1 rather than left to fall back silently.
+
+**Everything is served from this origin.** `vendor/transformers/` holds the
+library and the ORT WebAssembly; `assets/models/all-MiniLM-L6-v2/` holds the
+weights and tokenizer. `env.allowRemoteModels` is `false` and
+`env.backends.onnx.wasm.wasmPaths` is overridden, because the library's default is
+to fetch both from third-party CDNs at runtime. Leaving that default would mean
+pinning htmx by SRI digest in one file while pulling 35 MB of unpinned executable
+WebAssembly from someone else's CDN in another — the same integrity problem, an
+order of magnitude larger. The cost is repository size; the benefit is a page that
+makes zero third-party requests, which is verifiable in a network panel rather
+than merely asserted here.
+
+**The model loads on a click, never on page load.** The weights are 22 MB and do
+not compress — measured: gzip returns them at 21.91 MB, byte for byte — while the
+runtime compresses about five-fold. Since the incompressible part dominates,
+gating it behind an explicit button is the entire optimisation and no amount of
+shaving the runtime would matter.
+
+**Retrieval is an exhaustive scan, deliberately.** A few dozen passages at 384
+dimensions is under ten thousand multiply-accumulates per query: microseconds, and
+four orders of magnitude below the ~100,000-vector scale where an approximate
+index like HNSW starts to earn its build time, memory and recall loss. The
+reported query time is almost entirely the model embedding the question.
+
+**The corpus is parsed at runtime, not precomputed.** `js/ask.js` fetches
+`projects.html` and chunks it on `.project` sections. A committed embeddings file
+would be a second copy of the prose, free to drift from the first — the problem
+this repo already pays a CI checker to manage in two other places. Here it is
+avoidable, so it is avoided. The tradeoff is that the class names in
+`projects.html` are now an interface: rename one and the section contributes no
+passages while the page still looks healthy. The check for that is human — load
+the page and confirm the passage count moved.
+
+**Neither button uses the `disabled` property.** `#ask--load` and `#ask--submit`
+set `aria-disabled` and guard re-entry with a flag, for the same reason the
+carousel arrows use `hx-sync`: disabling the element under a keyboard user's focus
+sends it to `<body>` and re-enabling does not bring it back. On success the input
+is focused *before* the gate is hidden, so the pressed control never vanishes from
+under a live focus.
 
 ## Tech stack marquee
 
@@ -235,7 +327,8 @@ than loud.
 
 | Check | Why it cannot be left to review |
 | ----- | ------------------------------- |
-| `scripts/check_htmx.py` | A renamed fragment 404s in silence; a drifted rotation looks fine; a control without an `id` strands focus on `<body>` |
+| `scripts/check_htmx.py` | A renamed fragment 404s in silence; a drifted rotation looks fine; a control without an `id` strands focus on `<body>`; a carousel slot with no CSS tokens breaks the layout with no error |
+| `scripts/propagate_casestudy.py --check` | Proves the fragments are still what the generator emits, so a drift is fixed by regenerating rather than by hand-patching one copy |
 | `scripts/check_palette.py` | The palette exists in four copies (below) |
 | `scripts/check_repo.py` | Deleting `.nojekyll` breaks paths with no build error; `sitemap.xml` drifts silently |
 | `npx @google/design.md lint DESIGN.md` | Holds the file at 0 errors and 0 warnings |

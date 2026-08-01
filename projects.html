@@ -81,7 +81,8 @@
                     writing the code myself to leading a global team of fifty. Three
                     engagements below, in the detail the home page carousel has no room
                     for: what the problem actually was, what I decided, and what it
-                    cost.</p>
+                    cost. Then one thing I built rather than led — the search on this
+                    site, which runs its model in your browser.</p>
             </header>
 
             <article class="project" id="restaurant-technology-platform">
@@ -202,6 +203,69 @@
                     <li>Completed in <strong>9 months</strong>, after three years behind schedule</li>
                     <li>Realised the <strong>USD 3 million ROI</strong></li>
                     <li>Scaled to <strong>1.5 million MAU</strong> across three markets</li>
+                </ul>
+            </article>
+
+            <!-- This section is also the corpus the Ask page searches. js/ask.js
+                 fetches this file at runtime and chunks it on .project sections,
+                 reading the h2, the paragraphs and the .project--impact list while
+                 skipping .project--meta and anything under 40 characters. So the
+                 class names here are an interface, not just styling: rename one and
+                 the section silently contributes nothing while the status line still
+                 reports a healthy-looking count. After editing, load ask.html and
+                 check that the passage count moved. -->
+            <article class="project" id="browser-local-semantic-search">
+                <h2>Browser-Local Semantic Search</h2>
+                <p class="project--meta">
+                    <span class="project--category">Applied AI</span>
+                    <span class="project--role">This site</span>
+                </p>
+
+                <p>The Ask page on this site answers questions about these case studies
+                    by running a sentence embedding model inside the visitor's browser.
+                    There is no inference server, no API key and no request carrying the
+                    question anywhere. It is small, and it is deliberately small: the
+                    point was to build the thing end to end rather than describe having
+                    once specified it.</p>
+
+                <p><strong>all-MiniLM-L6-v2, quantised to 8-bit, executed by ONNX Runtime
+                    on WebAssembly</strong> through Transformers.js. Quantisation is what
+                    makes the model shippable at all — full precision is four times the
+                    weight for a retrieval quality difference this corpus cannot resolve.
+                    The runtime runs single-threaded because GitHub Pages cannot send the
+                    COOP and COEP headers that <code>SharedArrayBuffer</code> requires, so
+                    the threaded build would silently fall back anyway. I measured
+                    <code>crossOriginIsolated</code> in the deployed page rather than
+                    assuming it.</p>
+
+                <p><strong>The model, the runtime and the weights are all served from this
+                    origin.</strong> The obvious build fetches them from a model hub on
+                    first use. That would mean pinning a CDN script by SRI digest in one
+                    breath and then pulling tens of megabytes of unpinned executable
+                    WebAssembly from a third party in the next — the same integrity
+                    problem an order of magnitude larger. Vendoring costs repository size
+                    and buys a page with no third-party requests at all, which I verified
+                    in the network panel rather than in the source.</p>
+
+                <p><strong>Retrieval is an exhaustive cosine scan, not an approximate
+                    index.</strong> A few dozen passages at 384 dimensions is under ten
+                    thousand multiply-accumulates — microseconds, and four orders of
+                    magnitude below the cost of embedding the question that precedes it.
+                    An HNSW graph would add a dependency, a build artefact and a recall
+                    tradeoff to optimise the part that is already free. Knowing where that
+                    crossover sits is the engineering; reaching for the vector database
+                    before it is the failure mode.</p>
+
+                <p>The corpus is parsed out of this page at load time rather than
+                    committed as a generated embeddings file, so there is no build step to
+                    forget and no way for the index to describe a version of these case
+                    studies that no longer exists.</p>
+
+                <ul class="project--impact">
+                    <li><strong>No inference cost and no data egress</strong> — the
+                        question never leaves the tab</li>
+                    <li><strong>~25ms per query</strong> after a one-time model load</li>
+                    <li><strong>Zero third-party requests</strong> at runtime</li>
                 </ul>
             </article>
 

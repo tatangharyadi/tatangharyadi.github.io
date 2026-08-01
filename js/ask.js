@@ -276,8 +276,21 @@ function render(hits, query) {
 // and never on page load. Charging every visitor tens of megabytes to read a
 // page they might not interact with would be the wrong default no matter how
 // good the feature is.
+//
+// Neither this nor ask() uses the `disabled` property, for the same reason the
+// carousel arrows do not — see AGENTS.md#accessibility-invariants. Disabling the
+// element the user just activated moves focus to <body>, and re-enabling it later
+// does not bring focus back. Here that would strand a keyboard user for the whole
+// multi-second model download with no way back into the component. `aria-disabled`
+// announces the state without touching focus, and a plain guard flag is what
+// actually prevents a second press doing the work twice — the same division of
+// labour hx-sync provides for the arrows.
+let loading = false;
+
 async function start() {
-  els.load.disabled = true;
+  if (loading) return;
+  loading = true;
+  els.load.setAttribute('aria-disabled', 'true');
   els.progressWrap.hidden = false;
   setProgress(0, 'Fetching the runtime…');
 
@@ -294,15 +307,18 @@ async function start() {
     );
     corpus.forEach((c, i) => { c.vector = vectors[i]; });
 
-    els.gate.hidden = true;
+    // Focus is moved to the input below *before* the gate is hidden, so the
+    // button the user pressed never disappears from under a live focus.
     els.form.hidden = false;
     els.examples.hidden = false;
     els.status.textContent =
       `Ready. ${corpus.length} passages indexed in this tab. Ask a question.`;
     els.input.focus();
+    els.gate.hidden = true;
   } catch (err) {
+    loading = false;
     els.progressWrap.hidden = true;
-    els.load.disabled = false;
+    els.load.removeAttribute('aria-disabled');
     els.status.textContent = `The model could not be loaded: ${err.message}`;
     // Left in place deliberately: if this ever fires in the wild, the console is
     // the only place with the stack.
@@ -310,11 +326,14 @@ async function start() {
   }
 }
 
+let searching = false;
+
 async function ask(query) {
   const q = query.trim();
-  if (!q || !extractor) return;
+  if (!q || !extractor || searching) return;
 
-  els.submit.disabled = true;
+  searching = true;
+  els.submit.setAttribute('aria-disabled', 'true');
   els.status.textContent = 'Searching…';
   try {
     const t0 = performance.now();
@@ -329,7 +348,8 @@ async function ask(query) {
     els.status.textContent = `Search failed: ${err.message}`;
     console.error(err);
   } finally {
-    els.submit.disabled = false;
+    searching = false;
+    els.submit.removeAttribute('aria-disabled');
   }
 }
 

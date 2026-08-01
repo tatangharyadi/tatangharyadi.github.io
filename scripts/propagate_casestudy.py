@@ -13,9 +13,13 @@ result. Never edit a fragment directly.
     python3 scripts/propagate_casestudy.py          # rewrite the fragments
     python3 scripts/propagate_casestudy.py --check  # exit 1 if any are stale
 
-Adding or removing a case study means changing ROTATIONS in check_htmx.py to
-match, and adding the matching --casestudy-itemN-* tokens, :nth-child(N) rule and
-@keyframes fromItemN in css/style.css. Nothing here can infer those for you.
+The number of case studies is not a constant anywhere: it is however many
+.casestudy--item blocks index.html holds, and check_htmx.py derives the fragment
+count and the arrow modulus from the same source. So adding or removing one needs
+no edit here. It does need the matching --casestudy-itemN-* tokens, :nth-child(N)
+rule and @keyframes fromItemN in css/style.css, which nothing can infer for you —
+check_htmx.py fails when they are missing rather than letting the page break
+quietly.
 """
 
 import argparse
