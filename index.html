@@ -342,9 +342,17 @@
         <section class="colophon" id="colophon" aria-labelledby="colophon--heading">
             <div class="colophon--container">
                 <h2 id="colophon--heading">Colophon</h2>
-                <p class="section--lead">What this page is made of, what it measures, and
-                    what a machine checks on every commit. All of it is verifiable from
-                    the <a href="https://github.com/tatangharyadi/tatangharyadi.github.io">repository</a>,
+                <!-- Kept deliberately short. An earlier version ran to about twelve
+                     hundred words, which was more than two thirds of this page and
+                     meant the site spent most of its length talking about itself
+                     rather than about the work. Every paragraph cut from here already
+                     existed in ARCHITECTURE.md at greater depth, so nothing was lost
+                     and the audience that wants it is one link away. If you find
+                     yourself explaining a build decision here rather than there, that
+                     is the signal this section is growing back. -->
+                <p class="section--lead">What this page is made of and what a machine
+                    checks on every commit. The long version of all of it is in the
+                    <a href="https://github.com/tatangharyadi/tatangharyadi.github.io">repository</a>,
                     which is the point of writing it down.</p>
 
                 <!-- Numbers a reader could otherwise only take on trust. Deliberately
@@ -389,111 +397,53 @@
                 <div class="colophon--prose">
                     <h3>How the search works, and what it deliberately is not</h3>
 
-                    <p>The library is <a href="https://huggingface.co/docs/transformers.js/index">Transformers.js</a>,
-                        running <strong>all-MiniLM-L6-v2</strong> quantised to 8-bit
-                        through ONNX Runtime on WebAssembly. Every piece of it, the
-                        library, the runtime, the tokenizer and the weights, is served
-                        from this domain. No part of it comes from a CDN or a model hub
-                        at runtime, which is what lets the claim above be literal rather
-                        than approximate: the question is tokenised, embedded and
-                        compared in this tab, and no network request carries it. One
-                        script on this page does come from a CDN, htmx, pinned to a
+                    <p>The library is <a href="https://huggingface.co/docs/transformers.js/index">Transformers.js</a>.
+                        It, the runtime, the tokenizer and the weights are all served
+                        from this domain, which is what lets the claim above be
+                        literal rather than approximate: your question is tokenised,
+                        embedded and compared in this tab, and no network request carries
+                        it. One script here does come from a CDN, htmx, pinned to a
                         version and a Subresource Integrity digest so the host cannot
-                        change what runs here. It is loaded before you ask anything and
-                        takes no part in answering.</p>
-
-                    <p><strong>It runs on one thread, and that is not a choice.</strong>
-                        Multi-threaded ONNX Runtime needs <code>SharedArrayBuffer</code>,
-                        which needs cross-origin isolation, which needs COOP and COEP
-                        response headers. GitHub Pages cannot set headers, so
-                        <code>crossOriginIsolated</code> is <code>false</code> here and
-                        threads are unavailable no matter what the config asks for. The
-                        interesting part is that it does not matter: embedding one short
-                        question is a few tens of milliseconds single-threaded.</p>
-
-                    <p><strong>The search is a linear scan, on purpose.</strong> There is
-                        no HNSW graph, no IVF index and no vector database, because at
-                        this size every one of them would be slower and all of them would
-                        be worse. The status line above tells you how many passages are
-                        indexed; a few dozen at 384 dimensions is under ten thousand
-                        multiply-accumulates per query, which is microseconds, so the
-                        measured search time it reports is almost entirely the model
-                        embedding your question, not the search. An approximate index is
-                        a trade: you spend build time, memory and exact recall to avoid a
-                        scan that has become expensive. Here the scan has not become
-                        expensive, so the trade is all cost and no benefit. The crossover
-                        is somewhere around a hundred thousand vectors, four orders of
-                        magnitude away.</p>
+                        change what runs. It takes no part in answering.</p>
 
                     <p><strong>It retrieves; it does not generate.</strong> What comes
-                        back is the passage I actually wrote, with its similarity score,
-                        linked to where it sits on the portfolio page. There is no
-                        language model writing prose about me, which means there is
-                        nothing here that can invent a credential. The honest limitation
-                        of that: it answers <em>"what did he do with IoT"</em> well and
-                        <em>"would he suit a fintech CTO role"</em> badly, because the
-                        second question is asking for a judgement and this only knows how
-                        to find the nearest paragraph.</p>
-
-                    <p><strong>The corpus is this site.</strong> Every passage is
-                        generated from the portfolio page, embedded once, and committed
-                        as a JSON file next to it. The first version did the opposite: it
-                        fetched the portfolio, split it up and ran the model over all of
-                        it in your browser, to avoid keeping a second copy of the prose
-                        that could drift from the first. That was a real concern answered
-                        in the wrong currency. It charged every visitor seconds of
-                        WebAssembly inference to recompute a value that is the same for
-                        everyone, and it quietly made five CSS class names an interface,
-                        so renaming one would drop a whole section out of the search
-                        while the count still looked healthy. Precomputing turns a silent
-                        failure into a loud one: the generator is the only thing that
-                        writes the index, and CI fails if a passage in it is no longer on
-                        the page.</p>
+                        back is a passage I actually wrote, scored and linked to where it
+                        sits on the portfolio page. No language model writes prose about
+                        me here, so there is nothing that can invent a credential. The
+                        honest limitation: it answers <em>"what did he do with IoT"</em>
+                        well and <em>"would he suit a fintech CTO role"</em> badly,
+                        because the second is asking for a judgement and this only knows
+                        how to find the nearest paragraph.</p>
 
                     <h3>What a machine checks, so you do not have to trust me</h3>
 
                     <p>The interesting claim on a page like this is never the design, it
                         is whether anything stops the design from quietly going wrong.
-                        Six checks run on every pull request, and each one exists
-                        because the failure it catches is invisible on a page that loads
-                        cleanly.</p>
+                        Six checks run on every pull request, each catching a failure
+                        that is invisible on a page that loads cleanly.</p>
 
                     <ul class="colophon--checks" role="list">
-                        <li><strong>The palette is written out in four places</strong>, in
-                            the stylesheet, in the offline 404 page, in the machine-readable
-                            design token file and in the browser-chrome colour metas, and a
-                            check fails the build if any copy drifts from the source of
-                            truth. Contrast is held at 4.5:1 for text against the tighter of
-                            the two colour schemes, which is why one accent colour in this
-                            system is deliberately not a Catppuccin value: none of them
-                            reach the floor as text.</li>
-                        <li><strong>The navigation is written out three times</strong>, on
-                            this page, on the portfolio page and in the offline fallback,
-                            because the site has to navigate with no JavaScript at all and a
-                            crawler should see the links as content. A check compares the
-                            visible labels rather than the URLs, which legitimately differ
-                            per page.</li>
+                        <li><strong>The palette, written out in four files</strong>, cannot
+                            drift from the stylesheet that is its source of truth. Text
+                            contrast is held at 4.5:1 against the tighter of the two colour
+                            schemes.</li>
+                        <li><strong>The navigation, written out three times</strong> so the
+                            site works with no JavaScript and a crawler sees the links as
+                            content, cannot disagree with itself.</li>
                         <li><strong>Every passage in the search index must still exist on
-                            the page it was generated from.</strong> Editing the prose
-                            without regenerating the index would leave a passage describing
-                            one thing and its vector describing another, which retrieves
-                            worse without ever raising an error.</li>
-                        <li><strong>Every project fragment must be exactly what the
-                            generator emits.</strong> The detail you open in the index above
-                            is generated from the portfolio page, so the two cannot
-                            disagree. Hand-patching a fragment fails the build.</li>
-                        <li><strong>Every fragment an interaction asks for must resolve,
-                            and every control that fetches one must keep a stable
-                            identifier.</strong> A missing fragment is a silent no-op on
-                            click rather than an error, and a control that loses its
-                            identifier mid-swap sends keyboard focus to the top of the
-                            document, which a mouse user would never notice.</li>
+                            the page it was generated from.</strong> Editing prose without
+                            regenerating the index retrieves worse and raises no error.</li>
+                        <li><strong>Every project detail in the index above must be exactly
+                            what the generator emits</strong> from the portfolio page, so
+                            the two cannot say different things.</li>
+                        <li><strong>Every fragment an interaction fetches must resolve, and
+                            every control that fetches one must keep its identifier.</strong>
+                            A missing fragment is a silent no-op on click, and a control that
+                            loses its identifier mid-swap strands keyboard focus.</li>
                         <li><strong>The design tokens must still parse as design
-                            tokens.</strong> The colours, type scale and components are
-                            described in a machine-readable file, and the build fails on a
-                            warning, not only on an error, because a warning there means
-                            the file has started describing something that is no longer on
-                            the page.</li>
+                            tokens</strong>, and a warning fails the build rather than only
+                            an error, because a warning means the file has started
+                            describing something no longer on the page.</li>
                     </ul>
 
                     <h3>On how this was built</h3>
@@ -503,13 +453,8 @@
                         model asked for a personal site will hand back the same
                         centred hero and the same carousel every time. This page had one
                         of each until recently. The difference is not what the model can
-                        produce, it is what it is asked to hold itself to. The
-                        constraints above are the actual artifact: no build step, one
-                        first-party script with a written justification, an accessibility
-                        rule for every place the obvious implementation strands a
-                        keyboard user, and a machine check behind each invariant that a
-                        person would otherwise have to remember. Judge the repository, not
-                        the hero.</p>
+                        produce, it is what it is asked to hold itself to. Judge the
+                        repository, not the hero.</p>
 
                     <p class="colophon--links">
                         <a href="https://github.com/tatangharyadi/tatangharyadi.github.io">Source</a>
