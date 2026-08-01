@@ -7,7 +7,7 @@
     <title>Build corpus.json</title>
 
     <!-- Load-bearing, not tidiness. Every path below now resolves from the site
-         root exactly as it does on ask.html, so the model configuration in this
+         root exactly as it does on index.html, so the model configuration in this
          file can be a verbatim copy of the one in js/ask.js rather than the same
          thing rewritten with ../ in front of it. An earlier version did the
          rewriting and an absolute localModelPath made transformers.js skip loading
@@ -35,7 +35,7 @@
 <body>
     <h1>Build <code>corpus.json</code></h1>
 
-    <p>Regenerates the search index for <a href="ask.html">the Ask page</a> from
+    <p>Regenerates the search index for <a href="index.html#ask">the search on the home page</a> from
         <a href="portfolio.html">portfolio.html</a>. Serve the repository
         (<code>python3 -m http.server 8000</code>) and open this at
         <code>/scripts/build-corpus.html</code> — it needs real HTTP, because the
@@ -69,7 +69,7 @@
         const DIMS = 384;
 
         // Resolved against <base>, so this is both where the page is read from and
-        // the anchor prefix ask.html will resolve at the site root.
+        // the anchor prefix index.html will resolve at the site root.
         const SOURCE_URL = 'portfolio.html';
         const SOURCE_LABEL = 'Portfolio';
 
@@ -149,14 +149,31 @@
             log('Loading the model (16 MB, first time only)…');
             const extractor = await loadModel();
 
-            // Batched for the same reason ask.js batches: one call with everything
-            // pads every passage to the longest in the set.
+            // One passage per call, deliberately, and this is the slow way round.
+            //
+            // An earlier version batched sixteen at a time. A batch is padded to
+            // its longest member, and under 8-bit quantisation that padding
+            // changes the result: editing the prose of one passage moved the
+            // committed vectors of the eleven unedited passages sharing its batch,
+            // to a cosine of 0.997 against themselves. Nothing catches that.
+            // check_corpus.py compares text, so a vector that shifted because a
+            // neighbour got longer looks exactly like one that did not shift at
+            // all, and the file that lands in the diff is 12 passages wide for a
+            // 2 passage edit.
+            //
+            // Unbatched, a vector is a function of its own text and nothing else,
+            // so regenerating after an unrelated edit produces a diff you can
+            // actually read. It is also what the live path does: ask.js embeds a
+            // single query string, never a batch, so a sequence sitting alone in
+            // its call is the case the shipped code exercises.
             const texts = passages.map((p) => `${p.heading}. ${p.text}`);
             const vectors = [];
-            for (let i = 0; i < texts.length; i += 16) {
-                const out = await extractor(texts.slice(i, i + 16), { pooling: 'mean', normalize: true });
+            for (let i = 0; i < texts.length; i += 1) {
+                const out = await extractor(texts[i], { pooling: 'mean', normalize: true });
                 vectors.push(...out.tolist());
-                log(`embedded ${Math.min(i + 16, texts.length)} of ${texts.length}`);
+                if ((i + 1) % 8 === 0 || i + 1 === texts.length) {
+                    log(`embedded ${i + 1} of ${texts.length}`);
+                }
             }
 
             passages.forEach((p, i) => {

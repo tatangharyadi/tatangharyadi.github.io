@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
-"""Check the htmx wiring: fragments resolve, agree with index.html, and keep the
+"""Check the htmx wiring: fragments resolve, agree with their source, and keep the
 invariants that make the interaction accessible.
 
-The site's interaction is hypermedia. Every state of the case study carousel is a
-static file under fragments/, and the markup a fragment returns is the whole
-state — which buttons exist, which one is selected, where each button points
-next. That is what makes the pattern work without a server, and it is also what
-makes it fragile in ways a browser will not complain about:
+The site's interaction is hypermedia. Each entry in the work index on index.html
+asks for a static file under fragments/work/ and swaps in the detail it returns.
+That is what makes the pattern work without a server, and it is also what makes
+it fragile in ways a browser will not complain about:
 
   * A renamed or deleted fragment is a 404 on click. The page keeps working, the
     control silently does nothing.
-  * The case studies are written out once per rotation per direction, plus
-    index.html. Editing one copy and not the rest is the same class of mistake
-    the palette's four copies invite, and check_palette.py exists for exactly
-    that reason.
+  * The detail prose exists once, in portfolio.html, which is also what
+    corpus.json is generated from. A fragment for a project that page no longer
+    describes would still resolve, still render, and still contradict the search.
   * htmx restores focus after a swap by looking the previously focused element up
     again with document.getElementById. A control that loses its id during a swap
-    drops keyboard focus onto <body>, which is the regression the carousel's
-    whole shape is designed to avoid.
+    drops keyboard focus onto <body>. The index avoids this structurally, by
+    keeping every trigger outside the region it swaps, and that structure is
+    checked here rather than left to whoever edits the markup next.
+  * Each trigger is an <a> with a working href, so the index degrades to ordinary
+    links with no JavaScript. An hx-get bolted onto a <button>, or an <a> whose
+    href drifts from the fragment it fetches, breaks that quietly.
 
 None of that is visible to node --check, a linter, or a green page load. It is
 visible here.
@@ -31,23 +33,16 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 FRAGMENTS = ROOT / "fragments"
+WORK = FRAGMENTS / "work"
 
 HTMX_VERSION = "2.0.10"
 HTMX_SRI = "sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
 
-ITEM_OPEN = '<div class="casestudy--item">'
-
-# How many case studies there are is not written down anywhere as a number. It is
-# however many .casestudy--item blocks index.html holds, and everything else — the
-# count of fragments, the modulus the arrows wrap by, the slot rules in the
-# stylesheet — is checked against that. A constant here would be a fifth place to
+# Which projects the index holds is not written down anywhere as a number or a
+# list. It is whichever fragments index.html asks for by hx-get, and portfolio.html
+# must have an article for each. A constant here would be a third place to
 # remember to update, which is the class of bug this file exists to catch.
-
-# The re-entry guard. `:replace` is what makes a second press abandon the
-# in-flight request rather than queue behind it; `closest` resolves to
-# #casestudy both in index.html and in a swapped-in fragment, since the
-# fragment's arrows land inside that same container.
-ARROW_SYNC = "closest .casestudy--container:replace"
+HX_GET_WORK = re.compile(r'hx-get="fragments/work/([A-Za-z0-9._-]+)\.html"')
 
 problems = []
 
@@ -71,10 +66,10 @@ def squash(text):
     return re.sub(r"\s+", " ", text).strip()
 
 
-def tags_with(attr, text):
+def tags_with(attr_name, text):
     """Yield the full source of every start tag carrying the given attribute."""
     for match in re.finditer(r"<(\w+)\b[^>]*>", text, re.DOTALL):
-        if re.search(rf"\b{attr}\s*=", match.group(0)):
+        if re.search(rf"\b{attr_name}\s*=", match.group(0)):
             yield match.group(0)
 
 
@@ -96,20 +91,6 @@ def div_block(text, start):
         if depth == 0:
             return text[start:end], end
     return None, len(text)
-
-
-def casestudy_items(text):
-    """The .casestudy--item blocks, in document order, whitespace-normalised."""
-    items, index = [], 0
-    while True:
-        start = text.find(ITEM_OPEN, index)
-        if start == -1:
-            return items
-        block, index = div_block(text, start)
-        if block is None:
-            fail("a .casestudy--item block is never closed")
-            return items
-        items.append(squash(block))
 
 
 def check_fragment_targets(files):
@@ -175,125 +156,135 @@ def check_htmx_script(files):
                 fail(f"{relpath} loads htmx without crossorigin, so integrity is ignored")
 
 
-def check_casestudy_fragments(index_text):
-    """One rotation per case study, each the index.html deck rotated, each
-    pointing onward. Two files per rotation, one per direction of travel."""
-    deck = casestudy_items(index_text)
-    if not deck:
-        fail("index.html holds no .casestudy--item blocks")
-        return
-    rotations = len(deck)
-
-    stale = sorted(
-        p.name for p in (FRAGMENTS / "casestudy").glob("r*.html")
-        if not re.fullmatch(r"r(\d+)-(next|prev)\.html", p.name)
-        or int(re.match(r"r(\d+)", p.name).group(1)) >= rotations
-    )
-    if stale:
-        # A case study removed from index.html leaves its fragments behind, and
-        # nothing else would notice: they resolve, so no link 404s, but they serve
-        # a deck that no longer exists and arrows that wrap past the end.
-        fail(
-            f"index.html has {rotations} case studies, so rotations r0..r{rotations - 1} "
-            f"are the only valid ones; these are left over: {', '.join(stale)}"
-        )
-
-    for rotation in range(rotations):
-        expected_items = deck[rotation:] + deck[:rotation]
-        for direction in ("next", "prev"):
-            name = f"r{rotation}-{direction}.html"
-            path = FRAGMENTS / "casestudy" / name
-            if not path.is_file():
-                fail(f"fragments/casestudy/{name} is missing")
-                continue
-            relpath = path.relative_to(ROOT).as_posix()
-            text = read(path)
-
-            if casestudy_items(text) != expected_items:
-                fail(
-                    f"{relpath} does not hold the index.html case studies rotated by "
-                    f"{rotation}. index.html is the source of truth; edit it there and "
-                    "regenerate, do not edit one copy."
-                )
-
-            list_tag = next((t for t in tags_with("class", text)
-                             if "casestudy--list" in (attr(t, "class") or "")), None)
-            if list_tag is None:
-                fail(f"{relpath} has no .casestudy--list")
-            elif direction not in (attr(list_tag, "class") or "").split():
-                fail(
-                    f"{relpath} does not carry .{direction} on its list, so the slide "
-                    "animation for this direction never runs"
-                )
-
-            check_arrow_targets(relpath, text, rotation, rotations)
-
-    check_casestudy_slots(rotations)
+def work_slugs(index_text):
+    """The project slugs index.html asks for, in document order, deduplicated."""
+    seen, out = set(), []
+    for match in HX_GET_WORK.finditer(index_text):
+        slug = match.group(1)
+        if slug not in seen:
+            seen.add(slug)
+            out.append(slug)
+    return out
 
 
-def check_casestudy_slots(rotations):
-    """Every case study needs a slot in the stylesheet to be shown in.
+def check_work_set(index_text, portfolio_text):
+    """The index, the fragments on disk and the portfolio articles are one set.
 
-    The deck is positioned by :nth-child, so adding a case study to index.html
-    without adding its slot leaves the new item stacked at the default position —
-    visible, wrong, and reported by no other check. The @keyframes is what the
-    .next / .prev rules animate from; a missing one silently disables the slide.
+    Three places have to agree about which projects exist, and each disagreement
+    fails differently and quietly: a fragment nobody asks for is dead weight that
+    still resolves, and an index entry with no article is prose that vanished from
+    the search while the page still links to it.
     """
-    css = read(ROOT / "css" / "style.css")
-    for slot in range(1, rotations + 1):
-        for token in ("transform", "zindex"):
-            name = f"--casestudy-item{slot}-{token}"
-            if name not in css:
-                fail(
-                    f"css/style.css has no {name}, but index.html has {rotations} "
-                    f"case studies so slot {slot} needs one"
-                )
-        if f"@keyframes fromItem{slot}" not in css:
+    slugs = work_slugs(index_text)
+    if not slugs:
+        fail("index.html asks for no fragments under fragments/work/")
+        return []
+
+    for slug in slugs:
+        if f'<article class="project" id="{slug}">' not in portfolio_text:
             fail(
-                f"css/style.css has no @keyframes fromItem{slot}, so the case study "
-                f"entering slot {slot} would jump rather than slide"
+                f'index.html asks for fragments/work/{slug}.html but portfolio.html '
+                f'has no <article class="project" id="{slug}">. The detail is '
+                "generated from that article, and corpus.json is generated from the "
+                "same page, so the search cannot see this project either."
             )
+        if not (WORK / f"{slug}.html").is_file():
+            fail(f"fragments/work/{slug}.html is missing. Run scripts/propagate_work.py.")
+
+    if WORK.is_dir():
+        orphans = sorted(p.name for p in WORK.glob("*.html") if p.stem not in slugs)
+        if orphans:
+            fail(
+                "fragments/work/ holds files no index entry asks for: "
+                f"{', '.join(orphans)}. They resolve, so nothing 404s, but they are "
+                "served to nobody. Run scripts/propagate_work.py."
+            )
+    return slugs
 
 
-def check_arrow_targets(relpath, text, rotation, rotations):
-    """From rotation r, prev goes to r-1 and next to r+1, both wrapping."""
-    expected = {
-        "prev": f"fragments/casestudy/r{(rotation - 1) % rotations}-prev.html",
-        "next": f"fragments/casestudy/r{(rotation + 1) % rotations}-next.html",
-    }
-    for which, want in expected.items():
-        tag = next((t for t in re.findall(r"<button\b[^>]*>", text, re.DOTALL)
-                    if attr(t, "id") == which), None)
+def check_work_controls(index_text, slugs):
+    """Each entry is a link htmx upgrades, aimed at a panel it is not inside of."""
+    for slug in slugs:
+        tag = next(
+            (t for t in tags_with("hx-get", index_text)
+             if attr(t, "hx-get") == f"fragments/work/{slug}.html"),
+            None,
+        )
         if tag is None:
-            fail(f"{relpath} has no #{which} button")
             continue
-        got = attr(tag, "hx-get")
-        if got != want:
-            fail(f"{relpath}'s #{which} points at {got}, expected {want}")
-        # Disabling the control the user just pressed moves focus to <body>.
-        if re.search(r"\bdisabled\b(?!\s*=\s*\"false\")", tag) and "aria-disabled" not in tag:
+
+        # An <a> with a real href is what makes the index work with no JavaScript
+        # and stay crawlable. A <button> here would be a dead control for both.
+        if not tag.startswith("<a"):
             fail(
-                f"{relpath}'s #{which} uses the disabled property. Use hx-sync to "
-                "guard re-entry — disabling it strands keyboard focus on <body>."
+                f"index.html's control for {slug} is not an <a>. Without a real href "
+                "the entry does nothing when JavaScript is unavailable."
             )
-        # hx-sync is the re-entry guard that replaced the old isSliding flag.
-        # Losing it is invisible on a single click and only shows up as two
-        # slides racing, so nothing but this check would catch it.
-        if attr(tag, "hx-sync") != ARROW_SYNC:
+        want_href = f"portfolio.html#{slug}"
+        if attr(tag, "href") != want_href:
             fail(
-                f"{relpath}'s #{which} does not carry hx-sync=\"{ARROW_SYNC}\", "
-                "so a second press queues behind the first instead of replacing it"
+                f"index.html's control for {slug} has href=\"{attr(tag, 'href')}\", "
+                f"expected \"{want_href}\". The fallback must land on the same prose "
+                "the fragment carries."
             )
-        # Keyboard operation is declared here, not in a script. A fragment that
-        # drops the keydown binding still works with a mouse, so a green page
-        # load hides it — the arrows simply stop responding to arrow keys after
-        # the first swap.
-        key = "ArrowLeft" if which == "prev" else "ArrowRight"
-        want_trigger = f"click, keydown[key=='{key}'] from:#casestudy"
-        if attr(tag, "hx-trigger") != want_trigger:
+
+        want_target = f"#work--panel-{slug}"
+        if attr(tag, "hx-target") != want_target:
             fail(
-                f"{relpath}'s #{which} does not carry "
-                f"hx-trigger=\"{want_trigger}\", so {key} stops working after a swap"
+                f"index.html's control for {slug} does not target {want_target}, "
+                "so the detail would replace something else"
+            )
+        if attr(tag, "hx-swap") != "innerHTML":
+            fail(
+                f"index.html's control for {slug} does not use hx-swap=\"innerHTML\", "
+                "so the panel element itself would be replaced and its id lost"
+            )
+        # Disabling the control the user just pressed moves focus to <body>. The
+        # same invariant the Ask buttons keep, for the same reason.
+        if re.search(r"\bdisabled\b(?!\s*=\s*\"false\")", tag):
+            fail(
+                f"index.html's control for {slug} uses the disabled property, which "
+                "strands keyboard focus on <body>. Use aria-disabled if a state "
+                "genuinely needs announcing."
+            )
+
+        # Matched by attribute rather than as a literal tag: the panel carries
+        # aria-live, and a check that pins attribute order would fail the next
+        # time one is added while proving nothing about the wiring.
+        panel = re.search(
+            rf'<div\b[^>]*\bid="work--panel-{re.escape(slug)}"[^>]*>', index_text
+        )
+        if panel is None or "work--panel" not in attr(panel.group(0), "class").split():
+            fail(f"index.html has no <div class=\"work--panel\" id=\"work--panel-{slug}\">")
+            continue
+        start = panel.start()
+        block, _ = div_block(index_text, start)
+        if block is None:
+            fail(f"index.html's work--panel for {slug} is never closed")
+            continue
+
+        # The structural reason this pattern cannot strand focus: the trigger is
+        # not inside the region it replaces, so the swap never removes it. If a
+        # trigger is ever moved inside its own panel, it needs a stable id in
+        # every fragment that replaces it, and this stops being safe by
+        # construction.
+        control_id = attr(tag, "id")
+        if control_id and f'id="{control_id}"' in block:
+            fail(
+                f"index.html's control for {slug} sits inside the panel it swaps. "
+                "htmx re-focuses by id after a swap; a control that replaces itself "
+                "must keep a stable id in every incoming fragment or focus lands on "
+                "<body>. Move it outside the target."
+            )
+
+        # A panel that ships with content would show it twice after the first
+        # swap, and worse, that content would be a hand-written copy of prose the
+        # generator owns.
+        inner = block.partition(">")[2].rpartition("</div>")[0]
+        if inner.strip():
+            fail(
+                f"index.html's work--panel for {slug} is not empty. It is filled by "
+                "the fragment; anything written here is an unchecked second copy."
             )
 
 
@@ -309,7 +300,10 @@ def report():
         for problem in problems:
             print(f"  - {problem}")
         return 1
-    print("htmx fragments resolve, agree with index.html and keep their focus invariants.")
+    print(
+        "htmx fragments resolve, agree with portfolio.html and keep their focus "
+        "invariants."
+    )
     return 0
 
 
@@ -320,11 +314,13 @@ def main():
 
     files = html_files()
     index_text = read(ROOT / "index.html")
+    portfolio_text = read(ROOT / "portfolio.html")
 
     check_fragment_targets(files)
     check_ids_on_controls(files)
     check_htmx_script(files)
-    check_casestudy_fragments(index_text)
+    slugs = check_work_set(index_text, portfolio_text)
+    check_work_controls(index_text, slugs)
     check_robots()
 
     return report()

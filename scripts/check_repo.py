@@ -6,9 +6,9 @@
      See ARCHITECTURE.md#why-nojekyll-matters.
   2. `sitemap.xml` lists every indexable page. AGENTS.md asks for this to be kept
      in step by hand when a page is added or removed; nothing checked it.
-  3. Every copy of the nav offers the same destinations. There are four copies,
-     one per root page plus fragments/404-links.html, and editing three of them
-     leaves the fourth pointing somewhere the rest of the site has dropped.
+  3. Every copy of the nav offers the same destinations. There are three copies,
+     index.html, portfolio.html and fragments/404-links.html, and editing two of
+     them leaves the third pointing somewhere the rest of the site has dropped.
 
 Pages carrying `<meta name="robots" content="noindex">` are exempt from (2) --
 404.html is noindex and correctly absent from the sitemap. Listing it would ask
@@ -108,19 +108,28 @@ def nav_labels(text, path):
 def check_nav():
     """Every copy of the nav offers the same destinations.
 
-    The nav is written out four times: once in each root page, because those links
-    are content a crawler should see and the site has to navigate with no
-    JavaScript, and once in fragments/404-links.html. Nothing checked that the four
-    agreed. Removing an entry means editing four files, and missing one leaves a
+    The nav is written out three times: in index.html and portfolio.html, because
+    those links are content a crawler should see and the site has to navigate with
+    no JavaScript, and in fragments/404-links.html. Nothing checked that the three
+    agreed. Removing an entry means editing three files, and missing one leaves a
     page offering a destination the rest of the site has dropped -- which looks
     perfectly fine on the page you happen to be reading.
+
+    This walks whichever root pages have a nav rather than requiring one of each.
+    ask.html deliberately has none: it forwards a reader to the home page and
+    offering them a menu on the way would be a fourth copy to keep in step for no
+    benefit. An absent nav is therefore skipped; a *disagreeing* nav is not.
     """
     sources = {}
 
     for page in sorted(ROOT.glob("*.html")):
         text = page.read_text(encoding="utf-8")
+        # Matched by attribute rather than as a literal tag. These lists carry
+        # role="list" as well as their class, and a pattern that pins attribute
+        # order would report "no nav list" -- which reads as a missing nav rather
+        # than as a stale regex -- the next time one is added.
         block = re.search(
-            r'<ul class="nav-links--container">.*?</ul>', text, re.S
+            r'<ul\b[^>]*\bclass="nav-links--container"[^>]*>.*?</ul>', text, re.S
         )
         if block:
             sources[page.name] = nav_labels(block.group(0), page.name)
@@ -146,7 +155,7 @@ def check_nav():
         if labels is not None and labels != reference:
             fail(
                 f"{name} nav offers {labels}, but index.html offers {reference}. "
-                "The nav is written out in every root page and in "
+                "The nav is written out in index.html, portfolio.html and "
                 "fragments/404-links.html; change all of them or none."
             )
 

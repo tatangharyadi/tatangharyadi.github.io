@@ -1,5 +1,14 @@
-/* Poppins is loaded via <link rel="preconnect"> + <link rel="stylesheet"> in index.html.
-   Using @import here would serialize the request chain and delay first paint. */
+/* There is no webfont. This used to load Poppins from Google Fonts and an icon
+   font from a second CDN, which was two blocking third-party requests on the
+   critical path to render a page whose whole argument is that it does not need
+   anyone else's server. The stacks below are the fonts the reader already has,
+   so first paint is the first paint. The four social and menu glyphs that
+   justified the icon font are now inline SVG in the markup.
+
+   Two faces, used for two different things: the interface face for prose, and a
+   monospace face for anything that is a measurement, an identifier or a label.
+   That split is the type system here. It is doing the work a decorative
+   display face would otherwise be asked to do badly. */
 
 /* Colour comes from Catppuccin: Latte in light mode, Mocha in dark. Rules below
    only ever reference the semantic tokens, never a palette name, so a flavour
@@ -22,40 +31,19 @@
      body text and every focus ring, never decoration. */
   --accent-text: #026389;
 
-  --max-width: 1200px;
+  --max-width: 1100px;
+  /* The measure for running prose. Everything wider than this is a container,
+     not a column: line length is capped here rather than by the page width. */
+  --measure: 68ch;
 
-  /* Longest carousel slide animation. Nothing outside this stylesheet reads it
-     any more — the swap is not timed against it — so the unit is free. */
-  --casestudy-slide-duration: 700ms;
-
-  --casestudy-item1-transform: translate(-100%, -5%) scale(1.5);
-  --casestudy-item1-filter: blur(30px);
-  --casestudy-item1-zindex: 11;
-  --casestudy-item1-opacity: 0;
-  --casestudy-item2-transform: translate(0, 0);
-  --casestudy-item2-filter: blur(0);
-  --casestudy-item2-zindex: 10;
-  --casestudy-item2-opacity: 1;
-  --casestudy-item3-transform: translate(90%, 20%) scale(0.5);
-  --casestudy-item3-filter: blur(30px);
-  --casestudy-item3-zindex: 7;
-  --casestudy-item3-opacity: 1;
-
-  /* Slot 4: the reserve. Only three slots are ever visible — off-screen left,
-     active, and the blurred peek on the right — so a fourth card waits at
-     opacity 0 further out along the same arc the peek travels. Adding a second
-     visible peek would crowd the active card at every breakpoint; keeping the
-     reserve invisible means the deck grew from three studies to four without the
-     layout changing at all. Its z-index sits just under slot 3 so that if the
-     opacity is ever raised it stacks behind the peek rather than through it. */
-  --casestudy-item4-transform: translate(150%, 30%) scale(0.3);
-  --casestudy-item4-filter: blur(30px);
-  --casestudy-item4-zindex: 6;
-  --casestudy-item4-opacity: 0;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
 }
 
-/* Catppuccin Mocha. Only the colour tokens are overridden — layout, animation
-   state and --casestudy-slide-duration are flavour-independent. */
+/* Catppuccin Mocha. Only the colour tokens are overridden; layout and type are
+   flavour-independent. */
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #1e1e2e; /* base */
@@ -78,12 +66,23 @@
 
 html {
   scroll-behavior: smooth;
+  /* The nav is fixed, so an in-page anchor would otherwise scroll its target
+     underneath it. Every nav link on the home page is now such an anchor, and so
+     are the three in fragments/404-links.html. The old layout hid this by
+     accident: each section filled the viewport, so a section top was always the
+     scroll top. Slightly more than the 85px nav to leave the heading some air. */
+  scroll-padding-top: 6.5rem;
 }
 
 body {
-  font-family: "Poppins", sans-serif;
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  line-height: 1.6;
   background-color: var(--bg);
   color: var(--text);
+  /* Numbers in this design sit in tables, readouts and similarity scores, where
+     a proportional digit makes columns wobble as values change. */
+  font-variant-numeric: tabular-nums;
 }
 
 a {
@@ -128,8 +127,10 @@ nav {
 }
 
 nav .logo a {
-  font-size: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 1.125rem;
   font-weight: 600;
+  letter-spacing: -0.02em;
   color: var(--accent-text);
   align-self: flex-start;
 }
@@ -139,8 +140,9 @@ nav .logo a:hover {
 }
 
 /* Desktop: the nav links are always visible, so the toggle is genuinely
-   irrelevant and should not become a phantom tab stop. It is made
-   visually-hidden (but focusable) inside the mobile media query below. */
+   irrelevant and should not become a phantom tab stop. It carries
+   .visually-hidden in the markup, so below 750px this display: none is the only
+   thing the media query has to undo for it to be focusable but unseen. */
 #sidebar-toggle {
   display: none;
 }
@@ -149,8 +151,8 @@ nav .logo a:hover {
   display: none;
 }
 
-.sidebar-checkbox i {
-  font-size: 2rem;
+.sidebar-checkbox svg {
+  display: block;
   color: var(--accent-text);
   cursor: pointer;
 }
@@ -178,365 +180,375 @@ nav .logo a:hover {
   color: var(--accent-text);
 }
 
-.home {
-  background-color: var(--bg-alt);
+/* ---------------------------------------------------------------------------
+   Home page.
+
+   No section fills the viewport. The old layout was a stack of 100dvh bands,
+   one screenful each, which is the shape that makes a page read as a template
+   before a word of it is read: it forces a scroll between every idea and tells
+   the reader nothing about how much is left. Sections here are as tall as their
+   content and separated by a hairline, so the page has a length you can feel.
+   --------------------------------------------------------------------------- */
+
+.masthead,
+.ask,
+.work,
+.colophon {
+  border-bottom: 1px solid var(--border);
 }
 
-.home--container {
-  min-height: 100dvh;
+.masthead--container,
+.ask--container,
+.work--container,
+.colophon--container {
   max-width: var(--max-width);
   margin: auto;
-  padding: 1rem;
+  padding: 4rem 1rem;
+}
+
+/* The nav is fixed, so the first section needs to clear it. */
+.masthead--container {
+  padding-top: 9rem;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 4rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 3rem;
 }
 
-.home--content {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+.masthead--name {
+  font-size: clamp(2rem, 6vw, 3.25rem);
+  font-weight: 650;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  margin-bottom: 0.75rem;
 }
 
-.hero--subtitle {
-  letter-spacing: 2px;
-  color: var(--text-muted);
-  font-weight: 600;
-  margin-bottom: 0.5rem;
+/* A monospace label rather than a second heading. The job title is metadata
+   about the name above it, and setting it as data is what says so. */
+.masthead--role {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--accent-text);
+  margin-bottom: 1.5rem;
 }
 
-.hero--title {
-  font-size: 2.5rem;
-  font-weight: 400;
-  line-height: 3rem;
-  color: var(--text);
-  margin-bottom: 1rem;
-}
-
-.hero--title span {
-  font-weight: 600;
-}
-
-/* One paragraph, no longer a tab panel: no min-height reserving room for the
-   tallest of three, and no focus ring, because nothing focuses it any more. */
-.hero--txt {
-  line-height: 1.5rem;
+.masthead--lead {
+  max-width: var(--measure);
+  font-size: 1.125rem;
   color: var(--text-muted);
   margin-bottom: 2rem;
 }
 
-.image {
-  display: grid;
-  place-items: center;
-}
-
-.image img {
-  width: min(25rem, 90%);
-  height: auto;
-  border-radius: 100%;
-}
-
-.hero-socials {
-  position: relative;
-  bottom: 40px;
-  width: 170px;
+.masthead--socials {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
 }
 
-.hero-socials a {
+/* Labelled, not bare glyphs. The three icons used to be decoration with the
+   name hidden from sight and announced only to screen readers; at that size an
+   unlabelled mark is a guess for everyone. The text is the accessible name, so
+   the SVG stays aria-hidden. */
+.masthead--socials a {
   display: inline-flex;
-  justify-content: center;
   align-items: center;
-  width: 40px;
-  height: 40px;
-  background: var(--bg-chrome);
-  border-radius: 50%;
-  font-size: 1.5rem;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.875rem;
   color: var(--text);
-  text-decoration: none;
-  overflow: hidden;
+  background: var(--bg-alt);
 }
 
-.hero-socials a:hover,
-.hero-socials a:focus-visible {
+.masthead--socials a:hover {
   color: var(--accent-text);
+  border-color: var(--accent-text);
 }
 
 /* Colour alone is not a sufficient focus indicator (WCAG 1.4.11). */
-.hero-socials a:focus-visible {
+.masthead--socials a:focus-visible {
   outline: 2px solid var(--accent-text);
   outline-offset: 3px;
 }
 
-.casestudy--container {
-  position: relative;
-  height: 100dvh;
-  overflow: hidden;
-}
-
-.casestudy--list {
-  position: absolute;
-  top: 0;
-  width: 1140px;
-  max-width: 90%;
-  left: 40%;
-  transform: translateX(-50%);
-  height: 80%;
-}
-
-.casestudy--item {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 70%;
-  height: 100%;
-  font-size: 15px;
-  transition: opacity 2s;
-}
-
-.casestudy--intro {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 700px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.casestudy--intro .category {
-  font-size: 1em;
-}
-
-.casestudy--intro .title {
-  font-size: 2em;
-  font-weight: 500;
-  line-height: 1.2em;
-}
-
-.casestudy--intro .description {
-  font-size: small;
-}
-
-.casestudy--intro .impact,
-.casestudy--intro .summary {
-  gap: 10px;
-  width: 100%;
-  border-top: 1px solid var(--border);
-  margin-top: 20px;
-}
-
-.casestudy--item:nth-child(2) .casestudy--intro {
-  opacity: 1;
-  pointer-events: auto;
-  transition: opacity 0.5s;
-}
-
-.casestudy--item:nth-child(2) {
-  transform: var(--casestudy-item2-transform);
-  filter: var(--casestudy-item2-filter);
-  z-index: var(--casestudy-item2-zindex);
-  opacity: 1;
-}
-
-.casestudy--item:nth-child(1) {
-  transform: var(--casestudy-item1-transform);
-  filter: var(--casestudy-item1-filter);
-  z-index: var(--casestudy-item1-zindex);
-  opacity: var(--casestudy-item1-opacity);
-  pointer-events: none;
-}
-
-.casestudy--item:nth-child(3) {
-  transform: var(--casestudy-item3-transform);
-  filter: var(--casestudy-item3-filter);
-  z-index: var(--casestudy-item3-zindex);
-  opacity: var(--casestudy-item3-opacity);
-}
-
-/* pointer-events: none for the same reason slot 1 has it — an invisible card
-   must not intercept clicks aimed at what is behind it. */
-.casestudy--item:nth-child(4) {
-  transform: var(--casestudy-item4-transform);
-  filter: var(--casestudy-item4-filter);
-  z-index: var(--casestudy-item4-zindex);
-  opacity: var(--casestudy-item4-opacity);
-  pointer-events: none;
-}
-
-.casestudy--arrows {
-  position: absolute;
-  bottom: 40px;
-  width: 1140px;
-  max-width: 90%;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.casestudy--arrows #next,
-.casestudy--arrows #prev {
-  width: 40px;
-  height: 40px;
+/* Secondary, and sized like it. The portrait was half the old layout; a face is
+   not the evidence this page is offering. */
+.masthead--portrait img {
+  width: 8.5rem;
+  height: auto;
   border-radius: 50%;
-  font-family: monospace;
-  font-size: large;
-  font-weight: bold;
-  background-color: var(--bg-chrome);
-  color: var(--text);
-  border: 1px solid var(--text);
-  cursor: pointer;
+  border: 1px solid var(--border);
 }
 
-.casestudy--arrows button:focus-visible {
-  outline: 2px solid var(--accent-text);
-  outline-offset: 3px;
+/* Shared section furniture. */
+.ask h2,
+.work h2,
+.colophon h2 {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--accent-text);
+  margin-bottom: 1rem;
 }
 
-/* htmx puts .htmx-request on the button while its fragment is in flight. Purely
-   an affordance: re-entry is handled by hx-sync, and the disabled property is
-   still forbidden here because disabling the control the user just pressed moves
-   focus to <body> and strands keyboard users outside the carousel. */
-.casestudy--arrows button.htmx-request {
-  opacity: 0.5;
-  cursor: default;
+.section--lead {
+  max-width: var(--measure);
+  color: var(--text-muted);
+  margin-bottom: 2.5rem;
 }
 
-.casestudy--item:nth-child(2) .casestudy--intro .category,
-.casestudy--item:nth-child(2) .casestudy--intro .title,
-.casestudy--item:nth-child(2) .casestudy--intro .description {
-  opacity: 0;
-  animation: showContent 0.5s 0.7s ease-in-out 1 forwards;
-}
-
-@keyframes showContent {
-  from {
-    transform: translateY(50px);
-    filter: blur(30px);
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-    filter: blur(0);
-  }
-}
-
-.casestudy--item:nth-child(2) .casestudy--intro .category {
-  animation-delay: 0.3s;
-}
-.casestudy--item:nth-child(2) .casestudy--intro .description {
-  animation-delay: 0.7s;
-}
-
-/* Slide transitions.
-   The fragment htmx swaps in arrives already reordered and already carrying
-   .next or .prev on the list, so the direction of travel is part of the markup.
-   Each keyframe declares only a `from` block, so an item animates out of the
-   slot it just left and into the slot its :nth-child rule already assigns.
-   Because every item is a freshly parsed node, the animations start on their own
-   — the reflow nudge the old script needed to restart them is gone. */
-.casestudy--list.next .casestudy--item:nth-child(1) {
-  animation: fromItem2 var(--casestudy-slide-duration) ease-in-out 1 forwards;
-}
-
-.casestudy--list.next .casestudy--item:nth-child(2) {
-  animation: fromItem3 var(--casestudy-slide-duration) ease-in-out 1 forwards;
-}
-
-.casestudy--list.prev .casestudy--item:nth-child(2) {
-  animation: fromItem1 var(--casestudy-slide-duration) ease-in-out 1 forwards;
-}
-
-.casestudy--list.prev .casestudy--item:nth-child(3) {
-  animation: fromItem2 var(--casestudy-slide-duration) ease-in-out 1 forwards;
-}
-
-/* The fourth slot completes both chains. Moving forward, the card now in slot 3
-   is the one that was waiting in slot 4, so it animates in from there; moving
-   back, the card now in slot 4 is the one that was the peek in slot 3. Without
-   these two rules a four-card deck still works but one card in each direction
-   snaps into place while the others slide. */
-.casestudy--list.next .casestudy--item:nth-child(3) {
-  animation: fromItem4 var(--casestudy-slide-duration) ease-in-out 1 forwards;
-}
-
-.casestudy--list.prev .casestudy--item:nth-child(4) {
-  animation: fromItem3 var(--casestudy-slide-duration) ease-in-out 1 forwards;
-}
-
-@keyframes fromItem1 {
-  from {
-    transform: var(--casestudy-item1-transform);
-    filter: var(--casestudy-item1-filter);
-    z-index: var(--casestudy-item1-zindex);
-    opacity: var(--casestudy-item1-opacity);
-  }
-}
-
-@keyframes fromItem2 {
-  from {
-    transform: var(--casestudy-item2-transform);
-    filter: var(--casestudy-item2-filter);
-    z-index: var(--casestudy-item2-zindex);
-    opacity: var(--casestudy-item2-opacity);
-  }
-}
-
-@keyframes fromItem3 {
-  from {
-    transform: var(--casestudy-item3-transform);
-    filter: var(--casestudy-item3-filter);
-    z-index: var(--casestudy-item3-zindex);
-    opacity: var(--casestudy-item3-opacity);
-  }
-}
-
-/* No `to` block here either — see the note above fromItem1. The end state is
-   whatever the :nth-child rule assigns. */
-@keyframes fromItem4 {
-  from {
-    transform: var(--casestudy-item4-transform);
-    filter: var(--casestudy-item4-filter);
-    z-index: var(--casestudy-item4-zindex);
-    opacity: var(--casestudy-item4-opacity);
-  }
-}
-
-/* The one piece of running text on the home page's case study section: the way
-   out to the long-form versions. */
-.casestudy--more {
-  text-align: center;
-  padding: 0 1rem 4rem 1rem;
-}
-
-.casestudy--more a {
+.section--lead a {
   color: var(--accent-text);
   text-decoration: underline;
 }
 
-.casestudy--more a:focus-visible {
+.section--lead a:focus-visible {
   outline: 2px solid var(--accent-text);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 
-/* Prose pages (projects.html). The home page is a full-bleed layout built out of
-   grids and absolute positioning; this is the opposite — one measure-limited
-   column of running text. It shares the palette, the nav and the focus rules and
-   nothing else, so it gets its own block rather than reusing home page classes
-   that would have to be fought at every breakpoint. */
+/* ---------------------------------------------------------------------------
+   Work index.
+
+   A list, not a deck. The carousel showed one project at a time behind an
+   animation and hid the other three, which is a lot of machinery to make four
+   short items harder to compare. Here they are all on screen, and the detail
+   arrives in place when it is asked for.
+   --------------------------------------------------------------------------- */
+
+.work--index {
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+
+.work--entry {
+  border-bottom: 1px solid var(--border);
+  padding: 2rem 0;
+}
+
+.work--category {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.work--title {
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin-bottom: 0.75rem;
+}
+
+.work--title a {
+  color: var(--text);
+  /* The underline offset keeps the rule clear of the descenders at this size,
+     which matters because the underline is the only thing marking these as
+     links: they carry no colour of their own until hover or focus. */
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--border);
+}
+
+.work--title a:hover {
+  color: var(--accent-text);
+  text-decoration-color: var(--accent-text);
+}
+
+.work--title a:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 4px;
+}
+
+/* htmx puts .htmx-request on the trigger while its fragment is in flight.
+   Purely an affordance: the guard against a second press is the swap itself,
+   and nothing here is ever disabled. */
+.work--title a.htmx-request {
+  opacity: 0.5;
+}
+
+.work--scope {
+  max-width: var(--measure);
+  color: var(--text-muted);
+}
+
+/* Empty until a fragment lands in it. No min-height reserving space: an empty
+   reserved box reads as something that failed to load. */
+.work--panel:not(:empty) {
+  margin-top: 1.75rem;
+  padding-left: 1.25rem;
+  border-left: 2px solid var(--accent-text);
+}
+
+.work--detail {
+  max-width: var(--measure);
+}
+
+.work--detail p {
+  margin-bottom: 1rem;
+}
+
+.work--detail-more a,
+.work--more a {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+
+.work--detail-more a:focus-visible,
+.work--more a:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+.work--more {
+  margin-top: 2rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Colophon.
+   --------------------------------------------------------------------------- */
+
+/* The measurements, set as data. Two columns on a rule-separated grid, because
+   these are values a reader should be able to scan down rather than read. */
+.readout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 3rem;
+  border-top: 1px solid var(--border);
+  margin-bottom: 3rem;
+}
+
+.readout > div {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.readout dt {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding-top: 0.15rem;
+}
+
+.readout dd {
+  font-size: 0.9375rem;
+}
+
+.readout dd code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+
+.colophon--prose {
+  max-width: var(--measure);
+}
+
+.colophon--prose h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 2.5rem 0 1rem 0;
+}
+
+.colophon--prose h3:first-child {
+  margin-top: 0;
+}
+
+.colophon--prose p {
+  margin-bottom: 1rem;
+  color: var(--text-muted);
+}
+
+.colophon--prose code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.05em 0.3em;
+}
+
+.colophon--prose a {
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+
+.colophon--prose a:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+.colophon--checks {
+  list-style: none;
+  margin-bottom: 1rem;
+}
+
+.colophon--checks li {
+  color: var(--text-muted);
+  padding: 0.75rem 0 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+.colophon--checks li::before {
+  /* A rule marker rather than a bullet glyph, and decorative either way: the
+     list is already announced as a list. */
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 1.35rem;
+  width: 0.5rem;
+  height: 1px;
+  background: var(--accent-text);
+}
+
+.colophon--checks strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.colophon--links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 2rem;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+}
+
+/* Prose pages (portfolio.html, and the ask.html stub). The home page is a set of
+   sections that each choose their own width; this is one measure-limited column
+   of running text from top to bottom. It shares the palette, the nav and the
+   focus rules and nothing else, so it gets its own block rather than reusing
+   home page classes that would have to be fought at every breakpoint. */
 .page {
   /* The nav is fixed, so the first line of content would otherwise start
-     underneath it. Home solves this with its own hero padding. */
+     underneath it. Home solves this with its own masthead padding. */
   padding: 8rem 1rem 5rem 1rem;
 }
 
 .page--container {
-  /* 65ch, not --max-width. Line length is a legibility constraint measured in
-     characters, and 1200px of Poppins is roughly twice the comfortable measure.
-     The home page is wide because it is mostly not text. */
-  max-width: 65ch;
+  /* A measure, not --max-width. Line length is a legibility constraint measured
+     in characters, and 1100px of body text is roughly twice the comfortable
+     measure. */
+  max-width: var(--measure);
   margin: 0 auto;
 }
 
@@ -689,9 +701,9 @@ nav .logo a:hover {
   color: var(--text-muted);
 }
 
-/* The site's only primary action button. It borrows the carousel arrows' colour
-   relationship rather than inventing one: --accent-text on --bg, because
-   --accent is 2.47:1 on Latte and illegal anywhere text sits on it. */
+/* The site's only primary action buttons, and the only filled surfaces on the
+   page: --accent-text on --bg, never --accent, which is 2.47:1 on Latte and
+   illegal anywhere text sits on it. */
 .ask--load,
 .ask--form button {
   font-family: inherit;
@@ -719,8 +731,8 @@ nav .logo a:hover {
   outline-offset: 3px;
 }
 
-/* aria-disabled, never the disabled property — the same invariant the carousel
-   arrows keep, and for the same reason. An earlier version of this rule used
+/* aria-disabled, never the disabled property — the invariant that holds
+   everywhere on this site, for the same reason. An earlier version of this rule used
    :disabled on the argument that the button is removed from the flow anyway once
    the model has loaded. That was wrong about the timing: it is removed when the
    load *finishes*, so disabling it on press stranded a keyboard user on <body>
@@ -884,53 +896,41 @@ nav .logo a:hover {
 }
 
 @media (width < 1200px) {
-  .casestudy--list {
-    left: 0%;
-  }
-
-  .casestudy--item {
-    width: 100%;
-  }
-
-  .casestudy--intro {
-    left: 65%;
-    width: 80%;
+  /* The readout is a two-column grid of two-column rows, which is four columns
+     of content in a row. The label column is fixed, so it is the value column
+     that runs out of room first; drop to one pair per row before that happens
+     rather than letting a measurement wrap under its own label. */
+  .readout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
   }
 }
 
 @media (width < 850px) {
-  .casestudy--container {
-    height: 600px;
+  /* The portrait moves under the identity block rather than shrinking further.
+     At 8.5rem it is already small; taking more away would leave a thumbnail
+     squeezing the name into two or three lines to make room for it. */
+  .masthead--container {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.5rem;
   }
 
-  .casestudy--list {
-    left: 0%;
-    height: 100%;
-  }
-
-  .casestudy--item {
-    width: 100%;
-  }
-
-  .casestudy--intro {
-    top: 15%;
-    left: 65%;
-    width: 80%;
+  /* Source order puts the portrait after the identity, which is the order it
+     should read in, so nothing needs reordering here. */
+  .readout > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem;
   }
 }
 
 @media (width < 750px) {
-  /* Mobile: the toggle drives the slide-out menu, so it must be focusable. */
+  /* Mobile: the toggle drives the slide-out menu, so it must be focusable.
+     Everything that hides it is on .visually-hidden in the markup; all this rule
+     does is undo the display: none above. These declarations used to be copied
+     out here by hand, which is a second copy of a load-bearing pattern that
+     nothing would have noticed drifting. */
   #sidebar-toggle {
     display: block;
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-    border: 0;
   }
 
   .sidebar-checkbox {
@@ -975,9 +975,15 @@ nav .logo a:hover {
     font-size: 1.25rem;
   }
 
-  .home--container {
-    padding: 10rem 1rem 5rem 1rem;
-    grid-template-columns: repeat(1, 1fr);
+  .masthead--container,
+  .ask--container,
+  .work--container,
+  .colophon--container {
+    padding: 3rem 1rem;
+  }
+
+  .masthead--container {
+    padding-top: 8rem;
   }
 
   /* The two-column definition list has no room left at this width; stacking
@@ -1011,17 +1017,16 @@ nav .logo a:hover {
   .page--header h1 {
     font-size: 2rem;
   }
-
-  .image {
-    display: none;
-  }
 }
 
 /* WCAG 2.3.3 - respect an OS-level request for reduced motion.
-   The carousel becomes an instant cut and blur/opacity transitions are
-   removed. Nothing waits on these animations any more: the
-   arrows are released by the fragment arriving, not by an animation ending, so
-   collapsing the durations here cannot leave a control stuck. */
+
+   Nothing on this page is revealed by an animation any more, so there is no
+   longer a rule that has to put content back: collapsing every duration is the
+   whole of it. That is also why nothing can get stuck here. The old carousel
+   had entrance animations carrying opacity, which meant reduced motion needed a
+   matching opacity:1 override or the text stayed invisible. A swap that just
+   inserts markup has no such failure mode. */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -1033,12 +1038,5 @@ nav .logo a:hover {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-
-  .casestudy--item:nth-child(2) .casestudy--intro .category,
-  .casestudy--item:nth-child(2) .casestudy--intro .title,
-  .casestudy--item:nth-child(2) .casestudy--intro .description {
-    opacity: 1;
-    animation: none;
   }
 }

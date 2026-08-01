@@ -220,6 +220,10 @@ function render(hits, query) {
 
   const ol = document.createElement('ol');
   ol.className = 'ask--hits';
+  // The stylesheet sets list-style: none on this, which makes VoiceOver drop the
+  // list semantics and stop announcing "3 items". See AGENTS.md; the same reason
+  // every other unmarkered list on the site carries it.
+  ol.setAttribute('role', 'list');
 
   for (const hit of hits) {
     const li = document.createElement('li');
@@ -268,14 +272,16 @@ function render(hits, query) {
 // page they might not interact with would be the wrong default no matter how
 // good the feature is.
 //
-// Neither this nor ask() uses the `disabled` property, for the same reason the
-// carousel arrows do not — see AGENTS.md#accessibility-invariants. Disabling the
+// Neither this nor ask() uses the `disabled` property, and nothing else on the
+// site does either — see AGENTS.md#accessibility-invariants. Disabling the
 // element the user just activated moves focus to <body>, and re-enabling it later
 // does not bring focus back. Here that would strand a keyboard user for the whole
 // multi-second model download with no way back into the component. `aria-disabled`
 // announces the state without touching focus, and a plain guard flag is what
-// actually prevents a second press doing the work twice — the same division of
-// labour hx-sync provides for the arrows.
+// actually prevents a second press doing the work twice. The work index needs no
+// such guard: a second press re-fetches the same static fragment into the same
+// panel, which costs a request and changes nothing. This does need one, because
+// the work it guards is a 20 MB download.
 let loading = false;
 
 async function start() {

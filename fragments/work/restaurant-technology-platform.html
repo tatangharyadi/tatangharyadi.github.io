@@ -1,0 +1,56 @@
+<!-- Detail for "Restaurant Technology Platform", served to the work index on index.html.
+
+     GENERATED FILE — do not edit. The prose here exists once, in
+     portfolio.html#restaurant-technology-platform, because that page is also what corpus.json is
+     generated from and the search must not be able to disagree with the index.
+     scripts/propagate_work.py rewrites this from it and
+     scripts/check_htmx.py fails CI if it drifts. To change this project, edit
+     portfolio.html and re-run the propagate script.
+
+     The link at the end is focusable and carries no id, which is safe only
+     because it arrives in a panel that was empty: htmx re-focuses the
+     previously focused element by id after a swap, and nothing inside an empty
+     panel can have been that element. The control that triggered this swap sits
+     outside the panel and never moves. See AGENTS.md. -->
+<div class="work--detail">
+    <p class="project--meta">
+        <span class="project--category">Product Management</span>
+        <span class="project--role">Director of Engineering, Yummy Corp</span>
+    </p>
+
+    <p>Fast-tracked product–market fit for front and back of house technology
+        in the restaurant industry. Three systems, built in the order that
+        let each one pay for the next.</p>
+
+    <p><strong>Front of house</strong> came first: point-of-sale, kitchen
+        display system, loyalty programme and real-time analytics. Getting the
+        transaction layer right early meant every later system had trustworthy
+        data to read from, rather than a reporting pipeline bolted on after the
+        fact.</p>
+
+    <p><strong>The IoT layer</strong> was built with Operations rather than for
+        them, because the waste it targeted was operational, not technical. An
+        ESP32-based system handled temperature monitoring, energy metering and
+        AI-on-the-edge detection, with EMQX as the broker. Inference runs on
+        the device: a kitchen with intermittent connectivity still needs its
+        cold storage watched, and paying to stream raw sensor data to the cloud
+        to answer a question the device can answer itself is a cost with no
+        matching benefit.</p>
+
+    <p><strong>Menu planning</strong> was the piece that needed AI to be worth
+        anything. It uses an LLM with vector search to query product mix data
+        and infer location-specific variations — the same dish sells
+        differently two kilometres apart, and the interesting signal is in that
+        variation rather than in the aggregate. Retrieval over real product mix
+        data, not a model asked to guess at a menu.</p>
+
+    <p>I also took ownership of product management directly, driving the
+        roadmap for B2B value-added services and loyalty features.</p>
+
+    <ul class="project--impact" role="list">
+        <li>From MVP to <strong>100+ outlets in 6 months</strong></li>
+        <li><strong>Increased RPR</strong></li>
+    </ul>
+
+    <p class="work--detail-more"><a href="portfolio.html#restaurant-technology-platform">Read this in context</a></p>
+</div>

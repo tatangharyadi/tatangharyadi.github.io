@@ -12,39 +12,45 @@ This is deliberate rather than incidental. The site is a personal homepage whose
 content changes a few times a year; a toolchain would need reviving every time,
 and a dependency tree would need patching in between. The tradeoff accepted in
 exchange is that shared values live in CSS custom properties instead of build-time
-constants, and the three external resources load from a CDN at runtime:
+constants, and one external resource loads from a CDN at runtime:
 
-- [Poppins](https://fonts.google.com/specimen/Poppins) via Google Fonts
-- [Boxicons](https://boxicons.com/) 2.1.4 via unpkg
 - [htmx](https://htmx.org/) 2.0.10 via unpkg
 
+It used to be three. [Poppins](https://fonts.google.com/specimen/Poppins) from
+Google Fonts and [Boxicons](https://boxicons.com/) from unpkg both went in the
+redesign. A webfont and an icon font are render-blocking requests to hosts this
+site does not control, bought nothing the system UI stack and a handful of inline
+SVG paths do not already do, and made the page open by asking two strangers for
+permission to draw itself. Removing them is also what lets the colophon state that
+the site issues no third-party request at all until a visitor asks for the model.
+
 htmx is a `<script>` tag, not a dependency in the package-manager sense: pinned to
-an exact version, verified by an SRI digest, and loaded the same way Boxicons is.
+an exact version and verified by an SRI digest, which is how Boxicons was loaded
+before it was dropped.
 Nothing installs it and nothing builds against it. The rule this repo actually
 holds is *no toolchain*, and adding a library that is one URL does not breach it —
-but note the site now has a script it did not have before, and if unpkg is
-unreachable the carousel stops advancing. Everything that matters
-for reading the page is in the initial HTML, which is why that degradation costs
-interaction and not content.
-
-Fonts are loaded with `<link rel="preconnect">` plus `<link rel="stylesheet">` in
-`index.html`, **not** `@import` in the stylesheet. An `@import` would serialize the
-request chain — the browser must parse `style.css` before it discovers the font
-request — and delay first paint.
+but note the site has a script it did not have before, and if unpkg is unreachable
+the work index stops expanding in place. It does not stop working: every trigger in
+that index is an `<a href>` pointing at the same prose on `portfolio.html`, so
+without htmx a click is a navigation rather than a swap. The enhancement is the
+in-place detail, not the content, which is why that degradation is a change of
+route and not a dead control.
 
 ## Layout
 
 ```
-index.html              home: nav + hero, case study carousel
-portfolio.html          case studies in full, plus now/skills/earlier; the Ask
-                        source. Not in the nav: arrived at, not picked
-ask.html                browser-local semantic search over portfolio.html
+index.html              the whole site above the detail: masthead, the search,
+                        the work index, the colophon. Nav is three anchors into it
+portfolio.html          the work in full, plus now/skills/earlier; the source the
+                        search indexes. Not in the nav: arrived at, not picked
+ask.html                a noindex stub. The search moved to index.html#ask and a
+                        static host cannot 301, so the old URL says so in markup
 corpus.json             generated search index: one embedding per portfolio passage
 404.html                self-contained not-found page
-css/style.css           all styles, including the carousel slide animations
-js/ask.js               the only first-party script; see The Ask page
+css/style.css           all styles
+js/ask.js               the only first-party script; see The search
 fragments/              the HTML states htmx fetches; pieces of a page, not pages
-  casestudy/            r{0..3}-{next,prev}.html, one per rotation and direction
+  work/                 one per entry in the work index, generated from portfolio.html
   404-links.html        section shortcuts, loaded by 404.html
 vendor/transformers/    Transformers.js and the ORT WebAssembly, served from origin
 assets/models/          all-MiniLM-L6-v2 weights and tokenizer, likewise
@@ -64,23 +70,24 @@ CLAUDE.md               one line, imports AGENTS.md
 LICENSE                 MIT, code only
 ```
 
-**The nav offers three destinations and the site has four pages.** `portfolio.html`
-is not a menu choice. It holds the prose everything else is built out of, and the
-two things that read it are the search on `ask.html` and a crawler, neither of which
-uses a nav. A visitor reaches it from an Ask result, from the link under the case
-study deck, from the link below the results on `ask.html`, or from a search engine.
+**The nav offers three destinations and none of them is a page.** Ask, Work and
+Colophon are anchors into `index.html`; the site's second real page,
+`portfolio.html`, is not a menu choice. It holds the prose everything else is built
+out of, and the two things that read it are the search and a crawler, neither of
+which uses a nav. A visitor reaches it from a search result, from a work entry's
+title link, from the link under the work index, or from a search engine.
 
 Leaving it in the nav made the site ask the visitor to choose between reading the
 portfolio and searching it, which is a choice with an obviously better answer and no
 reason to be offered. Taking it out costs nothing measurable: the page is still in
-`sitemap.xml`, still linked from three places, and still the only crawlable copy of
-the detail. What it changes is what the site puts forward, which is the search. That
+`sitemap.xml`, still linked from several places on the home page, and still the
+only crawlable copy of the detail. What it changes is what the site puts forward, which is the search. That
 is also why nothing in that page's own nav carries `aria-current`.
 
 `404.html` intentionally duplicates its styles inline. It has to render correctly
 even if `css/style.css` is the thing that failed to load, so its only external
-references are the favicon and a `Poppins` font-family that degrades to a system
-sans-serif rather than being fetched. The cost of that independence is that its
+reference is the favicon. Its `font-family` is the same system UI stack the
+stylesheet uses, so it fetches nothing at all. The cost of that independence is that its
 palette is a copy of the one in `css/style.css` and has to be kept in step by hand.
 
 ## Design tokens
@@ -92,12 +99,13 @@ Mocha in dark. **[DESIGN.md](DESIGN.md) is the reference for which token to reac
 for and what contrast each one is verified at**; the rules below are the
 constraints that are not about colour at all:
 
-- `--casestudy-slide-duration` drives the slide animations and nothing else reads
-  it any more, so its unit is now free. It used to be parsed by JavaScript, which
-  is why older comments insisted on milliseconds.
-- The `--casestudy-item1/2/3-*` tokens are not styling knobs — they are animation
-  state, and they are deliberately *not* duplicated in the dark block because they
-  are flavour-independent. See below.
+- `--measure` is a line-length limit in characters, not a container width, and the
+  two are not interchangeable. Body text is capped at `--measure`; the sections
+  that hold it are capped at `--max-width`. Setting prose to the wider of the two
+  is the single easiest way to make this page hard to read.
+- `--font-mono` is load-bearing rather than decorative. Section labels, the
+  colophon readout and the category lines are all set in it because they are data
+  about the content rather than content, and the change of face is what says so.
 - `color-scheme: light dark` on `:root` is what makes native scrollbars and form
   controls follow the active flavour. Removing it leaves them light under Mocha.
 
@@ -108,31 +116,24 @@ every focus ring. See [DESIGN.md](DESIGN.md#the-accent-rule).
 
 ## Interaction patterns
 
-Interaction is hypermedia. Every state of the case study carousel is a file under
+Interaction is hypermedia. Every state the page can reach is a file under
 `fragments/`, and a control asks for the state it moves to. There is no
 client-side state to get out of step with the markup, because the markup *is* the
-state: a fragment says which case studies are in which slot and where each control
-points next.
+state.
 
-The htmx example that shapes this is a click-to-load swap for the carousel. The
-related [tabs (hateoas)](https://htmx.org/examples/tabs-hateoas/) documentation
+The related [tabs (hateoas)](https://htmx.org/examples/tabs-hateoas/) documentation
 says that pattern "requires dynamic server-side routing", which is true of a
 templated server and not true here: each response is fixed and depends on nothing
 about the request, so a static file serves it exactly. That is the whole reason
 this works on GitHub Pages, which cannot compute a response or set a header.
 
-The hero used to be a second instance of this, three tabs under `fragments/hero/`.
-It was removed once the Ask page existed: two of the three panels were answers to
-questions Ask can field, and the third was the positioning statement, which was
-never one option among three. The hero is now a single paragraph in `index.html`.
-
-- **Case study carousel** swaps the whole deck. See the section below.
+- **The work index** expands an entry in place. See the section below.
 - **Mobile sidebar** is still the pure-CSS checkbox hack: a single `<input
   type="checkbox">` toggles the menu, with a full-screen `<label>` as the
   click-away overlay. It stays CSS because it has nothing to fetch — there is no
   state to get from a server, and htmx would only add a network round trip to
   something that already works offline.
-- **The Ask page is the one exception**, and it is worth being precise about why.
+- **The search is the one exception**, and it is worth being precise about why.
   Every pattern above works because the state being requested is markup that
   already exists somewhere. Semantic search has no such file: the answer is a
   matrix multiply against 384-dimensional vectors computed in the visitor's tab
@@ -140,97 +141,67 @@ never one option among three. The hero is now a single paragraph in `index.html`
   question to a server, which is the exact property the page is built to avoid. So
   `js/ask.js` is a plain ES module — no bundler, no package manager, consistent
   with the rest of the repo — and it is the only first-party script on the site.
-  See [the Ask page](#the-ask-page) below.
+  See [the search](#the-search) below.
 
 One constraint runs through all of it. **Every control htmx can swap away needs a
 stable `id`.** After a swap htmx looks the previously focused element up again by
 `document.getElementById`; a control that arrives back without the same id leaves
 keyboard focus on `<body>`, stranded outside the widget. `scripts/check_htmx.py`
-enforces this, and [AGENTS.md](AGENTS.md#accessibility-invariants) explains why it
-is the same failure the arrows were already shaped to avoid.
+enforces this. The work index satisfies it structurally rather than by care, since
+no trigger is inside its own target, but the rule binds anything swapped in future
+and [AGENTS.md](AGENTS.md#accessibility-invariants) explains the failure in full.
 
-## The case study carousel
+## The work index
 
-The mechanism is unusual enough to be worth spelling out.
+Four entries, all on screen at once, each one a title and a line of scope. Pressing
+a title fetches that entry's detail and drops it into the panel below it.
 
-**Position comes from DOM order.** Three `.casestudy--item` elements are styled by
-`:nth-child`, and each slot has a fixed role:
+**This replaced a carousel, and the replacement is mostly a subtraction.** The deck
+showed one case study at a time behind a slide animation and kept the other three
+in off-screen slots addressed by `:nth-child`. That cost eight fragments (one per
+rotation per direction), four sets of slot tokens, four `@keyframes` blocks with a
+deliberate missing `to`, an arrow modulus that could only be wrong on the wrap, and
+a CSS-token check in CI to catch the one drift none of the rest would see. What it
+bought was a way to compare four short items by looking at one of them. The index
+is a list, so the comparison is free and all of that machinery is gone.
 
-| Slot              | Role       | State                                                     |
-| ----------------- | ---------- | --------------------------------------------------------- |
-| `:nth-child(1)`   | just left  | `opacity: 0`, off to the left, blurred, `pointer-events: none` |
-| `:nth-child(2)`   | centre     | visible, unblurred, the only slot whose text is readable  |
-| `:nth-child(3)`   | on deck    | visible but small and blurred, offset to the right        |
+**Triggers sit outside the region they swap.** Each entry is
 
-Advancing the carousel does not change any styles — it changes which item sits in
-which slot. Pressing an arrow fetches the fragment for the rotation it moves to,
-and that fragment contains the same three case studies written out in the new
-order. The `:nth-child` rules then re-apply themselves to whatever now sits in
-each slot. There is one fragment per rotation and direction of travel —
-`fragments/casestudy/r{0..3}-{next,prev}.html`, eight for the four case studies
-there are now. `index.html` holds rotation 0.
+```html
+<a id="work--open-{slug}" href="portfolio.html#{slug}"
+   hx-get="fragments/work/{slug}.html"
+   hx-target="#work--panel-{slug}" hx-swap="innerHTML">
+```
 
-**The rotations are copies, and two scripts keep them honest.** Nine files contain
-the same four case studies. That is the identical bargain the palette makes across
-four files, and it is accepted for the same reason — the alternative is a build
-step. `index.html` is the source of truth;
-`scripts/propagate_casestudy.py` regenerates every fragment from it and
-`scripts/check_htmx.py` fails CI if any rotation drifts, so editing one copy is a
-caught error rather than a silent one.
+and `#work--panel-{slug}` is a sibling that starts empty. A swap therefore never
+removes the control that caused it, which means the focus invariant the carousel
+had to be shaped around cannot be violated here rather than merely being avoided.
+`scripts/check_htmx.py` asserts the structure directly: it fails if a trigger's
+`id` appears anywhere inside its own target.
 
-The generator is what makes the duplication cheap enough to keep. Before it, the
-checker could tell you the copies disagreed but you still reconciled them by hand,
-which is the part that goes wrong. Now `--check` runs in CI as well, so a drifted
-fragment fails with an instruction to re-run the generator rather than an
-invitation to patch whichever file the error happened to name. The count of case
-studies is derived from `index.html` throughout — no script holds it as a
-constant — but the stylesheet cannot be derived, so adding a case study still
-means writing its slot tokens, `:nth-child` rule and keyframes by hand.
-`check_htmx.py` verifies they exist rather than trusting that someone remembered.
+**The `href` is the fallback and it is a real one.** With htmx unavailable the same
+click navigates to the same prose on `portfolio.html`, so the index degrades to a
+table of contents rather than to a set of dead links. This is also why the trigger
+is an `<a>` rather than a `<button>`: there is a URL behind it.
 
-**The animation runs backwards.** Because the new layout is already correct the
-instant the DOM changes, the slide has to animate *out of* the slot each element
-just left, *into* the one it now occupies. That is why every `@keyframes fromItemN`
-contains **only a `from` block and no `to`**. The end state is whatever the
-`:nth-child` rule assigns — writing a `to` block would override it and break the
-effect. The `--casestudy-itemN-*` custom properties hold those starting positions,
-which is why they read as animation state rather than theme values.
+**The fragments are generated, and two checks keep them honest.**
+`portfolio.html` is the source of truth, `scripts/propagate_work.py` writes every
+file under `fragments/work/` from it, and `--check` fails CI when a committed
+fragment is not what the generator would emit. `scripts/check_htmx.py` separately
+proves each fragment resolves and still agrees with the page. Editing a fragment by
+hand is a caught error, not a silent one. The number of entries is derived from
+`portfolio.html` throughout; no script holds it as a constant, and unlike the
+carousel nothing in the stylesheet has to be written by hand to add one.
 
-Slot 4 is not a visible position. Slots 1 to 3 are off-screen-left, active and
-blurred peek; the fourth is an off-screen reserve at `opacity: 0` with
-`pointer-events: none`, so a deck longer than three has somewhere to keep the
-items not currently in play. Its contents stay in the accessibility tree, which
-matches slot 1's long-standing behaviour and means a screen reader still meets
-every case study rather than three of them.
+**The panel carries `aria-live="polite"`.** Content arriving in a region the user
+did not navigate to is announced rather than appearing in silence. Nothing is
+focused on swap: the trigger keeps focus, which is where a keyboard user expects to
+still be, and the new content is the next thing in reading order.
 
-**Direction travels in the markup.** Each fragment carries `.next` or `.prev` on
-the list, which is what selects the animation for the way the deck just moved.
-Previously a script added that class to the container; the CSS selectors moved from
-`.casestudy--container.next` to `.casestudy--list.next` accordingly.
+## The search
 
-**Restarting no longer requires a reflow.** The old script had to remove the class,
-force layout with `void carousel.offsetWidth` and add it back, because re-adding
-the same class does not replay a CSS animation. Every item in a swapped fragment is
-a freshly parsed node, and a new element's animations start on their own, so that
-whole dance is gone. This is the one place the conversion genuinely removed
-complexity rather than relocating it.
-
-**Nothing is timed against the animation.** `--casestudy-slide-duration` (700ms)
-drives the CSS and is no longer read by anything else. The arrows used to be locked
-for exactly that long by a timer; now re-entry is handled declaratively by
-`hx-sync`, so a second press replaces the in-flight request instead of queueing
-behind it.
-
-**Reduced motion needs no special case.** Under `prefers-reduced-motion: reduce`
-the durations collapse and the slide becomes an instant cut. There is no longer any
-code waiting on an animation to finish, so the failure this used to risk — a
-control left disabled forever because the event never fired — is not merely handled
-but structurally impossible.
-
-## The Ask page
-
-`ask.html` runs semantic search over the portfolio without a server. The visitor's
-question is embedded by a sentence-transformer executing in their own tab and
+`index.html#ask` runs semantic search over the portfolio without a server. The
+visitor's question is embedded by a sentence-transformer executing in their own tab and
 compared against a precomputed index of `portfolio.html`. Nothing is sent
 anywhere, because there is nowhere to send it.
 
@@ -303,7 +274,7 @@ visitor several seconds of WebAssembly inference to recompute a value identical 
 all of them, and it quietly made five class names an interface: rename `.project`
 or `.project--impact` and a whole section contributed nothing to retrieval while
 the status line still reported a healthy-looking count. So the page now takes the
-bargain this repository already takes for the palette and the case study deck. One
+bargain this repository already takes for the palette and the work index. One
 source of truth, a generator, and a checker that fails CI when a copy drifts.
 
 **The generator is a page, and that is forced rather than chosen.**
@@ -318,18 +289,29 @@ same quantised weights, same runtime. It carries `<base href="../" />` for the s
 reason, so its model configuration can be a verbatim copy of the shipped one rather
 than the same thing rewritten with `../` in front of every path.
 
+**It embeds one passage per call, and the slow way round is the correct one.** An
+earlier version batched sixteen at a time. A batch is padded to its longest member,
+and under 8-bit quantisation that padding moves the result: editing the prose of
+two passages shifted the committed vectors of the eleven unedited passages sharing
+a batch with them, to a cosine of 0.997 against their own previous values. Nothing
+catches that. `check_corpus.py` compares text, so a vector that moved because a
+neighbour got longer is indistinguishable from one that did not move at all.
+Unbatched, a vector is a function of its own text and nothing else, so a
+regeneration after an unrelated edit produces a diff a reviewer can read. It also
+matches the live path more closely, since `js/ask.js` embeds a single query string
+and never a batch.
+
 **CI checks the meaning, not the model.** `scripts/check_corpus.py` cannot recompute
 an embedding, so it asserts that the text each embedding describes is still on
 `portfolio.html`, that each anchor still resolves to a real `id`, that every vector
 is 384-dimensional and unit-length, and that the corpus names the model `js/ask.js`
 expects. What it cannot catch is prose *added* to the portfolio and never indexed,
 because an unindexed paragraph is indistinguishable from one the generator was
-never meant to see. That half stays human: load `ask.html` and confirm the passage
-count went up.
+never meant to see. That half stays human: load the home page, press the load button and confirm the
+passage count went up.
 
 **Neither button uses the `disabled` property.** `#ask--load` and `#ask--submit`
-set `aria-disabled` and guard re-entry with a flag, for the same reason the
-carousel arrows use `hx-sync`: disabling the element under a keyboard user's focus
+set `aria-disabled` and guard re-entry with a flag: disabling the element under a keyboard user's focus
 sends it to `<body>` and re-enabling does not bring it back. On success the input
 is focused *before* the gate is hidden, so the pressed control never vanishes from
 under a live focus.
@@ -352,16 +334,17 @@ Three max-width breakpoints, in `css/style.css`, using range syntax:
 
 | Breakpoint       | What changes                          |
 | ---------------- | ------------------------------------- |
-| `width < 1200px` | container hits the `--max-width` edge |
-| `width < 850px`  | layout reflows to narrow tablet       |
-| `width < 750px`  | nav collapses into the sidebar        |
+| `width < 1200px` | the colophon readout drops to one label/value pair per row |
+| `width < 850px`  | the masthead portrait moves below the identity block       |
+| `width < 750px`  | nav collapses into the sidebar; sections lose vertical padding |
 
 They are **ordered widest-first**. These are max-width queries, so a later,
 narrower rule must win by source order — reordering them silently breaks the
 mobile layout.
 
-Full-height elements use `100dvh`, not `100vh`, so mobile browser chrome does not
-crop the viewport.
+No section is a full viewport any more. The one remaining viewport measurement is
+the mobile sidebar's height, and it uses `100dvh` rather than `100vh` so mobile
+browser chrome does not crop it.
 
 ## Deployment
 
@@ -394,8 +377,8 @@ than loud.
 
 | Check | Why it cannot be left to review |
 | ----- | ------------------------------- |
-| `scripts/check_htmx.py` | A renamed fragment 404s in silence; a drifted rotation looks fine; a control without an `id` strands focus on `<body>`; a carousel slot with no CSS tokens breaks the layout with no error |
-| `scripts/propagate_casestudy.py --check` | Proves the fragments are still what the generator emits, so a drift is fixed by regenerating rather than by hand-patching one copy |
+| `scripts/check_htmx.py` | A renamed fragment 404s in silence; a fragment that drifted from the prose looks fine; a control without an `id` strands focus on `<body>`; a trigger moved inside its own target strands it too, and only on a keyboard |
+| `scripts/propagate_work.py --check` | Proves the fragments are still what the generator emits, so a drift is fixed by regenerating rather than by hand-patching one copy |
 | `scripts/check_corpus.py` | A stale embedding does not raise, it just retrieves worse; a dead anchor sends a result nowhere; a corpus built for another model is the right shape in the wrong space |
 | `scripts/check_palette.py` | The palette exists in four copies (below) |
 | `scripts/check_repo.py` | Deleting `.nojekyll` breaks paths with no build error; `sitemap.xml` drifts silently; the nav exists in four copies and editing three of them looks fine on the page you are reading |

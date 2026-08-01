@@ -4,35 +4,26 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ask | Tatang Haryadi</title>
-    <meta name="description" content="Semantic search over my portfolio, running entirely in your browser: a sentence-transformer in WebAssembly, no server, no API key." />
-    <!-- Matches --bg-chrome (Catppuccin crust) in each flavour, so the browser
-         chrome continues the nav band rather than fighting it. -->
+    <title>Ask has moved to the home page | Tatang Haryadi</title>
+    <meta name="description" content="The browser-local search that used to live here is now on the home page." />
+    <!-- noindex, and therefore correctly absent from sitemap.xml: this page has no
+         content of its own, and two URLs competing for the same search is worse
+         than one. scripts/check_repo.py enforces both halves of that. -->
+    <meta name="robots" content="noindex" />
     <meta name="theme-color" content="#dce0e8" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#11111b" media="(prefers-color-scheme: dark)" />
-    <link rel="canonical" href="https://tatangharyadi.github.io/ask.html" />
+    <!-- Pointing at the page the content actually moved to, so any link or search
+         result that still names this URL passes its weight along. -->
+    <link rel="canonical" href="https://tatangharyadi.github.io/" />
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
 
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Tatang Haryadi" />
-    <meta property="og:url" content="https://tatangharyadi.github.io/ask.html" />
-    <meta property="og:title" content="Ask | Tatang Haryadi" />
-    <meta property="og:description" content="A sentence-transformer running in WebAssembly, searching my portfolio without sending your question anywhere." />
-    <meta property="og:image" content="https://tatangharyadi.github.io/assets/images/og-card.jpg" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Portrait of Tatang Haryadi" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Ask | Tatang Haryadi" />
-    <meta name="twitter:description" content="A sentence-transformer running in WebAssembly, searching my portfolio without sending your question anywhere." />
-    <meta name="twitter:image" content="https://tatangharyadi.github.io/assets/images/og-card.jpg" />
-
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="css/style.css" />
-    <link rel="stylesheet" href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" />
+
+    <!-- This file exists only because the URL was published and GitHub Pages
+         cannot issue a 301. A meta refresh would arrive faster and is deliberately
+         not used: it moves a reader who is mid-sentence and gives a screen reader
+         user no chance to hear where they went. A link they choose costs one
+         click and explains itself. -->
 
     <!-- htmx is loaded on every page in this repository, including the ones with
          no hx- attribute of their own, because scripts/check_htmx.py asserts the
@@ -41,192 +32,33 @@
     <script src="https://unpkg.com/htmx.org@2.0.10/dist/htmx.min.js"
         integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
         crossorigin="anonymous" defer></script>
-
-    <!-- The one first-party script in the repository. It is a module, so it is
-         deferred by definition; the reason it exists at all is at the top of the
-         file and in the pull request. -->
-    <script type="module" src="js/ask.js"></script>
 </head>
 
 <body>
+    <!-- No <ul class="nav-links--container"> here on purpose. A page whose only
+         job is to forward a reader should not offer them a menu, and
+         scripts/check_repo.py compares the nav copies only on pages that have
+         one, so this is a deliberate absence rather than a fourth copy to keep in
+         step. -->
     <nav>
         <div class="nav--container">
             <div class="logo"><a href="index.html">Tatang.</a></div>
-            <div class="nav-content">
-                <input type="checkbox" id="sidebar-toggle" />
-                <label for="sidebar-toggle" class="sidebar-checkbox">
-                    <i class="bx bx-menu" aria-hidden="true"></i>
-                    <span class="visually-hidden">Menu</span>
-                </label>
-                <label id="overlay" for="sidebar-toggle"></label>
-
-                <ul class="nav-links--container">
-                    <li><a href="index.html">Home</a></li>
-                    <li><a href="ask.html" aria-current="page">Ask</a></li>
-                </ul>
-            </div>
         </div>
     </nav>
 
     <main class="page">
         <div class="page--container">
-
             <header class="page--header">
-                <h1>Ask</h1>
-                <p class="page--lead">Semantic search over my portfolio, running
-                    entirely in this tab. A sentence-transformer turns your question
-                    into a vector, compares it against the passages on this site, and
-                    shows the closest ones. Nothing is sent anywhere — there is no
-                    server to send it to.</p>
+                <h1>Ask has moved</h1>
+                <p class="page--lead">The search is no longer a separate page. It is the
+                    first thing on the home page now, unchanged: the same model, running
+                    in your browser, with nothing sent anywhere.</p>
             </header>
 
-            <section class="ask" aria-labelledby="ask--heading">
-                <h2 id="ask--heading" class="visually-hidden">Search</h2>
+            <p class="page--back"><a href="index.html#ask">Go to the search &rarr;</a></p>
 
-                <!-- Hidden until js/ask.js reveals it. A no-JS visitor should never
-                     be shown a button that cannot do anything; what they get instead
-                     is the fallback at the bottom of the page. -->
-                <div class="ask--gate" id="ask--gate" hidden>
-                    <!-- Transfer sizes, not the sizes on disk. The server compresses
-                         both, and the runtime compresses nearly fourfold, so quoting
-                         the uncompressed 22 MB and 13 MB overstated the download by
-                         three quarters of the runtime. Measure before changing these:
-                         curl -H 'Accept-Encoding: br, gzip' -o /dev/null
-                         -w '%{size_download}' against the deployed URL. -->
-                    <p>The model is <strong>16 MB</strong> and the WebAssembly runtime
-                        <strong>3 MB</strong>, so neither loads until you ask for it.
-                        Your browser caches both, so this is a one-time cost. The
-                        passages are already indexed; the model is here to read your
-                        question, not this site.</p>
-                    <button type="button" class="ask--load" id="ask--load">
-                        Load the model
-                    </button>
-
-                    <div class="ask--progress-wrap" id="ask--progress-wrap" hidden>
-                        <!-- Determinate, with a real value. See the note in ask.js:
-                             a spinner in front of a 20 MB download says nothing
-                             about whether it is working. -->
-                        <label class="visually-hidden" for="ask--progress">Loading progress</label>
-                        <progress id="ask--progress" max="100" value="0"></progress>
-                        <p class="ask--progress-label" id="ask--progress-label"></p>
-                    </div>
-                </div>
-
-                <form class="ask--form" id="ask--form" hidden>
-                    <label for="ask--input">Your question</label>
-                    <div class="ask--field">
-                        <input type="search" id="ask--input" name="q" autocomplete="off"
-                            placeholder="How did you cut cloud costs?" required />
-                        <button type="submit" id="ask--submit">Search</button>
-                    </div>
-                </form>
-
-                <div class="ask--examples" id="ask--examples" hidden>
-                    <p id="ask--examples-label">Or try one of these:</p>
-                    <ul aria-labelledby="ask--examples-label">
-                        <li><button type="button" data-q="How did you reduce cloud and ICT costs?">How did you reduce cloud costs?</button></li>
-                        <li><button type="button" data-q="What have you built with IoT and edge AI?">What have you built with IoT?</button></li>
-                        <li><button type="button" data-q="Tell me about rescuing a failing ERP project.">Rescuing a failing project</button></li>
-                        <li><button type="button" data-q="What is your experience with AI and vector search?">AI and vector search</button></li>
-                        <li><button type="button" data-q="Have you led a team across multiple countries?">Leading a global team</button></li>
-                    </ul>
-                </div>
-
-                <!-- The answer appears seconds after the question, which is new for
-                     this site: every other interaction here is a synchronous htmx
-                     swap. Without a live region a screen reader user gets silence
-                     and no way to know the search finished. The status line carries
-                     the count and the timing; the results themselves are not live,
-                     because announcing five full passages would be unusable. -->
-                <p class="ask--status" id="ask--status" role="status" aria-live="polite"></p>
-                <div class="ask--results" id="ask--results"></div>
-
-                <!-- Never hidden, and not inside the gate. Search is one way to read
-                     this material and it costs a 20 MB download; someone who would
-                     rather just read, or who does not want to spend that, should not
-                     have to decline a model first to find out there is a plain page.
-                     The <noscript> block below covers a different visitor: this one
-                     is for a visitor who can run the search and does not want to. -->
-                <p class="ask--straight"><a href="portfolio.html">Or read the portfolio
-                        straight through</a>, without loading anything.</p>
-            </section>
-
-            <section class="project" id="how-it-works">
-                <h2>How it works, and what it deliberately is not</h2>
-
-                <p>The library is <a href="https://huggingface.co/docs/transformers.js/index">Transformers.js</a>,
-                    running <strong>all-MiniLM-L6-v2</strong> quantised to 8-bit
-                    through ONNX Runtime on WebAssembly. Every piece of it — the
-                    library, the runtime, the tokenizer and the weights — is served
-                    from this domain. Nothing is fetched from a CDN or a model hub at
-                    runtime, which is what lets the claim above be literal rather
-                    than approximate: the question is tokenised, embedded and
-                    compared in this tab, and no network request carries it.</p>
-
-                <p><strong>It runs on one thread, and that is not a choice.</strong>
-                    Multi-threaded ONNX Runtime needs <code>SharedArrayBuffer</code>,
-                    which needs cross-origin isolation, which needs COOP and COEP
-                    response headers. GitHub Pages cannot set headers, so
-                    <code>crossOriginIsolated</code> is <code>false</code> here and
-                    threads are unavailable no matter what the config asks for. The
-                    interesting part is that it does not matter: embedding one short
-                    question is a few tens of milliseconds single-threaded.</p>
-
-                <p><strong>The search is a linear scan, on purpose.</strong> There is
-                    no HNSW graph, no IVF index and no vector database, because at
-                    this size every one of them would be slower and all of them would
-                    be worse. The status line above tells you how many passages are
-                    indexed; a few dozen at 384 dimensions is under ten thousand
-                    multiply-accumulates per query, which is microseconds — the
-                    measured search time it reports is almost entirely the model
-                    embedding your question, not the search. An approximate index is
-                    a trade: you spend build time, memory and exact recall to avoid a
-                    scan that has become expensive. Here the scan has not become
-                    expensive, so the trade is all cost and no benefit. The crossover
-                    is somewhere around a hundred thousand vectors, four orders of
-                    magnitude away.</p>
-
-                <p><strong>It retrieves; it does not generate.</strong> What comes
-                    back is the passage I actually wrote, with its similarity score,
-                    linked to where it sits on the portfolio page. There is no
-                    language model writing prose about me, which means there is
-                    nothing here that can invent a credential. The honest limitation
-                    of that: it answers <em>"what did he do with IoT"</em> well and
-                    <em>"would he suit a fintech CTO role"</em> badly, because the
-                    second question is asking for a judgement and this only knows how
-                    to find the nearest paragraph.</p>
-
-                <p><strong>The corpus is this site.</strong> Every passage is
-                    generated from the portfolio page, embedded once, and committed
-                    as a JSON file next to it. The first version of this page did the
-                    opposite: it fetched the portfolio, split it up and ran the model
-                    over all of it in your browser, to avoid keeping a second copy of
-                    the prose that could drift from the first. That was a real
-                    concern answered in the wrong currency. It charged every visitor
-                    seconds of WebAssembly inference to recompute a value that is the
-                    same for everyone, and it quietly made five CSS class names an
-                    interface, so renaming one would drop a whole section out of the
-                    search while the count still looked healthy. Precomputing turns a
-                    silent failure into a loud one: the generator is the only thing
-                    that writes the index, and CI fails if a passage in it is no
-                    longer on the page.</p>
-            </section>
-
-            <!-- What remains when the module does not run: no dead controls, and the
-                 content the search would have surfaced, reachable. -->
-            <noscript>
-                <section class="project" id="ask--noscript">
-                    <h2>Without JavaScript</h2>
-                    <p>The search needs to run a model in your browser, so it needs
-                        JavaScript. Everything it searches is plain HTML and none of it
-                        is behind the search — the
-                        <a href="portfolio.html">portfolio page</a> is all there to read
-                        directly.</p>
-                </section>
-            </noscript>
-
-            <p class="page--back"><a href="index.html">&larr; Back to home</a></p>
-
+            <p class="page--back"><a href="portfolio.html">Or read the portfolio straight
+                    through</a>, without loading anything.</p>
         </div>
     </main>
 </body>

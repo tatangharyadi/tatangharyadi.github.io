@@ -2,7 +2,7 @@
 version: alpha
 name: Tatang Haryadi — Personal Site
 description: >-
-  A single-page personal portfolio themed with Catppuccin: Latte in light mode,
+  A personal portfolio site themed with Catppuccin: Latte in light mode,
   Mocha in dark, selected by prefers-color-scheme. Calm and layered rather than
   high-contrast, with accessibility floors treated as hard constraints.
 
@@ -27,39 +27,51 @@ colors:
   mocha-on-surface-muted: "#a6adc8"
   mocha-border: "#585b70"
 
+# Two families, both already on the machine. See "Type" for why there is no
+# webfont. `system-ui` and `ui-monospace` are the heads of the two stacks the
+# stylesheet declares as --font-ui and --font-mono; the fallbacks are in the CSS.
 typography:
   display:
-    fontFamily: Poppins
+    fontFamily: system-ui
     fontSize: 6rem
     fontWeight: 400
     lineHeight: 1
   headline-lg:
-    fontFamily: Poppins
-    fontSize: 2.5rem
-    fontWeight: 400
-    lineHeight: 3rem
+    fontFamily: system-ui
+    fontSize: 3.25rem
+    fontWeight: 650
+    lineHeight: 1.1
+    letterSpacing: -0.03em
   headline-md:
-    fontFamily: Poppins
-    fontSize: 2em
-    fontWeight: 500
-    lineHeight: 1.2
-  logo:
-    fontFamily: Poppins
-    fontSize: 1.5rem
+    fontFamily: system-ui
+    fontSize: 1.75rem
     fontWeight: 600
+    lineHeight: 1.25
+    letterSpacing: -0.02em
+  logo:
+    fontFamily: ui-monospace
+    fontSize: 1.125rem
+    fontWeight: 600
+    letterSpacing: -0.02em
   body-md:
-    fontFamily: Poppins
+    fontFamily: system-ui
     fontSize: 1rem
     fontWeight: 400
+    lineHeight: 1.6
   body-sm:
-    fontFamily: Poppins
-    fontSize: 15px
+    fontFamily: system-ui
+    fontSize: 0.9375rem
     fontWeight: 400
   label-caps:
-    fontFamily: Poppins
-    fontSize: 1rem
+    fontFamily: ui-monospace
+    fontSize: 0.8125rem
     fontWeight: 600
-    letterSpacing: 2px
+    letterSpacing: 0.14em
+  label-caps-sm:
+    fontFamily: ui-monospace
+    fontSize: 0.75rem
+    fontWeight: 400
+    letterSpacing: 0.12em
 
 rounded:
   full: 9999px
@@ -71,7 +83,7 @@ spacing:
   lg: 2rem
   xl: 3rem
   xxl: 4rem
-  max-width: 1200px
+  max-width: 1100px
 
 components:
   page:
@@ -82,20 +94,27 @@ components:
     backgroundColor: "{colors.surface-chrome}"
     textColor: "{colors.on-surface}"
     typography: "{typography.logo}"
-  hero-lede:
-    backgroundColor: "{colors.surface-alt}"
+  masthead-lead:
+    backgroundColor: "{colors.surface}"
     textColor: "{colors.on-surface-muted}"
     typography: "{typography.body-md}"
+  section-label:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.primary}"
+    typography: "{typography.label-caps}"
   social-pill:
-    backgroundColor: "{colors.surface-chrome}"
+    backgroundColor: "{colors.surface-alt}"
     textColor: "{colors.on-surface}"
     rounded: "{rounded.full}"
-    size: 40px
-  carousel-arrow:
-    backgroundColor: "{colors.surface-chrome}"
+    typography: "{typography.body-sm}"
+  work-entry:
+    backgroundColor: "{colors.surface}"
     textColor: "{colors.on-surface}"
-    rounded: "{rounded.full}"
-    size: 40px
+    typography: "{typography.headline-md}"
+  readout-label:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.on-surface-muted}"
+    typography: "{typography.label-caps-sm}"
   divider:
     backgroundColor: "{colors.border}"
     height: 1px
@@ -107,15 +126,21 @@ components:
   nav-dark:
     backgroundColor: "{colors.mocha-surface-chrome}"
     textColor: "{colors.mocha-on-surface}"
-  hero-lede-dark:
-    backgroundColor: "{colors.mocha-surface-alt}"
+  masthead-lead-dark:
+    backgroundColor: "{colors.mocha-surface}"
     textColor: "{colors.mocha-on-surface-muted}"
+  section-label-dark:
+    backgroundColor: "{colors.mocha-surface}"
+    textColor: "{colors.mocha-primary}"
   social-pill-dark:
-    backgroundColor: "{colors.mocha-surface-chrome}"
+    backgroundColor: "{colors.mocha-surface-alt}"
     textColor: "{colors.mocha-on-surface}"
-  carousel-arrow-dark:
-    backgroundColor: "{colors.mocha-surface-chrome}"
+  work-entry-dark:
+    backgroundColor: "{colors.mocha-surface}"
     textColor: "{colors.mocha-on-surface}"
+  readout-label-dark:
+    backgroundColor: "{colors.mocha-surface}"
+    textColor: "{colors.mocha-on-surface-muted}"
   divider-dark:
     backgroundColor: "{colors.mocha-border}"
   focus-ring-dark:
@@ -194,9 +219,9 @@ The token names in the front matter map one-to-one onto those custom properties:
 | Token               | CSS property    | Role                                     | Latte              | Mocha              |
 | ------------------- | --------------- | ---------------------------------------- | ------------------ | ------------------ |
 | `primary`           | `--accent-text` | all accent text + every focus ring       | **`#026389`**      | `sky` `#89dceb`    |
-| `surface`           | `--bg`          | page base, case study section            | `base` `#eff1f5`   | `base` `#1e1e2e`   |
-| `surface-alt`       | `--bg-alt`      | alternating section (hero, sidebar)      | `mantle` `#e6e9ef` | `mantle` `#181825` |
-| `surface-chrome`    | `--bg-chrome`   | nav band, social pills, carousel arrows  | `crust` `#dce0e8`  | `crust` `#11111b`  |
+| `surface`           | `--bg`          | page base, search input field            | `base` `#eff1f5`   | `base` `#1e1e2e`   |
+| `surface-alt`       | `--bg-alt`      | social pills, work panels, results, sidebar | `mantle` `#e6e9ef` | `mantle` `#181825` |
+| `surface-chrome`    | `--bg-chrome`   | the nav band, and nothing else           | `crust` `#dce0e8`  | `crust` `#11111b`  |
 | `on-surface`        | `--text`        | primary text; control outlines           | `text` `#4c4f69`   | `text` `#cdd6f4`   |
 | `on-surface-muted`  | `--text-muted`  | secondary text                           | `subtext1` `#5c5f77` | `subtext0` `#a6adc8` |
 | `border`            | `--border`      | decorative dividers and hairlines        | `surface2` `#acb0be` | `surface2` `#585b70` |
@@ -308,64 +333,94 @@ Two categories sit below 3:1 deliberately, and the token schema has no way to sa
 so — hence this paragraph:
 
 - **Decorative hairlines** — the `border` rules under the nav and the mobile
-  menu, and the case study dividers. Purely ornamental, so they are tuned to be
+  menu, the rules between sections, and the rules between entries in the work
+  index and the colophon readout. Purely ornamental, so they are tuned to be
   quiet rather than legible. The `divider` component therefore declares only a
   `backgroundColor` and no foreground: a contrast pair would assert a legibility
   requirement that does not apply.
-- **The social pill shape** (`surface-chrome` on `surface-alt`, 1.09:1). WCAG
-  1.4.11 requires 3:1 only for a boundary *needed to identify* a control; here the
-  icon inside does that at 6.04:1 and carries the accessible name. The circle is
-  ornament. Its focus ring, which is not ornament, is `primary` at 5.04:1.
+- **The social pill outline** (`border` on `surface`, 1.91:1 in Latte). WCAG
+  1.4.11 requires 3:1 only for a boundary *needed to identify* a control. These
+  pills are now labelled — the link text is inside them, at 6.57:1 — so the outline
+  is not what identifies them and the text is not relying on it. This is the change
+  that retired the exemption the old icon-only pills needed: an unlabelled 40px
+  circle really did depend on its shape, and now nothing does. The focus ring,
+  which is never ornament, is `primary` at 5.9:1 on `surface`.
 
-The carousel arrows are the opposite case: their 1px border is `on-surface`, not
-`border`, because there the outline genuinely is the control's boundary and
-`border` would be 1.91:1 in Latte. The schema has no `borderColor` property, so
-that value lives only in the CSS and in this sentence.
+The schema has no `borderColor` property, so every 1px outline on the site lives
+only in the CSS and in this prose.
 
 ## Typography
 
-Poppins throughout, loaded from Google Fonts via `preconnect` + `<link>` (see
-[ARCHITECTURE.md](ARCHITECTURE.md#no-build-step) for why not `@import`). Only two
-weights are in use — 400 for body copy and 600 for headings, the logo and the
-active tab label — with 500 appearing once on the case study card title.
+**Two families, no webfont.** Prose is `system-ui` and everything that is data
+rather than prose is `ui-monospace`, both resolved from stacks declared as
+`--font-ui` and `--font-mono` in the stylesheet. Poppins was removed in the
+redesign, and its absence is the point: a webfont is a render-blocking request to
+a host this site does not control, and a personal site whose whole argument is
+about what it does and does not fetch cannot open by fetching a typeface for
+decoration. See [ARCHITECTURE.md](ARCHITECTURE.md#no-build-step).
 
-- **`display`** — the 404 page heading, and the only fluid type on the site. Its
-  real value is `clamp(3rem, 12vw, 6rem)`; the token records the 6rem ceiling
-  because `Dimension` cannot express a clamp.
-- **`headline-lg`** — the hero title. Set at 400, not a heavier weight: at 2.5rem
-  the size alone carries the hierarchy.
-- **`headline-md`** — the case study card title, at `2em` of its card's own 15px
-  context rather than a root-relative size, so it scales with the card.
-- **`logo`** — the wordmark in the nav, and the one place a heavier weight is used
-  purely for brand presence.
-- **`body-md`** / **`body-sm`** — page copy, and the denser copy inside a case
-  study card.
-- **`label-caps`** — the hero subtitle, letterspaced at 2px.
+**The two families carry meaning, not variety.** Monospace marks anything that
+describes the content rather than being it: section labels, the job title under
+the name, work categories, and every label in the colophon readout. A reader does
+not have to be told that rule for it to work, but a change that sets a paragraph
+in mono, or a label in the UI face, breaks it.
 
-There is no `label` pair any more. It described the hero tab labels, inactive and
-active, and the tabs are gone: the hero is one paragraph now, set in `body-md`.
-The principle they demonstrated still binds anything that replaces them, though.
-State was signalled by **both** `primary` and a heavier weight, never colour
-alone, because WCAG 1.4.1 forbids the second and because a weight change survives
-in Latte where the accent is less vivid than the old bright cyan.
+- **`display`** — the 404 page heading, and the only type on the site with no
+  upper bound worth recording. Its real value is `clamp(3rem, 12vw, 6rem)`; the
+  token records the 6rem ceiling because `Dimension` cannot express a clamp.
+- **`headline-lg`** — the name in the masthead, `clamp(2rem, 6vw, 3.25rem)` at
+  weight 650 with `-0.03em` tracking. The negative tracking is what keeps a large
+  system font from reading as a default, and it is the one place the weight is not
+  400 or 600.
+- **`headline-md`** — a work index title, `clamp(1.25rem, 3vw, 1.75rem)`. Fluid for
+  the same reason the name is: these are the two sizes large enough for a narrow
+  viewport to notice.
+- **`logo`** — the wordmark, and the only monospace item that is not a label. It is
+  set in mono because the wordmark is a name rendered as an identifier.
+- **`body-md`** / **`body-sm`** — page copy at `line-height: 1.6`, and the denser
+  copy in the colophon readout.
+- **`label-caps`** / **`label-caps-sm`** — every section heading and the masthead
+  role at the larger size; work categories and readout labels at the smaller. Both
+  are uppercase monospace with open tracking, which is what makes them legible at
+  13px and 12px.
+
+**Body text is capped at `--measure` (68ch), not at `--max-width`.** Line length is
+a legibility constraint counted in characters and the two are not
+interchangeable; 1100px of running text is roughly twice a comfortable measure.
+`--measure` is a `ch` value, which the token schema's `Dimension` type cannot
+express, so it is recorded here only.
+
+One principle survives the tab labels that used to demonstrate it: state is
+signalled by **both** colour and a weight or shape change, never colour alone,
+because WCAG 1.4.1 forbids the second and because a weight change survives in
+Latte where the accent is less vivid than the old bright cyan.
 
 ## Layout
 
-A single centred column, capped at `spacing.max-width` (1200px) and padded
-`spacing.sm` (1rem) at the edges. Sections alternate between `surface` and
-`surface-alt` down the page; the nav is fixed to the top and the tech stack band
-is full-bleed.
+A single centred column, capped at `spacing.max-width` (1100px) and padded
+`spacing.sm` (1rem) at the edges. The nav is fixed to the top.
+
+**No section fills the viewport.** The page used to be a stack of `100dvh` bands,
+one screenful each, alternating `surface` and `surface-alt`. That is the shape that
+makes a page read as a template before a word of it is read: it forces a scroll
+between every idea and tells the reader nothing about how much is left. Sections
+are now as tall as their content and separated by a `border` hairline, so the page
+has a length you can feel. The alternating fills went with the bands — the page is
+`surface` throughout, and depth comes from rules rather than from tone.
 
 Spacing follows an 8px rhythm expressed in `rem` — every value in the stylesheet
-is a multiple of `0.5rem`, from `xs` through `xxl`, with the hero's asymmetric
-`10rem 1rem 5rem 1rem` clearing the fixed nav. There is no separate 4px half-step.
+is a multiple of `0.5rem`, from `xs` through `xxl`, with the masthead's asymmetric
+top padding clearing the fixed nav. There is no separate 4px half-step.
+
+`html` carries `scroll-padding-top: 6.5rem`. Every nav link is an in-page anchor
+and the nav is fixed, so without it a section heading lands underneath the bar.
 
 Three breakpoints, all written as `width <` queries:
 
 | Breakpoint | What changes                                                     |
 | ---------- | ---------------------------------------------------------------- |
-| `1200px`   | the column stops being capped and becomes fluid                  |
-| `850px`    | the hero's two columns collapse to one                           |
+| `1200px`   | the colophon readout drops to one label/value pair per row       |
+| `850px`    | the masthead portrait moves below the identity block             |
 | `750px`    | the nav links move into the CSS-only slide-out sidebar           |
 
 Breakpoints are not spacing tokens and the schema has no place for them, so they
@@ -391,11 +446,17 @@ case study sections (`#faf5ff`) — a ratio of about 15:1 between them. Dark mod
 does not rescue it either; Mocha's `crust` band is, if anything, marginally
 flatter against its page than Latte's.
 
-**So tone alone will not separate the nav from the content in either flavour, and
-a 1px hairline does the work instead.** `nav` and the mobile slide-out menu each
-carry a `border` hairline on the edge facing the content. It
-measures 1.78–2.63:1 against its neighbour, which is plenty for a line even
-though it would be far too little for text.
+**So tone alone will not separate anything from anything in either flavour, and a
+1px hairline does the work instead.** This was true of the nav before the redesign
+and it is now the site's entire structural vocabulary: the nav edge, the boundary
+between sections, the rules between work entries, the rows of the colophon readout
+and the left rule on an expanded work panel. It measures 1.78–2.63:1 against its
+neighbour, which is plenty for a line even though it would be far too little for
+text.
+
+The one hairline that is not `border` is the left rule on a work panel, which is
+`primary`. There it is not a divider but an indicator that the content beside it
+arrived in response to something the reader did, so it is allowed to be seen.
 
 The slide-out menu is the case where this is not optional. It is an overlay panel
 on top of the page at `surface-alt` over `surface` — 1.07:1 in Mocha — so without
@@ -406,40 +467,47 @@ the `border-left` its links appear to float on the page rather than sit in a men
 Almost nothing is rounded. The site's shape language is squared-off rectangular
 bands, with roundness reserved for one thing:
 
-- **Circles**, for anything that reads as a token or a control rather than a
-  region: the profile photo, the four social pills and the two carousel arrows.
-  These are literally `border-radius: 50%` (`100%` on the photo) in the CSS;
-  `rounded.full` is the token equivalent, since `Dimension` cannot express a
-  percentage.
+- **The profile photo**, a literal `border-radius: 50%`.
+- **The three social pills**, `border-radius: 999px` on a shape wider than it is
+  tall, so the radius resolves to a stadium rather than a circle. `rounded.full`
+  is the token for both cases, since `Dimension` cannot express a percentage and
+  the schema has no stadium.
+
 Nothing else. There was a `rounded.xs` (2px), softening the focus ring on the
-hero tab labels so the outline did not read as a hard box around text; it left
+old hero tab labels so the outline did not read as a hard box around text; it left
 with the tabs. Every remaining focus ring sits on a control with its own shape,
 so the ring follows that shape and needs no radius of its own.
 
-Section bands, cards and the nav have no radius at all. Do not add one to a
+Sections, panels and the nav have no radius at all. Do not add one to a
 rectangular container to "modernise" it; the flat bands are what the hairlines in
 [Elevation & Depth](#elevation--depth) are tuned against.
 
 ## Components
 
-Every component below is CSS-only — there is no component framework, and the tab
-panels and mobile menu are driven by hidden radio and checkbox inputs rather than
-JavaScript. See [AGENTS.md](AGENTS.md#accessibility-invariants) before changing any
+Every component below is CSS-only — there is no component framework, and the
+mobile menu is driven by a hidden checkbox rather than JavaScript. See [AGENTS.md](AGENTS.md#accessibility-invariants) before changing any
 of them; several look like mistakes and are load-bearing.
 
 - **`nav`** — fixed band on `surface-chrome`, wordmark in `primary`, links in
   `on-surface`. Carries a `border` hairline on its bottom edge.
-- **`hero-lede`** — the positioning paragraph under the hero title, in
-  `on-surface-muted` on the `surface-alt` hero band. Plain prose, not a control:
-  it replaced a three-tab panel switcher once the Ask page could answer the
-  questions the other two tabs were standing in for.
-- **`social-pill`** — 40px circle, `surface-chrome` fill, icon in `on-surface`.
-  The fill is ornament; the icon carries the accessible name.
-- **`carousel-arrow`** — 40px circle, same fill, plus a 1px `on-surface` border
-  that is the real boundary of the control. While a slide is in flight the arrow
-  takes `aria-disabled` and reduced opacity — never the `disabled` property, which
-  would move focus to `<body>`.
-- **`divider`** — 1px `border` hairline. Decorative; also the band separator
+- **`masthead-lead`** — the positioning paragraph under the name, in
+  `on-surface-muted`, capped at `--measure`. Plain prose, not a control.
+- **`section-label`** — the uppercase monospace heading over each section, in
+  `primary`. It is an `<h2>` doing the job of a label: small, tracked open, and
+  deliberately not competing with the entry titles beneath it.
+- **`social-pill`** — a labelled stadium, `surface-alt` fill with a `border`
+  outline, text in `on-surface`. The text is the accessible name; the fill and the
+  outline are both ornament. It used to be an icon-only circle, which made the
+  shape load-bearing for identification — see [Contrast](#contrast).
+- **`work-entry`** — a title link over a line of scope, separated from its
+  neighbours by a `border` rule. The title is underlined in `border` and turns
+  `primary` on hover or focus, so it is never colour alone that marks it as a link.
+  While its fragment is in flight the link takes reduced opacity and nothing else:
+  no `disabled`, ever, which would move focus to `<body>`.
+- **`readout-label`** — the monospace term in the colophon's measurement grid, in
+  `on-surface-muted` against its `on-surface` value. The contrast between the two
+  is the whole hierarchy of that block.
+- **`divider`** — 1px `border` hairline. Decorative; the section separator
   described under Elevation & Depth.
 - **`focus-ring`** — `2px solid` `primary` with a 2–4px offset, on every
   interactive control in both flavours. Not optional and not restyleable per
@@ -449,10 +517,8 @@ One schema gap to read past: component properties cover fill and text, but there
 is no stroke or `borderColor`. `focus-ring` therefore carries its *outline* colour
 in `textColor` — that is the only colour slot available, so read it as a stroke,
 not a label. Its `2px` width and 2–4px offset have no schema home at all and live
-only in this prose. `carousel-arrow` is
-luckier: its `textColor` really is a glyph colour, because the arrow is a
-monospace `<` / `>` character, and its border happens to be that same
-`on-surface` — so nothing is lost there, but nothing records the border either.
+only in this prose, as do the `border` outline on `social-pill`, the underline on
+a `work-entry` title and the `primary` left rule on an expanded work panel.
 
 Each of these has a `-dark` variant in the front matter carrying its Mocha
 colours. Those variants exist to make the dark flavour machine-readable and

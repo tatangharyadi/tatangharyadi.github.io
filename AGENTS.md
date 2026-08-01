@@ -10,19 +10,24 @@ served by GitHub Pages from `main`. There is nothing to install and nothing to
 compile. Edit the files directly.
 
 **There is exactly one JavaScript file of our own, and it is `js/ask.js`.**
-Everything else — the case study carousel — is
+Everything else — the work index on the home page — is
 [htmx](https://htmx.org) asking for static HTML fragments under `fragments/` and
-swapping them in. htmx arrives from a CDN pinned by version and SRI digest, the
-same way Boxicons does. That remains the default: adding a second `js/` file is a
+swapping them in. htmx arrives from a CDN pinned by version and SRI digest.
+
+**There is no webfont and no icon font.** Poppins and Boxicons were both removed:
+type is the system UI stack, and the handful of glyphs the site draws are inline
+SVG. Adding a font request back is the same kind of decision as adding a `js/`
+file, and for the same reason — it is a render-blocking request to a host this
+site does not control. That remains the default: adding a second `js/` file is a
 real decision, not a shortcut. Read
 [ARCHITECTURE.md](ARCHITECTURE.md#interaction-patterns) first and say in the pull
 request why markup could not carry it.
 
-`js/ask.js` earns its exception because the Ask page is the one interaction that
+`js/ask.js` earns its exception because the search is the one interaction that
 is not a request for HTML. Every htmx swap on this site fetches markup a server
-already holds; the Ask page multiplies a question against 384-dimensional vectors
+already holds; the search multiplies a question against 384-dimensional vectors
 that exist only in the visitor's tab. No endpoint could answer it without being
-sent the question, which is precisely the property the page exists to avoid. It is
+sent the question, which is precisely the property the search exists to avoid. It is
 a plain ES module with no bundler and no package manager, consistent with
 everything else here.
 
@@ -41,13 +46,14 @@ python3 -m http.server 8000
 ```
 
 **A file:// page cannot fetch fragments.** Opening `index.html` directly now leaves
-the carousel inert, because htmx issues real requests and the browser
-blocks cross-origin `file://` reads. Serve the site for anything touching
+the work index unable to expand, because htmx issues real requests and the browser
+blocks cross-origin `file://` reads. The entries still navigate, since each is a
+real link, so this failure looks like a design choice rather than a broken page. Serve the site for anything touching
 interaction.
 
 **Browsers cache aggressively on localhost.** If a change to `css/style.css` or to
 a file under `fragments/` appears not to have taken effect, confirm the server is
-sending the new bytes (`curl -s localhost:8000/fragments/casestudy/r0-next.html | head`)
+sending the new bytes (`curl -s localhost:8000/fragments/work/ghost-kitchen-startup.html | head`)
 before concluding the markup is wrong. Starting a server on a different port gives
 you a fresh cache key.
 
@@ -62,12 +68,12 @@ not pretend to cover them. **A green CI does not mean a change is verified.**
 
 1. **[CI]** `python3 scripts/check_htmx.py` if any markup, fragment or `hx-`
    attribute changed. It catches the three things a green page load hides: a
-   fragment that 404s, a case study copy that drifted, and a control that lost the
-   `id` htmx re-focuses by. It also checks that every carousel slot the deck needs
-   has its CSS tokens and keyframes, which is the one drift that is silent in CI
-   and glaringly visible on the page.
-2. **[CI]** `python3 scripts/propagate_casestudy.py --check` if you touched a case
-   study. It is the other half of step 1: that check proves the fragments agree
+   fragment that 404s, a work fragment whose prose drifted from `portfolio.html`,
+   and a control that lost the `id` htmx re-focuses by. It also checks that no
+   trigger sits inside the region it swaps, which is the failure that is invisible
+   to a mouse and strands a keyboard user on `<body>`.
+2. **[CI]** `python3 scripts/propagate_work.py --check` if you touched the work
+   prose. It is the other half of step 1: that check proves the fragments agree
    with `index.html`, this one proves they are still exactly what the generator
    emits. When it fails, re-run the generator — do not hand-patch the file it
    named.
@@ -76,7 +82,7 @@ not pretend to cover them. **A green CI does not mean a change is verified.**
    every passage in it is still on the page. Regenerate with
    `scripts/build-corpus.html` — see the bullet under "Other things not to break".
 4. If you **added** prose to `portfolio.html`, regenerate the corpus, then load
-   `ask.html`, press the load button and confirm the **passage count went up**.
+   the home page, press the load button and confirm the **passage count went up**.
    This is the one half of the bargain CI cannot hold up: text that was never
    indexed looks exactly like text the generator was never meant to see, so
    nothing static can tell the difference. Step 3 catches prose that changed;
@@ -86,13 +92,11 @@ not pretend to cover them. **A green CI does not mean a change is verified.**
    no-op on click, not an error.
 6. Tab through the whole page. Every interactive control must be reachable and
    show a visible focus ring.
-7. Operate the carousel **from the keyboard**, not just by clicking. Focus the
-   Next arrow, activate it, and check that focus is still on that arrow
-   afterwards. Clicking with a mouse does not exercise this and will hide a
-   regression. This is the check that catches a
-   swapped-in control missing its `id` — see the invariant below. Press it all the
-   way round the deck rather than once: an off-by-one in the arrow modulus only
-   shows itself on the wrap.
+7. Operate the work index **from the keyboard**, not just by clicking. Tab to an
+   entry title, activate it, and check that focus is still on that title afterwards
+   and that the detail appeared below it. Do every entry, not one: a fragment that
+   404s is a silent no-op, so an entry that does nothing looks identical to one you
+   have not pressed yet.
 8. Check the layout at each breakpoint (1200 / 850 / 750px) and with
    `prefers-reduced-motion: reduce` enabled.
 9. **Check both colour schemes.** The site themes itself off
@@ -112,35 +116,37 @@ not pretend to cover them. **A green CI does not mean a change is verified.**
 
 ## Accessibility invariants
 
-Five things in this codebase look like mistakes and are load-bearing. Each has an
+Six things in this codebase look like mistakes and are load-bearing. Each has an
 inline comment; do not "clean them up".
 
 - **Every control htmx drives keeps a stable `id`, and swapped-in fragments reuse
-  the same ones.** This is the invariant the whole shape of the carousel exists to
+  the same ones.** This is the invariant the shape of the work index exists to
   protect. After a swap htmx looks the previously focused element up again by
   `document.getElementById`; if the incoming markup has no element with that `id`,
   focus falls to `<body>` and a keyboard user is stranded outside the component
-  with no way back. So `#prev` and `#next` are fixed names, not decoration —
-  renaming one, or adding a focusable control to a fragment without an `id`,
-  breaks keyboard operation while looking perfectly fine to a mouse. The rule
-  binds anything htmx swaps in future, not just the two arrows that happen to be
-  the only such controls today. `scripts/check_htmx.py` fails CI on an `hx-get` with no `id`, and step 7
-  of "Verifying a change" is how you catch the rest.
+  with no way back.
+
+  The work index avoids this structurally rather than carefully: every trigger is
+  a sibling of the panel it fills, so a swap cannot remove it. That is the shape to
+  copy. `scripts/check_htmx.py` fails CI on an `hx-get` with no `id` *and* on a
+  trigger whose `id` appears inside its own target, so the arrangement is checked
+  rather than remembered. The rule still binds anything htmx swaps in future,
+  including a control that does replace itself: that one needs a stable `id` in
+  every incoming fragment, and step 7 of "Verifying a change" is how you catch it.
 - **The mobile menu checkbox is visually hidden, not `display: none`.**
   `display: none` removes an element from the tab order *and* the accessibility
   tree. The sidebar is a CSS-only pattern that depends on its checkbox staying
   focusable, so hiding it that way makes the menu unopenable by keyboard and
   invisible to screen readers. Use the `.visually-hidden` class. (The sidebar
   stays CSS because it has nothing to fetch.)
-- **The carousel arrows never use the `disabled` property — re-entry is guarded by
-  `hx-sync`.** Disabling the element the user just pressed moves focus to `<body>`,
-  which is the same failure as losing an `id`. `hx-sync="closest
-  .casestudy--container:replace"` is what actually prevents a second press from
-  queueing behind the first, and the `button.htmx-request` opacity rule provides
-  the visual affordance while the request is in flight. `aria-disabled` is
-  acceptable where a state genuinely needs announcing; `disabled` is not, ever.
+- **Nothing on this site uses the `disabled` property.** Disabling the element the
+  user just pressed moves focus to `<body>`, which is the same failure as losing an
+  `id`. In the work index the `.work--title a.htmx-request` opacity rule is the
+  whole of the in-flight affordance, and a second press simply supersedes the
+  first. `aria-disabled` is acceptable where a state genuinely needs announcing;
+  `disabled` is not, ever.
 
-  This holds outside the carousel too. The two buttons on the Ask page —
+  The two buttons in the search —
   `#ask--load` and `#ask--submit` — set `aria-disabled` and guard re-entry with a
   plain flag in `js/ask.js`, for exactly the same reason. An earlier version used
   `disabled` on the load button, reasoning that it is removed from the flow once
@@ -148,19 +154,24 @@ inline comment; do not "clean them up".
   disabling it on press stranded a keyboard user on `<body>` for the whole
   multi-second download. If you find yourself justifying a `disabled` here, check
   when the element actually leaves the page.
-- **Decorative Boxicons glyphs carry `aria-hidden="true"`.** Without this a
-  screen reader announces a run of meaningless list items. The rule applies to
-  any block of glyphs, not only the ones present today.
-- **The case study section carries a `visually-hidden` `<h2>`.** Its visible
-  content is image-based, so without the heading, heading navigation lands in an
-  unnamed empty region.
+- **Decorative inline SVG carries `aria-hidden="true"` and `focusable="false"`.**
+  Without the first a screen reader announces meaningless graphics; without the
+  second the SVG is a tab stop in some browsers. Every glyph on the site is
+  decoration next to a real text label, so this applies to all of them.
+- **Lists styled with `list-style: none` keep `role="list"`.** Removing the marker
+  removes the list semantics in Safari with VoiceOver, so `.work--index`,
+  `.masthead--socials` and `.colophon--checks` all carry the role back explicitly.
+- **The work panels carry `aria-live="polite"`.** Detail arrives in a region the
+  visitor did not navigate to; without this it appears in silence. Focus stays on
+  the trigger deliberately, so the announcement is the only signal a screen reader
+  user gets.
 
 Three further rules for any change:
 
-- **Animations stay behind a `prefers-reduced-motion` guard.** Nothing waits on an
-  animation to finish any more, so the old failure mode — arrows locked forever
-  because a timer never fired — is gone. The guard is now purely about honouring the
-  preference, which is reason enough: keep it.
+- **Animations stay behind a `prefers-reduced-motion` guard.** Nothing on the page
+  is revealed by an animation any more, so the guard cannot strand content and does
+  not need a matching `opacity: 1` override the way the old carousel entrances did.
+  It is now purely about honouring the preference, which is reason enough: keep it.
 - **Text contrast stays at or above 4.5:1, in both flavours.** This is why
   `--accent-text` exists alongside `--accent`; do not substitute one for the other
   to "keep the colours consistent". `--accent` is `sky`, which measures 2.47:1 on
@@ -178,55 +189,54 @@ Three further rules for any change:
   [ARCHITECTURE.md](ARCHITECTURE.md#why-nojekyll-matters).
 - **`portfolio.html` is out of the nav on purpose, and in `sitemap.xml` on
   purpose.** Those are not in conflict. It is a destination a visitor arrives at
-  rather than one they pick: from an Ask result, from the link under the case study
-  deck on `index.html`, from the link below the results on `ask.html`, or from a
-  search engine. Being absent from a menu costs it nothing that matters, because it
-  is still reachable by four routes and still crawlable. It is also the reason
+  rather than one they pick: from a search result, from a work entry's title link,
+  from the link under the work index, or from a search engine. Being absent from a
+  menu costs it nothing that matters, because it is still reachable by four routes
+  and still crawlable. It is also the reason
   nothing in its own nav carries `aria-current`.
 
   So do not "tidy" this in either direction. Adding it back to the nav undoes a
   deliberate decision; deleting the page because nothing in the nav points at it
   breaks every anchor in `corpus.json`, the `<noscript>` fallback, and the only
   crawlable copy of the detail prose.
-- **The nav is written out four times and nothing but `scripts/check_repo.py` keeps
-  them in step.** Once in each root page, because those links are content a crawler
-  should see and the site has to navigate with no JavaScript at all, and once in
-  `fragments/404-links.html`. Adding or removing an entry means editing all four.
-  The check compares the visible labels rather than the `href`s, because the hrefs
-  legitimately differ: `index.html` links Home to `#section-home`, the other pages
-  link it to `index.html`, and the 404 fragment must use root-absolute paths.
-- **The `@keyframes fromItemN` have no `to` block.** That is correct; the end state
-  comes from the `:nth-child` rules. Adding one breaks the slide.
-- **`.next` and `.prev` belong on `.casestudy--list`, not on the container.** The
-  direction of travel arrives in the fragment that was served, so it is a property
-  of the incoming list. There is no longer any reflow nudge and none is needed: a
-  swap inserts freshly parsed nodes, and a new element's animations start on their
-  own.
-- **`--casestudy-slide-duration` is read only by the stylesheet.** Nothing parses it
-  any more, so the unit is free. Older comments insisting on `ms` are obsolete.
-- **The case studies exist once per rotation per direction, plus `index.html`** —
-  four case studies currently, so `index.html` (rotation 0) plus the eight
-  `fragments/casestudy/r{0..3}-{next,prev}.html`. This is the same bargain the
-  palette makes across four files, with better enforcement: `index.html` is the
-  source of truth, `scripts/propagate_casestudy.py` regenerates every fragment
-  from it, and `scripts/check_htmx.py` plus `propagate_casestudy.py --check` both
-  fail CI if a copy drifts. **Never edit a fragment.** Edit `index.html`, run the
-  generator, commit what it wrote.
+- **The nav is written out three times and nothing but `scripts/check_repo.py`
+  keeps them in step.** In `index.html` and `portfolio.html`, because those links
+  are content a crawler should see and the site has to navigate with no JavaScript
+  at all, and in `fragments/404-links.html`. Adding or removing an entry means
+  editing all three. The check compares the visible labels rather than the `href`s,
+  because the hrefs legitimately differ: `index.html` links its own sections as
+  bare `#ask`, `portfolio.html` has to prefix them with `index.html`, and the 404
+  fragment must use root-absolute `/#ask`.
 
-  How many case studies there are is deliberately not written down as a number
-  anywhere. It is however many `.casestudy--item` blocks `index.html` holds, and
-  the fragment count, the arrow modulus and the CSS slot checks are all derived
-  from that. Adding a fifth is therefore mostly automatic — but not entirely: the
-  stylesheet still needs `--casestudy-item5-transform`, `--casestudy-item5-zindex`,
-  a `:nth-child(5)` rule and `@keyframes fromItem5` written by hand. Nothing can
-  infer those, which is why `check_htmx.py` fails loudly when they are missing.
-- **`corpus.json` is generated; never hand-edit it.** It is the Ask page's search
+  `ask.html` deliberately has no `nav-links--container`, so it is not a fourth
+  copy. A page whose only job is to forward a reader should not offer a menu, and
+  `check_repo.py` only compares pages that have one.
+- **Every work entry exists twice: in `portfolio.html` and in its fragment.** Four
+  entries currently, so four files under `fragments/work/`. This is the same
+  bargain the palette makes across several files, with better enforcement:
+  `portfolio.html` is the source of truth, `scripts/propagate_work.py` regenerates
+  every fragment from it, and `scripts/check_htmx.py` plus
+  `propagate_work.py --check` both fail CI if a copy drifts. **Never edit a
+  fragment.** Edit `portfolio.html`, run the generator, commit what it wrote.
+
+  How many entries there are is deliberately not written down as a number
+  anywhere, and unlike the carousel this replaced, adding one needs nothing written
+  by hand in the stylesheet: the index is a list, so a fifth entry styles itself.
+- **`corpus.json` is generated; never hand-edit it.** It is the search
   index: one entry per passage of `portfolio.html`, each carrying the
   384-dimensional embedding of that passage. `portfolio.html` is the source of
   truth and `scripts/build-corpus.html` is the only thing that writes the index.
   Regenerate it by serving the repository, opening
   `/scripts/build-corpus.html`, pressing the button and saving the result over
   `corpus.json`.
+
+  **The generator embeds one passage at a time, and that is not an oversight to
+  optimise.** Batching pads every sequence in a batch to its longest member, and
+  under 8-bit quantisation the padding changes the output: a two-passage prose edit
+  once moved the vectors of eleven untouched passages to a cosine of 0.997 against
+  themselves. Nothing catches that, because `check_corpus.py` compares text. Left
+  unbatched, re-running the generator with no prose change reproduces the committed
+  file byte for byte, which is a property worth more than the few seconds it costs.
 
   It is a page rather than a Python script for one reason: the vectors have to be
   the ones the shipped code would have produced, and a vector that differs does
