@@ -71,7 +71,7 @@ not pretend to cover them. **A green CI does not mean a change is verified.**
    with `index.html`, this one proves they are still exactly what the generator
    emits. When it fails, re-run the generator — do not hand-patch the file it
    named.
-3. If you changed `projects.html`, load `ask.html`, press the load button and
+3. If you changed `portfolio.html`, load `ask.html`, press the load button and
    confirm the **passage count went up**. `js/ask.js` parses that page for its
    corpus by class name; a renamed class makes the section contribute nothing
    while the status line still reports a healthy-looking number.

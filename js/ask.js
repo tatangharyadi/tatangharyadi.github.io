@@ -17,14 +17,14 @@
 const MODEL_ID = 'all-MiniLM-L6-v2';
 
 // Where the corpus comes from. Deliberately not a generated JSON file committed
-// beside the page: the case studies page IS the corpus, parsed at runtime. A
+// beside the page: the portfolio page IS the corpus, parsed at runtime. A
 // build step that emitted embeddings would be a second copy of the prose that
 // could drift from the first, and this repository already carries four copies of
 // the palette and eight of the case study deck precisely because that bargain is
 // sometimes unavoidable. Here it is avoidable, so the drift is designed out
 // rather than policed by another checker.
 const SOURCES = [
-  { url: 'projects.html', label: 'Case studies' },
+  { url: 'portfolio.html', label: 'Portfolio' },
 ];
 
 const TOP_K = 5;
@@ -55,7 +55,7 @@ let corpus = [];
 /* Corpus                                                                     */
 /* -------------------------------------------------------------------------- */
 
-// Split the case studies page into passages. Each passage keeps the heading it
+// Split the portfolio page into passages. Each passage keeps the heading it
 // sat under, because a paragraph about "the rescue turned on scope" means very
 // little on its own and a great deal under "Multinational Retail Company". The
 // heading is prepended for embedding and shown separately in the result, so the

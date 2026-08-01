@@ -36,8 +36,8 @@ request — and delay first paint.
 
 ```
 index.html              home: nav + hero, case study carousel, tech stack sections
-projects.html           the case studies in full; also the Ask page's corpus
-ask.html                browser-local semantic search over projects.html
+portfolio.html          case studies in full, plus now/skills/earlier; the Ask corpus
+ask.html                browser-local semantic search over portfolio.html
 404.html                self-contained not-found page
 css/style.css           all styles, including the carousel slide animations
 js/ask.js               the only first-party script; see The Ask page
@@ -216,7 +216,7 @@ but structurally impossible.
 
 `ask.html` runs semantic search over the case studies without a server. The
 visitor's question is embedded by a sentence-transformer executing in their own
-tab and compared against passages parsed out of `projects.html`. Nothing is sent
+tab and compared against passages parsed out of `portfolio.html`. Nothing is sent
 anywhere, because there is nowhere to send it.
 
 **The stack is [Transformers.js](https://huggingface.co/docs/transformers.js/index)
@@ -257,11 +257,11 @@ index like HNSW starts to earn its build time, memory and recall loss. The
 reported query time is almost entirely the model embedding the question.
 
 **The corpus is parsed at runtime, not precomputed.** `js/ask.js` fetches
-`projects.html` and chunks it on `.project` sections. A committed embeddings file
+`portfolio.html` and chunks it on `.project` sections. A committed embeddings file
 would be a second copy of the prose, free to drift from the first — the problem
 this repo already pays a CI checker to manage in two other places. Here it is
 avoidable, so it is avoided. The tradeoff is that the class names in
-`projects.html` are now an interface: rename one and the section contributes no
+`portfolio.html` are now an interface: rename one and the section contributes no
 passages while the page still looks healthy. The check for that is human — load
 the page and confirm the passage count moved.
 
