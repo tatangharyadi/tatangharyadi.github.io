@@ -13,22 +13,18 @@ description: >-
 # { light, dark } pairs.
 colors:
   primary: "#026389"
-  accent: "#04a5e5"
   surface: "#eff1f5"
   surface-alt: "#e6e9ef"
   surface-chrome: "#dce0e8"
   on-surface: "#4c4f69"
   on-surface-muted: "#5c5f77"
-  on-surface-subtle: "#acb0be"
   border: "#acb0be"
   mocha-primary: "#89dceb"
-  mocha-accent: "#89dceb"
   mocha-surface: "#1e1e2e"
   mocha-surface-alt: "#181825"
   mocha-surface-chrome: "#11111b"
   mocha-on-surface: "#cdd6f4"
   mocha-on-surface-muted: "#a6adc8"
-  mocha-on-surface-subtle: "#585b70"
   mocha-border: "#585b70"
 
 typography:
@@ -103,10 +99,6 @@ components:
   divider:
     backgroundColor: "{colors.border}"
     height: 1px
-  techstack-glyph:
-    textColor: "{colors.on-surface-subtle}"
-  techstack-glyph-hover:
-    textColor: "{colors.accent}"
   focus-ring:
     textColor: "{colors.primary}"
   page-dark:
@@ -126,10 +118,6 @@ components:
     textColor: "{colors.mocha-on-surface}"
   divider-dark:
     backgroundColor: "{colors.mocha-border}"
-  techstack-glyph-dark:
-    textColor: "{colors.mocha-on-surface-subtle}"
-  techstack-glyph-hover-dark:
-    textColor: "{colors.mocha-accent}"
   focus-ring-dark:
     textColor: "{colors.mocha-primary}"
 ---
@@ -206,13 +194,11 @@ The token names in the front matter map one-to-one onto those custom properties:
 | Token               | CSS property    | Role                                     | Latte              | Mocha              |
 | ------------------- | --------------- | ---------------------------------------- | ------------------ | ------------------ |
 | `primary`           | `--accent-text` | all accent text + every focus ring       | **`#026389`**      | `sky` `#89dceb`    |
-| `accent`            | `--accent`      | decoration only (see below)              | `sky` `#04a5e5`    | `sky` `#89dceb`    |
 | `surface`           | `--bg`          | page base, case study section            | `base` `#eff1f5`   | `base` `#1e1e2e`   |
 | `surface-alt`       | `--bg-alt`      | alternating section (hero, sidebar)      | `mantle` `#e6e9ef` | `mantle` `#181825` |
-| `surface-chrome`    | `--bg-chrome`   | nav band, tech stack band, pills, arrows | `crust` `#dce0e8`  | `crust` `#11111b`  |
+| `surface-chrome`    | `--bg-chrome`   | nav band, social pills, carousel arrows  | `crust` `#dce0e8`  | `crust` `#11111b`  |
 | `on-surface`        | `--text`        | primary text; control outlines           | `text` `#4c4f69`   | `text` `#cdd6f4`   |
 | `on-surface-muted`  | `--text-muted`  | secondary text                           | `subtext1` `#5c5f77` | `subtext0` `#a6adc8` |
-| `on-surface-subtle` | `--text-subtle` | decorative glyphs only                   | `surface2` `#acb0be` | `surface2` `#585b70` |
 | `border`            | `--border`      | decorative dividers and hairlines        | `surface2` `#acb0be` | `surface2` `#585b70` |
 
 `on-surface-muted` intentionally uses a different palette slot per flavour: Latte
@@ -255,21 +241,28 @@ released `alpha` linter reads the nested object as a token group, so every
 counting as a defined colour. Do not adopt it early. The format is version
 `alpha` and expects to change.
 
-### The accent rule
+### There is only one accent, and it is `primary`
 
-**`accent` may only be used on `aria-hidden` decoration. Anything a visitor has
-to read or aim at — text of any size, and every focus ring — uses `primary`.**
-This is a rule, not a description; the contrast figures below only hold if it is
-followed.
+**Every accent on this site — text of any size, and every focus ring — is
+`primary`. Catppuccin `sky` is not in the token set at all.**
 
-The rule is stricter than the usual "large text may be lighter" allowance, because
-Latte `sky` fails even the **3:1** large-text and UI-component floor, not just the
-4.5:1 small-text one. There is no size at which it becomes legal. `accent`
-consequently survives in exactly one place today: the hover colour of the tech
-stack marquee glyphs, which are decorative and `aria-hidden` as a whole.
+There used to be a second token, `accent`, holding Latte `sky` `#04a5e5` for
+decoration only. It was legal because it was never read or aimed at: its one
+remaining use was the hover colour of the tech stack marquee glyphs, which were
+`aria-hidden` as a whole. When that marquee was removed the token had no lawful
+home left anywhere on the site, so it went with it. A decoration-only colour with
+no decoration to sit on is a trap for whoever reaches for it next, and the rule
+governing it can be dropped now that the colour is gone.
 
-The 404 page's `<h1>` is the case that proves the point — at `clamp(3rem, 12vw,
-6rem)` it is the largest type on the site, and it still uses `primary`.
+The rule was stricter than the usual "large text may be lighter" allowance,
+because Latte `sky` fails even the **3:1** large-text and UI-component floor, not
+just the 4.5:1 small-text one. There is no size at which it becomes legal. The
+404 page's `<h1>` is the case that proves it — at `clamp(3rem, 12vw, 6rem)` it is
+the largest type on the site, and it still uses `primary`.
+
+If a decorative accent is ever wanted again, reintroduce the token deliberately
+and re-read this section first. Do not reach for `sky` because it is the
+Catppuccin-looking choice.
 
 The split exists because Catppuccin Latte's entire cyan family is too light to
 carry text on any Latte surface. Measured against Latte `base` `#eff1f5`:
@@ -325,12 +318,11 @@ change a colour, check it against Latte.**
 Two categories sit below 3:1 deliberately, and the token schema has no way to say
 so — hence this paragraph:
 
-- **Decorative fills and glyphs** — `on-surface-subtle` and `accent` on the
-  marquee, the `border` hairlines, the case study dividers. All `aria-hidden` or
-  purely ornamental, so they are tuned to be quiet rather than legible. The
-  `techstack-glyph` components therefore declare only a `textColor` and no
-  background: they are decoration, and a contrast pair would assert a
-  legibility requirement that does not apply.
+- **Decorative hairlines** — the `border` rules under the nav and the mobile
+  menu, and the case study dividers. Purely ornamental, so they are tuned to be
+  quiet rather than legible. The `divider` component therefore declares only a
+  `backgroundColor` and no foreground: a contrast pair would assert a legibility
+  requirement that does not apply.
 - **The social pill shape** (`surface-chrome` on `surface-alt`, 1.09:1). WCAG
   1.4.11 requires 3:1 only for a boundary *needed to identify* a control; here the
   icon inside does that at 6.04:1 and carries the accessible name. The circle is
@@ -411,8 +403,8 @@ does not rescue it either; Mocha's `crust` band is, if anything, marginally
 flatter against its page than Latte's.
 
 **So tone alone will not separate the nav from the content in either flavour, and
-a 1px hairline does the work instead.** `nav`, `.techstack` and the mobile
-slide-out menu each carry a `border` hairline on the edge facing the content. It
+a 1px hairline does the work instead.** `nav` and the mobile slide-out menu each
+carry a `border` hairline on the edge facing the content. It
 measures 1.78–2.63:1 against its neighbour, which is plenty for a line even
 though it would be far too little for text.
 
@@ -460,9 +452,6 @@ of them; several look like mistakes and are load-bearing.
   would move focus to `<body>`.
 - **`divider`** — 1px `border` hairline. Decorative; also the band separator
   described under Elevation & Depth.
-- **`techstack-glyph`** / **`techstack-glyph-hover`** — decorative marquee glyphs,
-  `aria-hidden` as a whole, `on-surface-subtle` resting and `accent` on hover.
-  The only place `accent` appears.
 - **`focus-ring`** — `2px solid` `primary` with a 2–4px offset, on every
   interactive control in both flavours. Not optional and not restyleable per
   component.
@@ -490,12 +479,14 @@ contrast-checkable; they are not separate components in the markup.
 - **Do** run `npx @google/design.md lint DESIGN.md` after editing this file, and a
   Lighthouse navigation audit **in both schemes** after editing colour — see
   [AGENTS.md](AGENTS.md#verifying-a-change).
-- **Don't** use `accent` on anything a visitor reads or aims at. It is `sky`, and
-  in Latte that is 2.47:1 — illegal at every font size. Use `primary`.
+- **Don't** reintroduce Catppuccin `sky` as a colour token. In Latte it is
+  2.47:1, illegal at every font size and below the 3:1 focus-ring floor too. It
+  was removed with the tech stack marquee, which was the only decoration quiet
+  enough to carry it legally.
 - **Don't** "fix" `primary` back to a Catppuccin colour. `#026389` is deliberate;
   no Latte cyan reaches 4.5:1 as text, and `primary` is also every focus ring.
-- **Don't** signal state by colour alone. The active tab changes weight as well as
-  colour, and that is a WCAG 1.4.1 requirement rather than a stylistic choice.
+- **Don't** signal state by colour alone. Nothing on the site does so today, and
+  WCAG 1.4.1 makes that a requirement rather than a stylistic choice.
 - **Don't** add a `surface0`-based fill. Latte `surface0` puts pill hover at
   4.32:1, just under AA.
 - **Don't** rely on tone to separate a band from the page. Use a `border`

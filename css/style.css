@@ -16,11 +16,10 @@
   --border: #acb0be; /* surface2 */
   --text: #4c4f69; /* text */
   --text-muted: #5c5f77; /* subtext1 — subtext0 is 4.37:1 here, just under AA */
-  --text-subtle: #acb0be; /* surface2, decorative glyphs only */
-  --accent: #04a5e5; /* sky — decoration only, 2.47:1 is unreadable as text */
   /* Latte sky deepened to 60% lightness, hue and saturation preserved. The one
      non-Catppuccin value in the system: no Latte cyan reaches 4.5:1 as text.
-     Do not "correct" this back to sky — it is also every focus ring. */
+     Catppuccin's own sky is 2.47:1 here, which is why it is not used: this is
+     body text and every focus ring, never decoration. */
   --accent-text: #026389;
 
   --max-width: 1200px;
@@ -65,10 +64,8 @@
     --border: #585b70; /* surface2 */
     --text: #cdd6f4; /* text */
     --text-muted: #a6adc8; /* subtext0 */
-    --text-subtle: #585b70; /* surface2, decorative glyphs only */
-    --accent: #89dceb; /* sky */
-    /* Mocha's sky clears 4.5:1 on every surface, so no deepened variant is
-       needed here — the two accent tokens collapse to one value. */
+    /* Mocha's sky clears 4.5:1 on every surface, so unlike Latte it needs no
+       deepened variant: this is Catppuccin sky unaltered. */
     --accent-text: #89dceb;
   }
 }
@@ -504,72 +501,6 @@ nav .logo a:hover {
     filter: var(--casestudy-item4-filter);
     z-index: var(--casestudy-item4-zindex);
     opacity: var(--casestudy-item4-opacity);
-  }
-}
-
-.techstack {
-  background-color: var(--bg-chrome);
-  border-top: 1px solid var(--border);
-}
-
-.techstack--container {
-  position: relative;
-  width: 100%;
-  height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.techstack--detail {
-  position: relative;
-  top: 50%;
-  width: 100%;
-  display: flex;
-  padding: 10px 0;
-  white-space: nowrap;
-  font-size: 64px;
-  transform: rotate(-30deg);
-}
-
-.techstack--detail i {
-  color: var(--text-subtle);
-  transition: 1s;
-  padding: 0 5px;
-  user-select: none;
-  cursor: default;
-}
-
-.techstack--detail i:hover {
-  color: var(--accent);
-  transition: 0s;
-}
-
-.techstack--detail div {
-  animation: techstack--animate1 80s linear infinite;
-  animation-delay: -80s;
-}
-
-.techstack--detail:nth-child(even) div {
-  animation: techstack--animate2 80s linear infinite;
-  animation-delay: -80s;
-}
-
-@keyframes techstack--animate1 {
-  0% {
-    transform: translateX(0%);
-  }
-  100% {
-    transform: translateX(-100%);
-  }
-}
-
-@keyframes techstack--animate2 {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(0%);
   }
 }
 
@@ -1087,8 +1018,8 @@ nav .logo a:hover {
 }
 
 /* WCAG 2.3.3 - respect an OS-level request for reduced motion.
-   The marquees stop, the carousel becomes an instant cut, and blur/opacity
-   transitions are removed. Nothing waits on these animations any more: the
+   The carousel becomes an instant cut and blur/opacity transitions are
+   removed. Nothing waits on these animations any more: the
    arrows are released by the fragment arriving, not by an animation ending, so
    collapsing the durations here cannot leave a control stuck. */
 @media (prefers-reduced-motion: reduce) {
@@ -1102,10 +1033,6 @@ nav .logo a:hover {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-
-  .techstack--detail div {
-    animation: none;
   }
 
   .casestudy--item:nth-child(2) .casestudy--intro .category,
