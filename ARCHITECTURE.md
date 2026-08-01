@@ -36,7 +36,8 @@ request — and delay first paint.
 
 ```
 index.html              home: nav + hero, case study carousel, tech stack sections
-portfolio.html          case studies in full, plus now/skills/earlier; the Ask source
+portfolio.html          case studies in full, plus now/skills/earlier; the Ask
+                        source. Not in the nav: arrived at, not picked
 ask.html                browser-local semantic search over portfolio.html
 corpus.json             generated search index: one embedding per portfolio passage
 404.html                self-contained not-found page
@@ -63,6 +64,19 @@ AGENTS.md               working rules and invariants
 CLAUDE.md               one line, imports AGENTS.md
 LICENSE                 MIT, code only
 ```
+
+**The nav offers three destinations and the site has four pages.** `portfolio.html`
+is not a menu choice. It holds the prose everything else is built out of, and the
+two things that read it are the search on `ask.html` and a crawler, neither of which
+uses a nav. A visitor reaches it from an Ask result, from the link under the case
+study deck, from the link below the results on `ask.html`, or from a search engine.
+
+Leaving it in the nav made the site ask the visitor to choose between reading the
+portfolio and searching it, which is a choice with an obviously better answer and no
+reason to be offered. Taking it out costs nothing measurable: the page is still in
+`sitemap.xml`, still linked from three places, and still the only crawlable copy of
+the detail. What it changes is what the site puts forward, which is the search. That
+is also why nothing in that page's own nav carries `aria-current`.
 
 `404.html` intentionally duplicates its styles inline. It has to render correctly
 even if `css/style.css` is the thing that failed to load, so its only external
@@ -363,7 +377,7 @@ than loud.
 | `scripts/propagate_casestudy.py --check` | Proves the fragments are still what the generator emits, so a drift is fixed by regenerating rather than by hand-patching one copy |
 | `scripts/check_corpus.py` | A stale embedding does not raise, it just retrieves worse; a dead anchor sends a result nowhere; a corpus built for another model is the right shape in the wrong space |
 | `scripts/check_palette.py` | The palette exists in four copies (below) |
-| `scripts/check_repo.py` | Deleting `.nojekyll` breaks paths with no build error; `sitemap.xml` drifts silently |
+| `scripts/check_repo.py` | Deleting `.nojekyll` breaks paths with no build error; `sitemap.xml` drifts silently; the nav exists in four copies and editing three of them looks fine on the page you are reading |
 | `npx @google/design.md lint DESIGN.md` | Holds the file at 0 errors and 0 warnings |
 
 **The palette check is the one that earns its keep.** The Catppuccin values are
