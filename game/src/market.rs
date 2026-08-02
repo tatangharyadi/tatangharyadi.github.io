@@ -18,6 +18,12 @@
 //! That second case is the whole game. A hold full of nutmeg is a fortune in
 //! Lisbon and near worthless in Amboina, and the distance between those two
 //! facts is what you are being paid for.
+//!
+//! On top of the index there is a **cooldown**, which is what stops a wrecked
+//! route from healing the moment you leave. A port that has just been flooded
+//! with a good sits at the low price for a few months before it starts climbing
+//! back, so coming straight back with a second hold of the same thing does not
+//! merely earn less, it pushes the recovery further away.
 
 use crate::world::{BUY, ECONOMIES, GOODS, PORTS, SELL};
 
@@ -41,9 +47,23 @@ const GLUT_PAYS_PERCENT: i32 = 35;
 /// A port's own speciality is cheap at the quayside.
 const SPECIALTY_DISCOUNT_PERCENT: i32 = 80;
 
+/// Months a market sulks after a trade before the index starts moving back.
+///
+/// Two rather than more, and the reason is arithmetic rather than taste. The
+/// index only recovers one point a month, so the largest possible crash already
+/// takes ten months to heal on its own. A long dwell on top of that would not
+/// make routes feel worn, it would make them feel dead, and the map has to keep
+/// offering you somewhere to come back to. Two months is long enough that
+/// turning straight round with a second cargo is visibly the wrong move and
+/// short enough that the port is worth remembering.
+const COOLDOWN_MONTHS: u8 = 2;
+
 pub struct Markets {
     /// Index per port per good, row-major over ports.
     index: Vec<i32>,
+    /// Months left before the matching index may move back toward neutral.
+    /// Same shape and same indexing as `index`.
+    cooldown: Vec<u8>,
     goods: usize,
 }
 
@@ -51,6 +71,7 @@ impl Markets {
     pub fn new() -> Self {
         Markets {
             index: vec![INDEX_NEUTRAL; PORTS.len() * GOODS.len()],
+            cooldown: vec![0; PORTS.len() * GOODS.len()],
             goods: GOODS.len(),
         }
     }
@@ -61,6 +82,16 @@ impl Markets {
 
     pub fn index_of(&self, port: usize, good: usize) -> i32 {
         self.index[self.slot(port, good)]
+    }
+
+    /// Months this market will stay where it is before it starts recovering.
+    ///
+    /// Exposed rather than kept private because a cooldown nobody can see is
+    /// indistinguishable from the price simply being low. The status column
+    /// prints it, so a reader can tell "this route is worn out" from "this route
+    /// was never any good".
+    pub fn cooldown_of(&self, port: usize, good: usize) -> i32 {
+        self.cooldown[self.slot(port, good)] as i32
     }
 
     fn economy(port: usize) -> Option<usize> {
@@ -128,9 +159,16 @@ impl Markets {
         }
     }
 
+    /// Move the index and restart the clock.
+    ///
+    /// The cooldown is set on every trade rather than only on a big one, which
+    /// is what makes repeat visits bite: each fresh cargo pushes the recovery
+    /// two months further out whether or not the index had any room left to
+    /// fall. Pumping a port dry costs you the port for a season.
     fn shift(&mut self, port: usize, good: usize, points: i32) {
         let s = self.slot(port, good);
         self.index[s] = (self.index[s] + points).clamp(INDEX_FLOOR, INDEX_CEILING);
+        self.cooldown[s] = COOLDOWN_MONTHS;
     }
 
     /// Record a purchase. Buying scarcity in makes the next unit dearer.
@@ -148,8 +186,16 @@ impl Markets {
     /// Called on the first of the month. Every index creeps back toward
     /// neutral, so a route you wrecked will recover if you leave it alone, and
     /// the map keeps offering you somewhere to come back to.
+    ///
+    /// A market still inside its cooldown spends the month sulking instead: the
+    /// counter comes down and the price does not move. Recovery therefore begins
+    /// `COOLDOWN_MONTHS` after the *last* trade rather than after the first.
     pub fn drift(&mut self) {
-        for v in self.index.iter_mut() {
+        for (v, cool) in self.index.iter_mut().zip(self.cooldown.iter_mut()) {
+            if *cool > 0 {
+                *cool -= 1;
+                continue;
+            }
             if *v > INDEX_NEUTRAL {
                 *v -= 1;
             } else if *v < INDEX_NEUTRAL {
@@ -279,6 +325,75 @@ mod tests {
             m.drift();
         }
         assert_eq!(m.index_of(wanted, good), INDEX_NEUTRAL);
+    }
+
+    /// The cooldown, stated as the thing a player would notice: the month after
+    /// a sale the price has not begun to come back.
+    #[test]
+    fn a_market_sulks_before_it_starts_recovering() {
+        let mut m = Markets::new();
+        let (good, _, wanted) = glut_example();
+        m.on_sell(wanted, good, 9_000);
+        let sunk = m.index_of(wanted, good);
+        assert!(sunk < INDEX_NEUTRAL, "the sale did not move the index");
+        assert_eq!(m.cooldown_of(wanted, good), COOLDOWN_MONTHS as i32);
+
+        for month in 1..=COOLDOWN_MONTHS {
+            m.drift();
+            assert_eq!(
+                m.index_of(wanted, good),
+                sunk,
+                "the price moved {month} month(s) in, while still on cooldown"
+            );
+        }
+        m.drift();
+        assert!(
+            m.index_of(wanted, good) > sunk,
+            "the price never started coming back"
+        );
+    }
+
+    /// Coming straight back with a second cargo pushes the recovery further out
+    /// rather than merely earning less. This is the whole point of the cooldown
+    /// and it is the half that a "price goes down when you sell" test misses.
+    #[test]
+    fn flooding_the_same_port_again_restarts_the_clock() {
+        let mut m = Markets::new();
+        let (good, _, wanted) = glut_example();
+        m.on_sell(wanted, good, 9_000);
+        m.drift();
+        assert_eq!(m.cooldown_of(wanted, good), COOLDOWN_MONTHS as i32 - 1);
+        m.on_sell(wanted, good, 1_000);
+        assert_eq!(
+            m.cooldown_of(wanted, good),
+            COOLDOWN_MONTHS as i32,
+            "a second cargo did not restart the cooldown"
+        );
+    }
+
+    /// The combined figure, which is the one that decides whether the map still
+    /// works. Cooldown and drift compose, so what one voyage costs you is the
+    /// dwell plus one month per point, and the question is not whether the
+    /// cooldown is short but whether the total is a length of time a player
+    /// would plausibly sail out and back in.
+    ///
+    /// One hold sold is at most `MAX_MOVE_PER_TRADE`, so the honest answer for a
+    /// single visit is a year and no worse. Bottoming a market right out takes
+    /// five such visits and then genuinely does cost you the port for years,
+    /// which is the intended shape: the punishment is for pumping, not trading.
+    #[test]
+    fn one_voyage_never_costs_a_port_more_than_a_year() {
+        let mut m = Markets::new();
+        m.on_sell(0, 0, 1_000_000);
+        let sunk = INDEX_NEUTRAL - m.index_of(0, 0);
+        assert_eq!(sunk, MAX_MOVE_PER_TRADE, "one sale should move the full cap");
+
+        let months = sunk + COOLDOWN_MONTHS as i32;
+        assert!(months <= 12, "one voyage costs the port {months} months");
+        for _ in 0..months {
+            m.drift();
+        }
+        assert_eq!(m.index_of(0, 0), INDEX_NEUTRAL, "it did not heal in {months}");
     }
 
     #[test]

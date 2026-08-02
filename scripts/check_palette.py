@@ -60,7 +60,9 @@ MOCHA_EXTRA = {
     "#6c7086": "overlay0",
     "#89b4fa": "blue",
     "#a6e3a1": "green",
+    "#cba6f7": "mauve",
     "#f38ba8": "red",
+    "#fab387": "peach",
     "#f5e0dc": "rosewater",
     "#f9e2af": "yellow",
 }

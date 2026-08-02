@@ -30,6 +30,8 @@
   --harbour: #f9e2af;
   --ship: #f5e0dc;
   --raider: #f38ba8;
+  --trader: #fab387;
+  --crown: #cba6f7;
   --loss: #f38ba8;
   --gain: #a6e3a1;
 
@@ -78,9 +80,28 @@ a {
   z-index: 10;
 }
 
+/* Aligned to the grid below rather than centred on the window.
+ *
+ * Both of these keep a 70ch reading measure, and both used to centre it with
+ * `margin: 0 auto`. The chart does not centre: `.helm` is a 1400px maximum that
+ * only starts centring once the window is wider than that, so on every screen
+ * between about 620px and 1400px the heading drifted right of the chart's left
+ * edge while the chart stayed put. It was 322px adrift at 1280.
+ *
+ * The start margin below is the grid's own left offset, written out: nothing
+ * while the window is narrower than the grid's maximum, and half the overflow
+ * once it is wider. So the heading sits over the chart's left edge at every
+ * width, and still centres with everything else on a very wide screen.
+ */
+.helm--head,
+.helm--notice {
+  margin-inline-start: max(0px, calc((100% - 1400px) / 2));
+  margin-inline-end: auto;
+}
+
 .helm--head {
   max-width: 70ch;
-  margin: 0 auto 1rem;
+  margin-bottom: 1rem;
 }
 
 .helm--head h1 {
@@ -97,7 +118,10 @@ a {
 
 .helm--notice {
   max-width: 70ch;
-  margin: 0 auto 1rem;
+  /* Explicit, because this is a <p> and the shorthand it replaced was zeroing
+     the browser's own top margin as a side effect. */
+  margin-top: 0;
+  margin-bottom: 1rem;
   padding: 0.75rem;
   border: 1px solid var(--border);
   background: var(--bg-alt);
@@ -111,6 +135,15 @@ a {
   display: grid;
   gap: 0.75rem;
   grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
+  /* The status column is much taller than the chart and spans both rows. With
+     two auto rows the browser splits its height between them, which pushed the
+     log down to the middle of the left-hand side and left a hole between it and
+     the chart: 427px of nothing at 1024, 306px at 1280. Sizing the second row
+     as a fraction stops the spanning column contributing to the first row at
+     all, so the first row is the chart's own height and the log follows
+     directly under it. The surplus then lands at the bottom of the column,
+     where it reads as whitespace rather than as a rendering fault. */
+  grid-template-rows: auto 1fr;
   grid-template-areas:
     "map column"
     "log column";
@@ -122,6 +155,9 @@ a {
 @media (max-width: 60rem) {
   .helm {
     grid-template-columns: minmax(0, 1fr);
+    /* Reset: nothing spans anything once the three regions are stacked, so the
+       fraction above would only misdescribe the middle one. */
+    grid-template-rows: auto auto auto;
     grid-template-areas:
       "map"
       "column"
@@ -248,6 +284,18 @@ a {
   overflow-y: auto;
 }
 
+/* On a 320px screen the market wanted 285px inside a 262px box, so it scrolled
+   sideways inside a box that already scrolls down and put the buy buttons off
+   the edge. Four columns of horizontal cell padding is the cheapest 23 pixels
+   on the page, and the table is the last thing that should be the reason a
+   phone has to scroll two ways at once. */
+@media (max-width: 22rem) {
+  .market th,
+  .market td {
+    padding: 0.15rem 0.1rem;
+  }
+}
+
 button {
   font: inherit;
   color: var(--text);
@@ -281,6 +329,36 @@ input[type="number"] {
   background: var(--bg-alt);
   border: 1px solid var(--border);
   padding: 0.1rem 0.25rem;
+}
+
+/* Every control on this page was between 26 and 29 pixels tall, which is fine
+ * for a mouse and wrong for a finger: the guideline floor is 44, and a phone
+ * visitor is precisely the one who cannot fall back on the keyboard this game
+ * is really played with. The block is behind `pointer: coarse` rather than a
+ * width query because it is the input device that matters, not the screen. A
+ * narrow window on a laptop keeps the dense layout; a tablet at 1024 gets the
+ * larger targets.
+ *
+ * Only the block-level controls grow. The links inside the heading are inline
+ * text, where enlarging the target means changing the line height of the prose
+ * around it, and where the guideline makes an exception for exactly that
+ * reason. */
+@media (pointer: coarse) {
+  button,
+  input[type="number"] {
+    min-height: 44px;
+  }
+
+  .market td button,
+  .panel--ports button {
+    min-width: 44px;
+  }
+
+  /* The ports list is a column of two-word links; without this the taller
+     targets overlap into one undifferentiated block. */
+  .panel--ports li {
+    padding: 0.15rem 0;
+  }
 }
 
 .helm--rose {
@@ -374,6 +452,8 @@ input[type="number"] {
 .cell.code-3 { fill: var(--harbour); }
 .cell.code-4 { fill: var(--ship); }
 .cell.code-5 { fill: var(--raider); }
+.cell.code-6 { fill: var(--trader); }
+.cell.code-7 { fill: var(--crown); }
 
 .cell--hit {
   fill: transparent;
