@@ -345,10 +345,11 @@ is `step`, then `write_status`, then decode the result and parse it as JSON, and
 measured in Chrome that whole path is 37 microseconds. Only 0.23 of it is the
 simulation; the rest is serialising the status block to text and reading it back.
 That is a fifth of a percent of a frame at 60Hz, and any of it would run fine in
-JavaScript. The reason is the other one: the simulation is about 4,500 hand-written
+JavaScript. The reason is the other one: the simulation is about 6,900 hand-written
 lines (a count that excludes `game/src/world.rs`, which is generated and would
 flatter it) with a world model, a market, navigation, fog of war, hunters that
-remember you and a reputation the world reads, and it has 72 tests. Rust gives that
+remember you, a crew that eats and is paid, and a reputation the world reads, and
+it has 116 tests. Rust gives that
 a type system, exhaustive matching and `cargo test`. Claiming a performance need
 would be the easier argument and it would not be true.
 
@@ -391,6 +392,26 @@ and the test that pins it puts a whole squadron alongside at once and fails with
 an out-of-bounds index against the previous code. Nothing about it was reachable
 from clicking around, which is the argument for the test suite rather than for
 another afternoon of playing.
+
+**Being short-handed is a multiplier, never a bar.** The crew is the first thing
+in the simulation that can get worse on its own: they eat, they drink, they are
+paid at the turn of the month, and any of those going unmet takes hands off the
+ship. Every consequence of that is a coefficient. A ship below her minimum sails
+slower and works fewer guns; she is never refused an order, and no order ever
+removes her last hand. Desertion floors at one, a lost fight floors at one, and
+paying hands off floors at one. Only starvation reaches nought, and that is a
+stated loss with warnings at three days and at one, not a silent deadlock.
+
+The alternative was tempting and wrong: gating orders on a full complement reads
+as realism until the ship is at sea with four hands and no food, at which point
+every order that could save her is the one being refused. Two tests pin this,
+`an_empty_strongbox_never_takes_the_last_hand` and
+`a_short_handed_ship_is_slower_and_still_sails`, and a third,
+`every_class_can_provision_the_emptiest_stretch_of_sea`, re-derives from the
+pathfinder and the wind model that every hull can carry enough to cross the
+emptiest gap on the map three times over. That last one is the same standard as
+`no_class_is_shut_out_of_any_market`: it measures the game rather than restating
+a constant, so tuning a ration cannot quietly strand a class.
 
 **No `wasm-bindgen`, no `wasm-pack`.** The exports are `#[no_mangle] extern "C"`
 functions taking and returning `i32`. Strings cross the boundary as UTF-8 in

@@ -11,7 +11,7 @@ use crate::market::Markets;
 use crate::nav::{self, CELLS, REMEMBERED, UNSEEN, VISIBLE};
 use crate::reputation;
 use crate::rng::Rng;
-use crate::ship::{guns_at, Class, Ship, Upgrade, CLASSES};
+use crate::ship::{self, guns_at, Class, Ship, Upgrade, CLASSES};
 use crate::world::{GOODS, PORTS};
 
 pub const CODE_SHALLOW: u8 = 0;
@@ -352,13 +352,22 @@ impl Game {
             lost: false,
         };
 
+        // Eight days of both, at the three hands a Balsa starts with. Enough
+        // that the first voyage is about trade rather than about the purser,
+        // and little enough that the second one is not. It is also sixteen of
+        // her forty units of hold, which is the trade-off stated in the plainest
+        // way the game has: this is what provisions cost you.
+        g.ship.food = 8;
+        g.ship.water = 8;
+
         g.discovered[start] = true;
         g.spawn_pirates();
         g.spawn_merchants();
         g.look();
         g.say(format!(
-            "You take command at {}. Three thousand in gold, a coastal hull, and no guns.",
-            PORTS[start].name
+            "You take command at {}. Three thousand in gold, a coastal hull, no guns, and {} hands.",
+            PORTS[start].name,
+            g.ship.crew
         ));
         g.say("The chart is blank beyond the harbour mouth.".into());
         g
@@ -383,6 +392,11 @@ impl Game {
         while self.hour >= HOURS_PER_DAY {
             self.hour -= HOURS_PER_DAY;
             self.day += 1;
+            // Inside the loop, not after it. A single order can be two days
+            // long: `repair` is forty-eight hours and a fair wind can carry a
+            // course several days in one call. Feeding the crew once per call
+            // rather than once per day would make the long orders free.
+            self.ration();
             if self.day > DAYS_PER_MONTH {
                 self.day = 1;
                 self.month += 1;
@@ -392,6 +406,7 @@ impl Game {
                 }
                 self.markets.drift();
                 self.say("A new month. Prices ease back toward their old levels.".into());
+                self.pay_wages();
                 let was = reputation::standing(self.reputation);
                 self.reputation = reputation::fade(self.reputation);
                 let now = reputation::standing(self.reputation);
@@ -404,6 +419,113 @@ impl Game {
                 self.enforce();
             }
         }
+    }
+
+    // -- crew, stores and wages --------------------------------------------
+
+    /// One day's food and water, and the consequence of not having it.
+    ///
+    /// Short of either, one hand dies; short of both, two. That is the "one by
+    /// one" the rule is meant to be, and it is slow enough that a player who
+    /// reads the chronicle has several days to make for land. The warnings
+    /// below exist so that nobody meets this mechanic for the first time by
+    /// losing to it.
+    fn ration(&mut self) {
+        if self.ship.crew <= 0 || self.lost {
+            return;
+        }
+        let (need_food, need_water) = (self.ship.food_per_day(), self.ship.water_per_day());
+        let mut short = 0;
+        if self.ship.food >= need_food {
+            self.ship.food -= need_food;
+        } else {
+            self.ship.food = 0;
+            short += 1;
+        }
+        if self.ship.water >= need_water {
+            self.ship.water -= need_water;
+        } else {
+            self.ship.water = 0;
+            short += 1;
+        }
+
+        if short == 0 {
+            // Warn on the way down rather than at the bottom. Both figures are
+            // exact rather than approximate because the player can act on
+            // them: three days is a course change, one day is an emergency.
+            match self.ship.days_of_stores() {
+                3 => self.say("Three days of stores left. The purser says so twice.".into()),
+                1 => self.say("One day of stores left. Make land or go hungry.".into()),
+                _ => {}
+            }
+            return;
+        }
+
+        let what = match (self.ship.food, self.ship.water) {
+            (0, 0) => "There is neither food nor water aboard",
+            (0, _) => "The food is gone",
+            _ => "The water is gone",
+        };
+        let died = short.min(self.ship.crew);
+        self.ship.crew -= died;
+        let who = if died == 1 { "a hand" } else { "two hands" };
+        self.say(format!(
+            "{what}. You lose {who}. {} left aboard.",
+            self.ship.crew
+        ));
+        if self.ship.crew == 0 {
+            self.lost = true;
+            self.say("There is nobody left to steer. She drifts away under bare poles.".into());
+        }
+    }
+
+    /// Wages, at the turn of the month.
+    ///
+    /// Hands you cannot pay do not stay. They are floored at one, so being
+    /// broke costs you almost the whole crew and never the ship: an empty ship
+    /// is a loss, and losing on a bookkeeping tick you could not see coming is
+    /// not a fair way to lose. One hand is enough to sail badly and reach a
+    /// port, which is all the guarantee needs to be.
+    fn pay_wages(&mut self) {
+        let owed = self.ship.wages();
+        if owed <= 0 || self.lost {
+            return;
+        }
+        if self.gold >= owed {
+            self.gold -= owed;
+            self.say(format!(
+                "Wages for {} hands: {}.",
+                self.ship.crew,
+                coin(owed)
+            ));
+            return;
+        }
+        let short = owed - self.gold;
+        self.gold = 0;
+        let unpaid = ((short + ship::MONTHLY_WAGE - 1) / ship::MONTHLY_WAGE)
+            .min(self.ship.crew - 1)
+            .max(0);
+        self.ship.crew -= unpaid;
+        self.say(format!(
+            "You cannot make the wage bill. {unpaid} hands go looking for a better berth. {} stay.",
+            self.ship.crew
+        ));
+    }
+
+    /// Hands lost to shot and splinters. Never takes the last one: a fight is
+    /// survivable by definition, and the ship is already lost at 100% damage
+    /// if it was not.
+    fn kill_crew(&mut self, n: i32) {
+        let died = n.min((self.ship.crew - 1).max(0));
+        if died <= 0 {
+            return;
+        }
+        self.ship.crew -= died;
+        let who = if died == 1 { "One hand is" } else { "Hands are" };
+        self.say(format!(
+            "{who} killed in the exchange: {died} lost, {} still aboard.",
+            self.ship.crew
+        ));
     }
 
     // -- sight -------------------------------------------------------------
@@ -952,7 +1074,7 @@ impl Game {
     /// two outcomes are answering for it or adding to it. Winning is the worse
     /// of the two in the long run, which is the point.
     fn arrest(&mut self, idx: usize, strength: i32) {
-        let guns = self.ship.gun_count();
+        let guns = self.ship.guns_worked();
         let name = self.pirates[idx].name;
         let hull = self.pirates[idx].class.name();
         self.pirates[idx].met = true;
@@ -984,6 +1106,8 @@ impl Game {
             }
             let wound = self.rng.range(4, 14);
             self.hurt(wound, "They fired into your rigging to bring you to.");
+            let toll = self.rng.range(0, 2);
+            self.kill_crew(toll);
             if !self.lost {
                 self.pirates[idx].at = self.scatter_from(self.at);
                 self.pirates[idx].last_seen = None;
@@ -1022,6 +1146,8 @@ impl Game {
         }
         let scars = self.rng.range(6, 18);
         self.hurt(scars, "They were gunners by trade.");
+        let toll = self.rng.range(2, 5 + strength / 6);
+        self.kill_crew(toll);
         // Deferred for the same reason as the branch above, and unconditionally:
         // the flag costs nothing to set when the game is already lost, and
         // guarding it here was the only asymmetry between the two outcomes.
@@ -1032,7 +1158,10 @@ impl Game {
         if self.pirates[idx].navy {
             return self.arrest(idx, strength);
         }
-        let guns = self.ship.gun_count();
+        // Guns she can serve, not guns she carries. A gun deck with nobody on
+        // it is a hold full of iron, and a ship that has starved her way down
+        // to a handful of hands fights like the unarmed trader she has become.
+        let guns = self.ship.guns_worked();
         let name = self.pirates[idx].name;
         // Recognition. The second meeting reads differently from the first, and
         // this one line is most of what makes the memory above land as memory
@@ -1050,6 +1179,9 @@ impl Game {
         self.pirates[idx].met = true;
 
         if guns == 0 {
+            if self.ship.gun_count() > 0 {
+                self.say("The guns are run out and there is nobody to serve them.".into());
+            }
             // Unarmed, the only question is how much they take.
             let cargo = self.ship.cargo();
             if cargo == 0 && self.gold < 200 {
@@ -1069,6 +1201,8 @@ impl Game {
             }
             let parting = self.rng.range(5, 15);
             self.hurt(parting, "They fire into you as they sheer off.");
+            let toll = self.rng.range(0, 2);
+            self.kill_crew(toll);
             self.pirates[idx].at = self.scatter_from(self.at);
             // Both sides break off. Without this the memory above would let a
             // raider who has just robbed an unarmed ship turn straight round and
@@ -1110,6 +1244,11 @@ impl Game {
             }
             let scars = self.rng.range(2, 10);
             self.hurt(scars, "You did not come off clean.");
+            // Winning costs people too, and it costs more against a heavier
+            // ship. This is the figure that makes a run of victories something
+            // you have to pay for at the next quayside.
+            let toll = self.rng.range(0, 2 + strength / 10);
+            self.kill_crew(toll);
         } else {
             let taken_gold = self.gold / 5;
             self.gold -= taken_gold;
@@ -1124,6 +1263,8 @@ impl Game {
             ));
             let wound = self.rng.range(8, 24);
             self.hurt(wound, "The mainmast is wounded.");
+            let toll = self.rng.range(1, 3 + strength / 6);
+            self.kill_crew(toll);
             if !self.lost {
                 self.pirates[idx].at = self.scatter_from(self.at);
                 self.pirates[idx].last_seen = None;
@@ -1257,9 +1398,13 @@ impl Game {
             self.say("There is nobody alongside to fire on.".into());
             return false;
         };
-        let guns = self.ship.gun_count();
+        let guns = self.ship.guns_worked();
         if guns == 0 {
-            self.say("You have no guns. It would be a boarding with bare hands.".into());
+            if self.ship.gun_count() > 0 {
+                self.say("You have guns and not the hands to serve one of them.".into());
+            } else {
+                self.say("You have no guns. It would be a boarding with bare hands.".into());
+            }
             return false;
         }
 
@@ -1289,6 +1434,8 @@ impl Game {
             self.say("She fights her guns better than you expected and hauls off.".into());
             let wound = self.rng.range(4, 16);
             self.hurt(wound, "You take the worst of the exchange.");
+            let toll = self.rng.range(1, 4);
+            self.kill_crew(toll);
             return true;
         }
 
@@ -1309,6 +1456,8 @@ impl Game {
         // would call the whole sale a loss against an outlay that never happened.
         let scars = self.rng.range(2, 12);
         self.hurt(scars, "Not without damage.");
+        let toll = self.rng.range(0, 3);
+        self.kill_crew(toll);
         if !self.lost {
             let away = self.scatter_from(self.at);
             self.merchants[idx].at = away;
@@ -1415,6 +1564,200 @@ impl Game {
         true
     }
 
+    // -- crew and stores at the quayside -----------------------------------
+
+    /// Sign hands on. Any port, not only a capital.
+    ///
+    /// The yard that sells hulls is in nine places; the crimp who finds you a
+    /// crew is in all seventy. That asymmetry is deliberate. Provisions and
+    /// hands are what you need to *leave* a port, and a rule that let you into
+    /// a harbour you could not victual out of would be a trap rather than a
+    /// difficulty.
+    pub fn hire(&mut self, n: i32) -> bool {
+        if self.lost || n <= 0 {
+            return false;
+        }
+        if self.port_here().is_none() {
+            self.say("Hands are signed on at a quayside, not at sea.".into());
+            return false;
+        }
+        let berths = self.ship.crew_max() - self.ship.crew;
+        if berths <= 0 {
+            self.say(format!(
+                "A {} berths {} and you have them.",
+                self.ship.class.name(),
+                self.ship.crew_max()
+            ));
+            return false;
+        }
+        let affordable = self.gold / ship::HIRE_ADVANCE;
+        let take = n.min(berths).min(affordable);
+        if take <= 0 {
+            self.say(format!(
+                "The advance is {} a head and you have {}.",
+                coin(ship::HIRE_ADVANCE),
+                coin(self.gold)
+            ));
+            return false;
+        }
+        let cost = take * ship::HIRE_ADVANCE;
+        self.gold -= cost;
+        self.ship.crew += take;
+        self.say(format!(
+            "{take} hands sign on for {} in advance. {} aboard, of {} berths.",
+            coin(cost),
+            self.ship.crew,
+            self.ship.crew_max()
+        ));
+        true
+    }
+
+    /// Pay hands off, which is how a wage bill gets smaller.
+    ///
+    /// Never takes the last one. A ship with nobody aboard is lost, and losing
+    /// by pressing the discharge key would be a cruelty rather than a
+    /// consequence.
+    pub fn discharge(&mut self, n: i32) -> bool {
+        if self.lost || n <= 0 {
+            return false;
+        }
+        if self.port_here().is_none() {
+            self.say("Hands are paid off ashore, not at sea.".into());
+            return false;
+        }
+        let take = n.min((self.ship.crew - 1).max(0));
+        if take <= 0 {
+            self.say("There is one hand left and she needs one hand.".into());
+            return false;
+        }
+        self.ship.crew -= take;
+        self.say(format!(
+            "{take} hands paid off and gone ashore. {} left.",
+            self.ship.crew
+        ));
+        true
+    }
+
+    /// Buy or sell food, water and lumber. Positive to buy, negative to sell.
+    ///
+    /// Selling back exists as a way out of the one corner this feature could
+    /// otherwise paint a player into: a hold full of water, no gold, and
+    /// nothing the market will take. It pays half, which is enough to be a
+    /// rescue and not enough to be a trade.
+    ///
+    /// Alongside a merchant the same order works at a premium, because she is
+    /// selling out of her own lockers and has no reason to be generous.
+    pub fn provision(&mut self, kind: i32, qty: i32) -> bool {
+        if self.lost || qty == 0 {
+            return false;
+        }
+        let Some(store) = ship::Store::from_index(kind) else {
+            return false;
+        };
+        let port = self.port_here();
+        let afloat = port.is_none();
+        if afloat && self.merchant_here().is_none() {
+            self.say("There is no chandler at sea and nobody alongside.".into());
+            return false;
+        }
+
+        let unit = if afloat {
+            store.price_afloat()
+        } else {
+            store.price()
+        };
+
+        if qty < 0 {
+            if afloat {
+                self.say("She has her own stores and no room for yours.".into());
+                return false;
+            }
+            let take = (-qty).min(self.ship.store(store));
+            if take <= 0 {
+                self.say(format!("There is no {} aboard to sell.", store.name()));
+                return false;
+            }
+            let paid = take * unit / 2;
+            *self.ship.store_mut(store) -= take;
+            self.gold += paid;
+            self.say(format!(
+                "Sold {take} {} back to the chandler for {}.",
+                store.name(),
+                coin(paid)
+            ));
+            return true;
+        }
+
+        let affordable = self.gold / unit;
+        let fits = self.ship.free_space();
+        let take = qty.min(affordable).min(fits);
+        if take <= 0 {
+            if fits <= 0 {
+                self.say("The hold is full. Stores take the same room as cargo.".into());
+            } else {
+                self.say(format!(
+                    "{} is {} a unit and you have {}.",
+                    store.name(),
+                    coin(unit),
+                    coin(self.gold)
+                ));
+            }
+            return false;
+        }
+        let cost = take * unit;
+        self.gold -= cost;
+        *self.ship.store_mut(store) += take;
+        let whom = if afloat { " out of her own lockers" } else { "" };
+        self.say(format!(
+            "Took aboard {take} {} at {} a unit{whom}: {}.",
+            store.name(),
+            coin(unit),
+            coin(cost)
+        ));
+        true
+    }
+
+    /// Mend the ship with lumber and hands, wherever she happens to be.
+    ///
+    /// This is the counterpart to `repair`, not a cheaper version of it. The
+    /// yard wants gold and gives you a whole ship back in two days; the
+    /// carpenter wants timber and people and gives you back only as much as
+    /// there is timber for. What it buys is the ability to mend at sea after a
+    /// fight, which is the whole reason to carry lumber at all.
+    pub fn mend(&mut self) -> bool {
+        if self.lost {
+            return false;
+        }
+        if self.ship.damage == 0 {
+            self.say("She is sound. There is nothing to mend.".into());
+            return false;
+        }
+        if self.ship.crew < self.ship.crew_min() {
+            self.say(format!(
+                "It takes {} hands to work the timber and you have {}.",
+                self.ship.crew_min(),
+                self.ship.crew
+            ));
+            return false;
+        }
+        let points = self.ship.mendable();
+        if points <= 0 {
+            self.say("There is no lumber aboard.".into());
+            return false;
+        }
+        self.ship.lumber -= points * ship::LUMBER_PER_POINT;
+        self.ship.damage -= points;
+        // Carpentry is a day's work whatever the size of the hole, and the day
+        // costs food and water like any other. That is what stops mending from
+        // being free.
+        self.advance(HOURS_PER_DAY);
+        self.say(format!(
+            "A day of hammering and {points} points of damage go. She is at {}%.",
+            self.ship.damage
+        ));
+        true
+    }
+
     /// Put money into the harbour and have one more of its goods opened to you.
     ///
     /// Deliberately not a choice of *which* good. The port decides what it lets
@@ -1487,11 +1830,15 @@ impl Game {
                     ))
                 } else if self.gold < price {
                     Some(format!("{} gold, and you have {}.", coin(price), coin(self.gold)))
-                } else if self.ship.cargo() > Ship::capacity_of(class) {
+                } else if self.ship.stowed() > Ship::capacity_of(class) {
+                    // Stores count. They come across with the ship, so a hold
+                    // that will not take them is the same refusal as a hold
+                    // that will not take the cargo, and saying otherwise here
+                    // would tip the crew's water onto the quay.
                     Some(format!(
-                        "She holds {} and you have {} aboard. Sell down first.",
+                        "She holds {} and you have {} aboard, stores and all. Sell down first.",
                         Ship::capacity_of(class),
-                        self.ship.cargo()
+                        self.ship.stowed()
                     ))
                 } else {
                     None
@@ -1536,15 +1883,45 @@ impl Game {
             return false;
         }
 
-        // Carry the cargo across by hand. The hold vectors are per-ship and the
-        // new one starts empty, so this is the only thing that survives the
-        // sale besides the money.
+        // Carry the cargo, the stores and the people across by hand. The hold
+        // vectors are per-ship and the new one starts empty, so this is the
+        // only thing that survives the sale besides the money.
+        //
+        // Crew comes across capped at the new berths and is *not* topped up to
+        // the new minimum. Buying a Carrack with eight hands leaves you
+        // undermanned and slow until you have been to the crimp, which is the
+        // honest outcome and, more to the point, is not a lock: the alternative
+        // of refusing the sale until you had fifteen hands would be
+        // unreachable, since a Balsa berths twelve.
         let hold = core::mem::take(&mut self.ship.hold);
         let paid = core::mem::take(&mut self.ship.paid);
+        let (crew, food, water_aboard, lumber) = (
+            self.ship.crew,
+            self.ship.food,
+            self.ship.water,
+            self.ship.lumber,
+        );
         self.gold -= offer.price;
         self.ship = Ship::of_class(class, GOODS.len());
         self.ship.hold = hold;
         self.ship.paid = paid;
+        self.ship.crew = crew.min(self.ship.crew_max());
+        self.ship.food = food;
+        self.ship.water = water_aboard;
+        self.ship.lumber = lumber;
+        if crew > self.ship.crew {
+            self.say(format!(
+                "{} hands more than she berths are paid off on the quay.",
+                crew - self.ship.crew
+            ));
+        }
+        if self.ship.crew < self.ship.crew_min() {
+            self.say(format!(
+                "She wants {} hands and you have {}. She will be slow until you find more.",
+                self.ship.crew_min(),
+                self.ship.crew
+            ));
+        }
 
         let spec = class.spec();
         let water = if class.is_bluewater() {
@@ -1790,6 +2167,300 @@ mod tests {
             })
             .map(|(_, p)| p.name)
             .collect()
+    }
+
+    /// Days under sail from one port to another, or `None` if this ship cannot
+    /// make the passage at all.
+    ///
+    /// The hours are summed from the same `passage_factor` the voyage itself
+    /// uses, over the route the same pathfinder returns, so this is a
+    /// measurement of the game rather than a second model of it.
+    fn leg_days(g: &Game, s: &Ship, from: Hex, to: Hex) -> Option<f32> {
+        let mut scratch = nav::Scratch::new();
+        let path = nav::find_path(
+            &mut scratch,
+            from,
+            to,
+            g.month,
+            s.rigging,
+            s.base_hours(),
+            &g.depth,
+            s.bluewater_rating(),
+        );
+        if path.is_empty() {
+            return None;
+        }
+        let mut hours = 0.0;
+        let mut at = from;
+        for step in &path {
+            let dir = (0..6).find(|&d| hex::normalise(hex::neighbour(at, d)) == *step)?;
+            hours += s.base_hours() * nav::passage_factor(dir, at, g.month, s.rigging);
+            at = *step;
+        }
+        Some(hours / HOURS_PER_DAY)
+    }
+
+    /// The longest hop this ship would ever have to make between one trading
+    /// port and the next nearest one she can reach: the emptiest stretch of the
+    /// map, from her point of view.
+    ///
+    /// Only the nearest handful of candidates by hex distance are tried, which
+    /// can only make the answer larger than the truth. An overestimate here
+    /// makes the test that reads it stricter, never laxer, which is the right
+    /// direction for a bound to be wrong in.
+    fn worst_hop(g: &Game, s: &Ship) -> (f32, &'static str) {
+        let mut worst = (0.0f32, "nowhere");
+        for (i, p) in PORTS.iter().enumerate() {
+            if !Markets::trades(i) {
+                continue;
+            }
+            let from = hex::from_offset(p.col as i32, p.row as i32);
+            let mut near: Vec<usize> = (0..PORTS.len())
+                .filter(|&j| j != i && Markets::trades(j))
+                .collect();
+            near.sort_by_key(|&j| {
+                let h = hex::from_offset(PORTS[j].col as i32, PORTS[j].row as i32);
+                hex::wrapped_distance(from, h)
+            });
+            let nearest = near
+                .iter()
+                .take(8)
+                .filter_map(|&j| {
+                    let to = hex::from_offset(PORTS[j].col as i32, PORTS[j].row as i32);
+                    leg_days(g, s, from, to)
+                })
+                .fold(f32::INFINITY, f32::min);
+            assert!(
+                nearest.is_finite(),
+                "a {} at {} can reach none of its neighbours",
+                s.class.name(),
+                p.name
+            );
+            if nearest > worst.0 {
+                worst = (nearest, p.name);
+            }
+        }
+        worst
+    }
+
+    /// Provisions cannot strand a ship, the way a rigging ceiling cannot.
+    ///
+    /// This is the counterpart of `no_class_is_shut_out_of_any_market`, and it
+    /// guards the same failure in the new mechanic: a class whose hold is too
+    /// small to carry the food and water her own crew need to reach the next
+    /// harbour would be a ship you could sail into a corner of the map and
+    /// starve in, with no order left that helps.
+    ///
+    /// The margin is a factor of three, not a hair's breadth, because the hop
+    /// measured here is the best case: a fair wind, no detour round a hunting
+    /// squadron, and a player who leaves with a hold full of nothing but
+    /// stores. Any real voyage carries cargo as well.
+    #[test]
+    fn every_class_can_provision_the_emptiest_stretch_of_sea() {
+        let g = Game::new(1);
+        for c in CLASSES {
+            let mut s = Ship::of_class(c, GOODS.len());
+            while s.fit(Upgrade::Rigging) {}
+            let per_day = s.food_per_day() + s.water_per_day();
+            assert!(per_day > 0, "a {} eats nothing", c.name());
+            let endurance = s.capacity() / per_day;
+            let (hop, where_) = worst_hop(&g, &s);
+            assert!(
+                endurance as f32 >= hop * 3.0,
+                "a {} carries {endurance} days of stores and the worst hop, out of {where_}, is {hop:.1} days",
+                c.name()
+            );
+        }
+    }
+
+    /// The same guarantee for the boat you actually start in: not fully rigged,
+    /// not fully provisioned, and carrying what `Game::new` puts aboard.
+    #[test]
+    fn the_opening_boat_leaves_harbour_with_days_in_hand() {
+        let g = Game::new(1);
+        let (hop, where_) = worst_hop(&g, &g.ship);
+        assert!(
+            g.ship.days_of_stores() as f32 >= hop * 2.0,
+            "she sails with {} days of stores and the worst hop, out of {where_}, is {hop:.1} days",
+            g.ship.days_of_stores()
+        );
+    }
+
+    /// Starving is a slow, legible loss and never a silent one.
+    #[test]
+    fn an_empty_hold_kills_the_crew_one_at_a_time() {
+        let mut g = Game::new(1);
+        g.ship.crew = 4;
+        g.ship.food = 0;
+        g.ship.water = 0;
+        let before = g.ship.crew;
+        g.advance(HOURS_PER_DAY);
+        assert_eq!(g.ship.crew, before - 2, "short of both, two hands a day");
+        assert!(
+            g.chronicle().iter().any(|l| l.contains("lose")),
+            "the chronicle says nothing about it"
+        );
+        g.advance(HOURS_PER_DAY);
+        assert_eq!(g.ship.crew, 0);
+        assert!(g.lost, "an empty ship is not lost");
+    }
+
+    /// A long order is charged for every day it covers, not once per call.
+    #[test]
+    fn one_order_of_several_days_eats_for_all_of_them() {
+        let mut g = Game::new(1);
+        g.ship.crew = 10;
+        g.ship.food = 40;
+        g.ship.water = 40;
+        let (food, water) = (g.ship.food, g.ship.water);
+        g.advance(HOURS_PER_DAY * 3.0);
+        assert_eq!(g.ship.food, food - 3 * g.ship.food_per_day());
+        assert_eq!(g.ship.water, water - 3 * g.ship.water_per_day());
+    }
+
+    /// Being unable to make the wage bill costs you the crew and never the ship.
+    #[test]
+    fn an_empty_strongbox_never_takes_the_last_hand() {
+        let mut g = Game::new(1);
+        g.ship.crew = g.ship.crew_max();
+        g.gold = 0;
+        g.ship.food = 999;
+        g.ship.water = 999;
+        g.advance(HOURS_PER_DAY * (DAYS_PER_MONTH as f32 + 1.0));
+        assert_eq!(g.ship.crew, 1, "somebody has to steer");
+        assert!(!g.lost, "a wage bill is not a shipwreck");
+    }
+
+    /// The ordinary case, which the floor test above does not reach: some of
+    /// the wage bill is met and the rest walks off. Called directly rather
+    /// than through a month of sailing, because the arithmetic is the point
+    /// and a pirate on the way would blur it.
+    #[test]
+    fn a_part_paid_crew_loses_exactly_the_hands_it_cannot_pay() {
+        let mut g = Game::new(1);
+        g.ship.crew = 12;
+        // Twelve hands at eight apiece is ninety-six, of which forty is in
+        // hand. Fifty-six short buys off seven berths, rounding against you.
+        g.gold = 40;
+        assert_eq!(g.ship.wages(), 96);
+        g.pay_wages();
+        assert_eq!(g.gold, 0, "the strongbox is emptied first");
+        assert_eq!(g.ship.crew, 5, "56 short at 8 a head is seven berths");
+    }
+
+    /// However bad a fight goes, it leaves somebody alive to sail home.
+    #[test]
+    fn a_fight_never_kills_the_whole_crew() {
+        let mut g = Game::new(1);
+        g.ship.crew = 2;
+        g.kill_crew(50);
+        assert_eq!(g.ship.crew, 1);
+        assert!(!g.lost);
+    }
+
+    /// Short-handed is slow and never stopped, which is the whole reason
+    /// starvation cannot become a stall.
+    #[test]
+    fn a_short_handed_ship_is_slower_and_still_sails() {
+        let mut s = Ship::of_class(Class::Carrack, GOODS.len());
+        let manned = s.base_hours();
+        s.crew = 1;
+        let thin = s.base_hours();
+        assert!(thin > manned, "losing the crew cost her nothing");
+        assert!(thin.is_finite() && thin < manned * 3.0, "she is becalmed");
+        assert_eq!(s.guns_worked(), 0, "one hand fires a whole gun deck");
+    }
+
+    /// Stores are charged against the hold like anything else aboard.
+    #[test]
+    fn stores_take_the_same_room_as_cargo() {
+        let mut s = Ship::of_class(Class::Latina, GOODS.len());
+        let empty = s.free_space();
+        s.water = 20;
+        assert_eq!(s.free_space(), empty - 20);
+        assert_eq!(s.cargo(), 0, "water is not cargo");
+    }
+
+    /// The way out of the corner: a full hold, an empty purse and nothing the
+    /// market wants is still recoverable, because the chandler buys back.
+    #[test]
+    fn stores_can_be_sold_back_when_there_is_nothing_else_left() {
+        let mut g = Game::new(1);
+        g.gold = 0;
+        g.ship.water = g.ship.free_space() + g.ship.water;
+        assert_eq!(g.ship.free_space(), 0);
+        assert!(g.provision(ship::Store::Water as i32, -10));
+        assert!(g.gold > 0, "she got nothing for it");
+        assert!(g.ship.free_space() > 0, "the hold is still full");
+    }
+
+    /// Hands and stores survive a change of hull, and surplus hands do not.
+    #[test]
+    fn a_new_hull_keeps_the_crew_it_can_berth() {
+        let mut g = Game::new(1);
+        g.ship.crew = g.ship.crew_max();
+        g.ship.food = 5;
+        g.ship.lumber = 3;
+        g.gold = 500_000;
+        let port = port_named("Lisbon");
+        g.at = hex::from_offset(PORTS[port].col as i32, PORTS[port].row as i32);
+        assert!(g.buy_ship(Class::Carrack as i32), "the yard refused");
+        assert_eq!(g.ship.food, 5, "the stores went over the side");
+        assert_eq!(g.ship.lumber, 3);
+        assert_eq!(g.ship.crew, 12, "the hands did not come across");
+        assert!(
+            g.ship.crew < g.ship.crew_min(),
+            "she should be undermanned and sailable, not refused"
+        );
+    }
+
+    /// Lumber mends at sea; without hands it does not.
+    #[test]
+    fn mending_needs_both_timber_and_people() {
+        let mut g = Game::new(1);
+        g.ship.damage = 20;
+        g.ship.lumber = 8;
+        g.ship.crew = 1;
+        assert!(!g.mend(), "one hand rebuilt a ship");
+        g.ship.crew = g.ship.crew_min();
+        assert!(g.mend());
+        assert_eq!(g.ship.damage, 12, "eight lumber mends eight points");
+        assert_eq!(g.ship.lumber, 0);
+    }
+
+    /// A trader alongside sells stores, and dearer than a quayside would.
+    #[test]
+    fn a_merchant_alongside_sells_stores_at_a_premium() {
+        let mut g = Game::new(1);
+        let quay = g.gold;
+        assert!(g.provision(ship::Store::Food as i32, 10), "no chandler in Lisbon");
+        let ashore = quay - g.gold;
+
+        // The fleet starts alongside their quays, so sail a while and catch one
+        // in open water: the premium is for the inconvenience of buying at sea.
+        let mut g = Game::new(1);
+        let mut days = 0;
+        let afloat = loop {
+            g.move_merchants(HOURS_PER_DAY);
+            days += 1;
+            let found = g.merchants.iter().map(|m| m.at).find(|&h| {
+                let i = hex::index(h).unwrap();
+                !PORTS
+                    .iter()
+                    .any(|p| hex::index(hex::from_offset(p.col as i32, p.row as i32)) == Some(i))
+            });
+            if let Some(h) = found {
+                break h;
+            }
+            assert!(days < 20, "no trader ever left harbour");
+        };
+        g.at = afloat;
+        let purse = g.gold;
+        assert!(g.provision(ship::Store::Food as i32, 10), "she would not sell");
+        assert!(
+            purse - g.gold > ashore,
+            "a trader at sea sold at the quayside price"
+        );
     }
 
     /// No class ceiling strands a market.
@@ -2741,3 +3412,4 @@ mod tests {
         assert_eq!(buf.len(), CELLS * 2);
     }
 }
+

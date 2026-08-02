@@ -171,6 +171,35 @@ pub extern "C" fn repair() -> i32 {
     game().repair() as i32
 }
 
+/// Sign hands on at the quayside.
+#[no_mangle]
+pub extern "C" fn hire(n: i32) -> i32 {
+    game().hire(n) as i32
+}
+
+/// Pay hands off. Never takes the last one.
+#[no_mangle]
+pub extern "C" fn discharge(n: i32) -> i32 {
+    game().discharge(n) as i32
+}
+
+/// Buy stores, or sell them back with a negative quantity. `kind` indexes
+/// `ship::STORES`: nought food, one water, two lumber.
+///
+/// The same order serves the chandler and a merchant met at sea, because from
+/// the player's side it is the same decision and only the price differs. Which
+/// of the two answered is in the chronicle line.
+#[no_mangle]
+pub extern "C" fn provision(kind: i32, qty: i32) -> i32 {
+    game().provision(kind, qty) as i32
+}
+
+/// Mend the ship with lumber and hands rather than gold and a yard.
+#[no_mangle]
+pub extern "C" fn mend() -> i32 {
+    game().mend() as i32
+}
+
 /// Buy a share in the port under the keel, opening one more of its goods.
 #[no_mangle]
 pub extern "C" fn invest() -> i32 {
@@ -280,8 +309,54 @@ pub extern "C" fn write_status() {
     kv_i(&mut s, "rigging", g.ship.rigging as i32, false);
     kv_i(&mut s, "gunTier", g.ship.guns as i32, false);
     kv_i(&mut s, "guns", g.ship.gun_count(), false);
+    // Guns she carries and guns there are hands to fire. The page prints both
+    // whenever they differ, because a rated broadside the crew cannot serve is
+    // the one number in the status that would otherwise lie.
+    kv_i(&mut s, "gunsWorked", g.ship.guns_worked(), false);
     kv_i(&mut s, "capacity", g.ship.capacity(), false);
     kv_i(&mut s, "cargo", g.ship.cargo(), false);
+    kv_i(&mut s, "crew", g.ship.crew, false);
+    kv_i(&mut s, "crewMin", g.ship.crew_min(), false);
+    kv_i(&mut s, "crewMax", g.ship.crew_max(), false);
+    kv_i(&mut s, "hireCost", ship::HIRE_ADVANCE, false);
+    kv_i(&mut s, "wages", g.ship.wages(), false);
+    kv_i(&mut s, "food", g.ship.food, false);
+    kv_i(&mut s, "water", g.ship.water, false);
+    kv_i(&mut s, "lumber", g.ship.lumber, false);
+    kv_i(&mut s, "foodPerDay", g.ship.food_per_day(), false);
+    kv_i(&mut s, "waterPerDay", g.ship.water_per_day(), false);
+    // Days before the first of the two runs out. Capped so the page never has
+    // to print an integer overflow at a crew of nought.
+    kv_i(&mut s, "daysOfStores", g.ship.days_of_stores().min(999), false);
+    kv_i(&mut s, "stores", g.ship.stores(), false);
+    kv_i(&mut s, "mendable", g.ship.mendable(), false);
+    // The names go with the prices so the page never has to keep its own copy
+    // of the enum's order. `provision` takes the index into this array.
+    s.push_str(",\"storeNames\":[");
+    for (i, st) in ship::STORES.iter().enumerate() {
+        if i > 0 {
+            s.push(',');
+        }
+        push_str_json(&mut s, st.name());
+    }
+    s.push(']');
+    // Prices are fixed and the same everywhere, so they go out once with the
+    // status rather than per port. Both rows go out because the page has to
+    // print what the order will cost before the player gives it, and afloat
+    // that is the dearer figure.
+    for (key, afloat) in [("storePrices", false), ("storePricesAfloat", true)] {
+        s.push_str(",\"");
+        s.push_str(key);
+        s.push_str("\":[");
+        for (i, st) in ship::STORES.iter().enumerate() {
+            if i > 0 {
+                s.push(',');
+            }
+            let p = if afloat { st.price_afloat() } else { st.price() };
+            s.push_str(&p.to_string());
+        }
+        s.push(']');
+    }
     kv_i(&mut s, "bluewater", g.ship.bluewater_rating(), false);
     kv_i(&mut s, "offshore", g.offshore(), false);
     kv_i(&mut s, "weather", g.weather_here(), false);
@@ -673,6 +748,12 @@ mod tests {
         assert_eq!(buy(-1, 5), 0);
         assert_eq!(sell(-1, 5), 0);
         assert_eq!(upgrade(9), 0);
+        // A store index off the end of the enum, and a hire of nobody. Both
+        // reach the game from a page that could be holding a stale build.
+        assert_eq!(provision(7, 5), 0);
+        assert_eq!(provision(0, 0), 0);
+        assert_eq!(hire(0), 0);
+        assert_eq!(discharge(0), 0);
         // In port at the start of a game, so there is nobody alongside to fire
         // on and the order should be refused rather than swallowed.
         assert_eq!(attack(), 0);
@@ -708,6 +789,23 @@ mod tests {
             "\"shipBluewater\"",
             "\"ceiling\"",
             "\"yard\"",
+            "\"crew\"",
+            "\"crewMin\"",
+            "\"crewMax\"",
+            "\"hireCost\"",
+            "\"wages\"",
+            "\"gunsWorked\"",
+            "\"food\"",
+            "\"water\"",
+            "\"lumber\"",
+            "\"foodPerDay\"",
+            "\"waterPerDay\"",
+            "\"daysOfStores\"",
+            "\"stores\"",
+            "\"mendable\"",
+            "\"storeNames\"",
+            "\"storePrices\"",
+            "\"storePricesAfloat\"",
         ] {
             assert!(s.contains(key), "the status no longer carries {key}");
         }
