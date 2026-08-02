@@ -498,6 +498,21 @@ input[type="number"] {
 .cell.code-6 { fill: var(--trader); }
 .cell.code-7 { fill: var(--crown); }
 
+/* More than one on the hex. Same colour as the single, because the colour says
+ * what it is and the doubled mark says how many; a stack is a quantity of a
+ * thing the reader already knows, not a new thing to learn. Two glyphs are
+ * wider than one, so these draw a size down to keep the pair inside its hex. */
+.cell.code-8,
+.cell.code-9,
+.cell.code-10 {
+  font-size: 11px;
+  letter-spacing: -0.06em;
+}
+
+.cell.code-8 { fill: var(--raider); }
+.cell.code-9 { fill: var(--trader); }
+.cell.code-10 { fill: var(--crown); }
+
 .cell--hit {
   fill: transparent;
   cursor: pointer;
