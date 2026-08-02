@@ -349,7 +349,7 @@ JavaScript. The reason is the other one: the simulation is about 6,900 hand-writ
 lines (a count that excludes `game/src/world.rs`, which is generated and would
 flatter it) with a world model, a market, navigation, fog of war, hunters that
 remember you, a crew that eats and is paid, and a reputation the world reads, and
-it has 134 tests. Rust gives that
+it has 136 tests. Rust gives that
 a type system, exhaustive matching and `cargo test`. Claiming a performance need
 would be the easier argument and it would not be true.
 
