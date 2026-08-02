@@ -340,17 +340,17 @@ under a live focus.
 `game.html` is an age-of-sail trading game on a hexagonal grid. Rust in `game/`,
 compiled to `wasm32-unknown-unknown`, drawn by `js/game.js` as inline SVG.
 
-**Why WebAssembly, honestly.** Not for speed. A full turn measured in Chrome is
-37 microseconds: 0.23 for the simulation step and the rest for serialising the
-425-cell viewport and the status block to text the page can read. That is a fifth
-of a percent of a frame at 60Hz, and any of it would run fine in JavaScript. The
-reason is the other one: the simulation is about 4,500 hand-written lines
-with a world model, a market, navigation, fog of war, hunters that remember you
-and a reputation the world reads, and it has 71 tests.
-(That count excludes `game/src/world.rs`, which is generated and would flatter
-it.) Rust gives that a type
-system, exhaustive matching and `cargo test`. Claiming a performance need would
-be the easier argument and it would not be true.
+**Why WebAssembly, honestly.** Not for speed. What the page does on every keypress
+is `step`, then `write_status`, then decode the result and parse it as JSON, and
+measured in Chrome that whole path is 37 microseconds. Only 0.23 of it is the
+simulation; the rest is serialising the status block to text and reading it back.
+That is a fifth of a percent of a frame at 60Hz, and any of it would run fine in
+JavaScript. The reason is the other one: the simulation is about 4,500 hand-written
+lines (a count that excludes `game/src/world.rs`, which is generated and would
+flatter it) with a world model, a market, navigation, fog of war, hunters that
+remember you and a reputation the world reads, and it has 72 tests. Rust gives that
+a type system, exhaustive matching and `cargo test`. Claiming a performance need
+would be the easier argument and it would not be true.
 
 Those figures are re-measured rather than inherited. The step cost did not move
 when twenty-four merchants and up to five king's ships started moving every tick,
@@ -378,6 +378,19 @@ beaten is warier of you afterwards. None of that is observable unless the page
 says so, so the status block carries the score, its band, the count out looking
 for you and whether anything currently has you in memory. A mechanic nobody can
 perceive is indistinguishable from one that is not there.
+
+One bug in that loop is worth recording because it was invisible in play and
+fatal when it landed. Fighting a king's ship changes your score, and changing your
+score is exactly what makes the crown recall ships, so the arrest was calling the
+recall from inside the loop that was still holding indices into the vector the
+recall resizes. Surrendering to the nearest of five ships halves the score, sends
+three of them home and leaves the rest of the loop reading positions that have
+shifted underneath it. With `panic = "abort"` that is not a stack trace, it is a
+page that stops. The fix is a deferred flag flushed once the loop is done indexing,
+and the test that pins it puts a whole squadron alongside at once and fails with
+an out-of-bounds index against the previous code. Nothing about it was reachable
+from clicking around, which is the argument for the test suite rather than for
+another afternoon of playing.
 
 **No `wasm-bindgen`, no `wasm-pack`.** The exports are `#[no_mangle] extern "C"`
 functions taking and returning `i32`. Strings cross the boundary as UTF-8 in

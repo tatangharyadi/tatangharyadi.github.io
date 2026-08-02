@@ -212,6 +212,8 @@ pub struct Game {
 
     /// Autopilot: hexes still to sail, in reverse order so the next is last.
     course: Vec<Hex>,
+    /// An `enforce()` owed once it is safe to resize `pirates`. See `arrest`.
+    pending_enforce: bool,
     pub lost: bool,
 }
 
@@ -243,6 +245,7 @@ impl Game {
             ray: Vec::new(),
             pathfinder: nav::Scratch::new(),
             course: Vec::new(),
+            pending_enforce: false,
             lost: false,
         };
 
@@ -824,6 +827,12 @@ impl Game {
                 return;
             }
         }
+
+        // Safe now: nothing above holds an index into `pirates` any more.
+        if self.pending_enforce {
+            self.pending_enforce = false;
+            self.enforce();
+        }
     }
 
     /// Being brought to by a king's ship.
@@ -870,7 +879,14 @@ impl Game {
                 self.pirates[idx].last_seen = None;
                 self.pirates[idx].memory = 0;
             }
-            self.enforce();
+            // Deferred, not called. `enforce` adds and removes ships, and this
+            // runs from inside a loop that is holding indices into that same
+            // vector: recalling a ship below the one being fought would shift
+            // every index above it and the next engagement would read the wrong
+            // pirate or read off the end. With `panic = "abort"` that is a blank
+            // page, not a stack trace. The caller flushes this once it is done
+            // indexing.
+            self.pending_enforce = true;
             return;
         }
 
@@ -896,9 +912,10 @@ impl Game {
         }
         let scars = self.rng.range(6, 18);
         self.hurt(scars, "They were gunners by trade.");
-        if !self.lost {
-            self.enforce();
-        }
+        // Deferred for the same reason as the branch above, and unconditionally:
+        // the flag costs nothing to set when the game is already lost, and
+        // guarding it here was the only asymmetry between the two outcomes.
+        self.pending_enforce = true;
     }
 
     fn fight(&mut self, idx: usize, strength: i32) {
@@ -1898,6 +1915,46 @@ mod tests {
             "the worst score brought no more ships than a middling one: {seen:?}"
         );
         assert_eq!(*seen.last().unwrap(), reputation::NAVY_MAX, "the cap is not reached");
+    }
+
+    /// A whole squadron alongside at once, which is the case where the recall
+    /// and the engagement loop are both touching `pirates` on the same tick.
+    ///
+    /// Standing trial halves the score, and halving it from the floor recalls
+    /// three of the five ships. If that recall happened while the loop was
+    /// still holding indices into the vector, the ships left to fight would be
+    /// at indices that no longer mean what they meant, and with `panic =
+    /// "abort"` the page would simply stop. Every seed here reaches the
+    /// squadron, so a regression is a failure rather than a run that quietly
+    /// never got there.
+    #[test]
+    fn a_squadron_alongside_at_once_does_not_lose_its_place() {
+        for seed in 0..40 {
+            let mut g = Game::new(seed);
+            g.reputation = reputation::FLOOR;
+            g.enforce();
+            let out = g.navy_out();
+            assert_eq!(out, reputation::NAVY_MAX, "seed {seed}: the squadron is short");
+
+            // Alongside, all of them, and armed enough that either outcome of
+            // the arrest is reachable.
+            g.ship.guns = 2;
+            let at = g.at;
+            for p in g.pirates.iter_mut().filter(|p| p.navy) {
+                p.at = at;
+                p.hours = 100.0;
+            }
+            g.move_pirates(0.0);
+
+            if g.lost {
+                continue;
+            }
+            assert_eq!(
+                g.navy_out(),
+                reputation::navy_wanted(g.reputation),
+                "seed {seed}: the fleet does not match the score after the boarding"
+            );
+        }
     }
 
     /// The recall matters as much as the summons. Without it the first two
