@@ -139,7 +139,7 @@ pub const ECONOMIES: [&str; 8] = [
     "Far East",
 ];
 
-pub const GOODS: [&str; 26] = [
+pub const GOODS: [&str; 42] = [
     "Pepper",
     "Cinnamon",
     "Nutmeg",
@@ -166,11 +166,27 @@ pub const GOODS: [&str; 26] = [
     "Porcelain",
     "Artwork",
     "Carpet",
+    "Tobacco",
+    "Cacao",
+    "Dyewood",
+    "Salt",
+    "Gum Arabic",
+    "Ambergris",
+    "Tortoiseshell",
+    "Frankincense",
+    "Coffee",
+    "Sandalwood",
+    "Camphor",
+    "Tea",
+    "Jade",
+    "Amber",
+    "Iron",
+    "Glassware",
 ];
 
 /// Base price in gold to buy one unit, indexed [good][economy].
 /// -1 means no port of that economy stocks it.
-pub const BUY: [[i16; 8]; 26] = [
+pub const BUY: [[i16; 8]; 42] = [
     [-1, -1, -1, -1, -1, -1, 3, -1], // Pepper
     [-1, -1, -1, -1, -1, -1, 7, -1], // Cinnamon
     [-1, -1, -1, -1, -1, -1, 6, -1], // Nutmeg
@@ -197,13 +213,29 @@ pub const BUY: [[i16; 8]; 26] = [
     [60, 60, -1, -1, -1, -1, -1, 25], // Porcelain
     [280, -1, -1, -1, -1, 160, -1, 140], // Artwork
     [-1, -1, -1, -1, -1, 70, -1, -1], // Carpet
+    [-1, -1, 20, -1, -1, -1, -1, -1], // Tobacco
+    [-1, -1, 28, -1, -1, -1, -1, -1], // Cacao
+    [-1, -1, 35, 40, -1, -1, -1, -1], // Dyewood
+    [8, -1, -1, 6, -1, -1, -1, -1], // Salt
+    [-1, -1, -1, 25, -1, 30, -1, -1], // Gum Arabic
+    [-1, -1, -1, -1, 210, -1, -1, -1], // Ambergris
+    [-1, -1, -1, -1, 55, -1, 48, -1], // Tortoiseshell
+    [-1, -1, -1, -1, 45, 38, -1, -1], // Frankincense
+    [-1, -1, -1, -1, -1, 22, -1, -1], // Coffee
+    [-1, -1, -1, -1, 60, -1, 50, -1], // Sandalwood
+    [-1, -1, -1, -1, -1, -1, 65, -1], // Camphor
+    [-1, -1, -1, -1, -1, -1, -1, 35], // Tea
+    [-1, -1, -1, -1, -1, -1, -1, 120], // Jade
+    [-1, 95, -1, -1, -1, -1, -1, -1], // Amber
+    [55, 40, -1, -1, -1, -1, -1, -1], // Iron
+    [85, -1, -1, -1, -1, -1, -1, -1], // Glassware
 ];
 
 /// Base price in gold to sell one unit, indexed [good][economy].
 /// -1 means every port of that economy already sells it, so there is no
 /// market: carrying pepper to a pepper coast is the mistake the game is
 /// about. The simulation prices those at a fraction of the buy price.
-pub const SELL: [[i16; 8]; 26] = [
+pub const SELL: [[i16; 8]; 42] = [
     [80, 110, 64, 52, 35, 42, 2, 20], // Pepper
     [70, 80, 40, 32, 43, 30, 3, 20], // Cinnamon
     [100, 105, 32, 30, 28, 28, 3, 20], // Nutmeg
@@ -230,6 +262,22 @@ pub const SELL: [[i16; 8]; 26] = [
     [105, -1, 45, 40, 35, 40, 35, -1], // Porcelain
     [400, 400, 300, 30, 45, 150, 160, -1], // Artwork
     [320, 340, 115, 140, 120, -1, 75, 50], // Carpet
+    [95, 120, -1, 55, 50, 60, 45, 55], // Tobacco
+    [130, 145, -1, 60, 55, 70, 50, 60], // Cacao
+    [150, 165, -1, -1, 70, 90, 60, 75], // Dyewood
+    [-1, 22, 30, -1, 28, 20, 25, 18], // Salt
+    [90, 100, 40, -1, 45, -1, 40, 50], // Gum Arabic
+    [600, 640, 300, 260, -1, 520, 330, 480], // Ambergris
+    [190, 205, 90, 80, -1, 150, -1, 175], // Tortoiseshell
+    [160, 175, 70, 60, -1, -1, 80, 130], // Frankincense
+    [115, 135, 55, 48, 50, -1, 60, 70], // Coffee
+    [175, 185, 75, 65, -1, 140, -1, 200], // Sandalwood
+    [210, 225, 85, 70, 90, 160, -1, 230], // Camphor
+    [155, 180, 70, 55, 60, 95, 65, -1], // Tea
+    [380, 395, 150, 120, 130, 300, 260, -1], // Jade
+    [290, -1, 130, 110, 120, 330, 250, 310], // Amber
+    [-1, -1, 120, 130, 125, 110, 115, 95], // Iron
+    [-1, 130, 190, 210, 200, 165, 180, 145], // Glassware
 ];
 
 /// Landmasses rasterised into LAND, for the record: 28.

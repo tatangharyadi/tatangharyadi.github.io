@@ -298,6 +298,18 @@ function drawHere(s) {
   const port = atlas.ports[s.port];
   body.appendChild(el("p", null, `${port.name}. ${port.economy}.`));
 
+  // Standing, spelled out. The discount tops out at twelve percent, which is
+  // small enough that a player would read it as noise in the price index
+  // unless the figure is stated beside the market it applies to.
+  const standing = s.favour === 0
+    ? "A stranger here."
+    : `Known here: ${s.favour} favour, ${s.favourDiscount}% off what they ask.`;
+  const shut = s.stockedGoods - s.openGoods;
+  const book = shut === 0
+    ? " Their whole book is open to you."
+    : ` ${shut} of their ${s.stockedGoods} goods are still closed to you.`;
+  body.appendChild(el("p", "dim", standing + book));
+
   const wrap = el("div", "market--scroll");
   const table = el("table", "market");
   const head = el("tr");
@@ -308,7 +320,14 @@ function drawHere(s) {
     const tr = el("tr");
     tr.appendChild(el("td", null, atlas.goods[row.good]));
     tr.appendChild(el("td", null, row.have === 0 ? "·" : String(row.have)));
-    tr.appendChild(el("td", null, row.buy < 0 ? "—" : String(row.buy)));
+    // A shut good keeps its price and is marked shut. Blanking it would make
+    // it indistinguishable from a good this economy never carried, and those
+    // are opposite facts: one is an invitation to invest, the other is a
+    // reason to sail somewhere else.
+    const asks = row.buy < 0 ? "—"
+      : row.shut ? `${row.buy} · shut`
+      : String(row.buy);
+    tr.appendChild(el("td", row.shut ? "dim" : null, asks));
     // A depressed price with no clock on it reads as a poor port rather than a
     // route you personally wore out, so the months are printed beside it.
     const pays = row.sell < 0 ? "—"
@@ -316,7 +335,7 @@ function drawHere(s) {
     tr.appendChild(el("td", row.glut || row.cool > 0 ? "bad" : null, pays));
 
     const actions = el("td");
-    if (row.buy >= 0) {
+    if (row.buy >= 0 && !row.shut) {
       const b = el("button", null, "buy");
       b.id = `buy-${row.good}`;
       b.addEventListener("click", () => trade("buy", row.good));
@@ -348,6 +367,25 @@ function drawHere(s) {
   qty.appendChild(label);
   qty.appendChild(input);
   body.appendChild(qty);
+
+  body.appendChild(el("h3", "panel--sub", "the counting house"));
+  const house = el("div", "helm--orders");
+  const share = el("button", null,
+    s.investCost < 0
+      ? "nothing left to buy into"
+      : `buy a share, ${s.investCost.toLocaleString("en")}`);
+  share.id = "invest";
+  // Never `disabled`, even with the book fully open: disabling the control the
+  // player just pressed drops focus to <body>. It says why instead, and a
+  // press when there is nothing left is a no-op the chronicle explains.
+  if (s.investCost < 0) share.setAttribute("aria-disabled", "true");
+  share.addEventListener("click", () => order(() => wasm.invest()));
+  house.appendChild(share);
+  body.appendChild(house);
+  if (s.invested > 0) {
+    body.appendChild(el("p", "dim",
+      `${s.invested.toLocaleString("en")} sunk into this harbour so far.`));
+  }
 
   body.appendChild(el("h3", "panel--sub", "the yard"));
   const yard = el("div", "helm--orders");
