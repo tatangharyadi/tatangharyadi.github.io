@@ -749,7 +749,7 @@ resizes. With `panic = "abort"` that is not a stack trace, it is a stopped page.
 | F02-AC04 | The rustc version that produced the committed binary is recorded, not remembered. | Written by `build_game.sh` into the hash file |
 | F02-AC05 | `render_len()` equals `CELLS * STRIDE`, and the buffer holds a `CODE_SHIP`. | `the_render_buffer_is_the_length_it_says` |
 | F02-AC06 | All three writers emit well-formed JSON, in port and at sea, and for an off-map hex. | `the_atlas_is_well_formed`, `the_status_is_well_formed_at_sea_and_in_port`, `a_look_at_an_unseen_hex_is_still_well_formed` |
-| F02-AC07 | The status still carries every key the page reads. | `the_status_carries_everything_the_page_reads` |
+| F02-AC07 | The status still carries the keys the page reads. The test names forty of them explicitly, which is a subset of what `write_status` emits: a key the page starts reading has to be added to that list to be covered. | `the_status_carries_everything_the_page_reads` |
 | F02-AC08 | Nonsense orders are refused rather than panicking: out-of-range directions, negative indices, zero quantities. | `orders_reject_nonsense_without_panicking` |
 | F02-AC09 | A player can never be left unable to act by an empty strongbox. | `an_empty_strongbox_never_takes_the_last_hand` |
 | F02-AC10 | A short-handed ship is penalised, not stranded. | `a_short_handed_ship_is_slower_and_still_sails` |
