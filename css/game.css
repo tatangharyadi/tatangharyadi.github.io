@@ -33,7 +33,7 @@
    * a separate grey-blue for the deeps read as a third kind of thing rather than
    * as more of the same water. */
   --sea-shallow: #89b4fa;
-  --land: #11111b;
+  --land: #a6e3a1;
   --harbour: #f9e2af;
   --ship: #f5e0dc;
   --raider: #f38ba8;
@@ -577,27 +577,31 @@ input[type="number"] {
  * Water is one hue at two strengths, because depth is a quantity and drawing it as
  * a quantity of the same blue is what makes the shelf legible at a glance.
  *
- * Land is drawn dark rather than green, and that one decision is what makes the
- * rest of this file affordable. Every mark on the chart is a light colour, so the
- * tile a mark stands on wants to be dark, and green is bright: a green shore at
- * 0.24 drew a handsome coastline and put a remembered raider standing on it at
- * 2.79:1, under the floor. Dimming the green to 0.13 bought the raider 3.18:1 and
- * cost the coastline, which was then so faint it barely reported the terrain it
- * existed to report. Tinting toward crust instead inverts the tradeoff: at 0.6 the
- * raider measures 3.72:1, better than the faint green ever managed, while land
- * reads as solid mass against luminous water. Land against the shallows goes from
- * 1.08:1 to 1.59:1 in the bargain.
+ * Every tile here is a light colour at a low alpha, so every tile is brighter than
+ * the page it sits on. That is not decoration: unexplored water draws no tile at
+ * all, so bare --bg is what a tile is most often adjacent to, and it is also the
+ * colour dimming moves a tile toward. Both of those only behave if the tiles stay
+ * above the background. A land fill *below* it was tried -- crust at 0.6, on the
+ * theory that light marks want a dark tile under them -- and it did buy the marks
+ * headroom, 3.72:1 for a remembered raider. It also measured 1.09:1 against
+ * unexplored, so the most common edge on the chart became almost invisible, ran the
+ * grid stroke to 1.05:1 because that stroke *is* crust, and inverted the fog: with
+ * land under the background, dimming made land brighter, so remembered meant
+ * fainter on water and bolder on land. Three regressions for one gain.
  *
- * The water alphas are still set by what stands on them, and the shallows are now
- * the binding tile: a remembered raider over shallow water is the worst case
- * anywhere on the chart, at 3.11:1. That is why 0.19 and not more, and it is why
- * depth is the faintest distinction here. Of the two channels the fill is the one
- * that can afford to give way, because a fill one step too faint still only
- * reinforces what the glyph already said, whereas a mark under its floor is a ship
- * you cannot see. */
+ * So the alphas are set by what stands on them, from above. Land is green at 0.13
+ * rather than the 0.24 it started at, because 0.24 put a remembered raider on a
+ * shore at 2.79:1, under the floor; the ceiling is about 0.18, where the raider hits
+ * 3.02:1. 0.13 is a step back from that edge and reads 1.35:1 against unexplored,
+ * which is better than the dark version managed. Water is 0.19, where a remembered
+ * raider over the shallows measures 3.11:1 and is the worst case anywhere on the
+ * chart. Depth is therefore the faintest distinction of the three, and of the two
+ * channels the fill is the one that can afford to give way, because a fill one step
+ * too faint still only reinforces what the glyph already said, whereas a mark under
+ * its floor is a ship you cannot see. */
 .tile.terrain-0 { fill: var(--sea-shallow); fill-opacity: 0.19; }
 .tile.terrain-1 { fill: var(--sea-shallow); fill-opacity: 0.10; }
-.tile.terrain-2 { fill: var(--land); fill-opacity: 0.6; }
+.tile.terrain-2 { fill: var(--land); fill-opacity: 0.13; }
 
 /* Terrain texture: one neutral ink, drawn small.
  *
