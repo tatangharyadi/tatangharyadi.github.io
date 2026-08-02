@@ -327,7 +327,7 @@ def emit(land, ports, goods, econs, table, coast, water_cells):
     a(f"pub const COLS: i32 = {COLS};")
     a(f"pub const ROWS: i32 = {ROWS};")
     a("")
-    a("/// Odd-r offset grid, row-major. '#' is land, '~' is open water.")
+    a("/// Odd-r offset grid, row-major. '#' is land, '.' is open water.")
     a(f"/// {water_cells} of {COLS * ROWS} cells are sea reachable from every port.")
     a("pub const LAND: &[u8] = b\"\\")
     for row in range(ROWS):

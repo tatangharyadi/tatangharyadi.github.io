@@ -86,8 +86,8 @@ pub extern "C" fn rows() -> i32 {
     world::ROWS
 }
 
-/// Redraw and return a pointer to `cols * rows * 2` bytes: for each hex, what
-/// is there and how well it can be seen.
+/// Redraw and return a pointer to `cols * rows * sim::STRIDE` bytes: for each
+/// hex, the terrain, what is on it, and how well it can be seen.
 #[no_mangle]
 pub extern "C" fn render_ptr() -> *const u8 {
     game().render().as_ptr()
