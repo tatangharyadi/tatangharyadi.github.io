@@ -334,7 +334,7 @@ disabling it on press stranded a keyboard user on `<body>` for the entire
 multi-second download. `aria-disabled` announces the state without touching
 focus; a plain flag is what actually prevents the work happening twice.
 
-### The download, and being honest about it
+### The download
 
 The model and runtime are large enough that the feature does not load on page
 view. `#ask--gate` states the cost before spending it and waits for a press.

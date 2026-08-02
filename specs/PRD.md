@@ -158,7 +158,7 @@ in CI and the rest is checked by a person in a browser, which is deliberate:
 - A comment system, newsletter or analytics.
 - Reproducible wasm builds. The committed hash proves the binary has not changed
   since it was committed, and does not prove it is what `game/src` compiles to.
-  That limit is stated honestly in the script's own header rather than papered over.
+  That limit is stated in the script's own header.
 
 ## Deferred
 
