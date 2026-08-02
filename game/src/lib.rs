@@ -33,6 +33,11 @@ use world::{ECONOMIES, GOODS, PORTS};
 /// One game, one thread. Wasm has no threads to race with, and a raw pointer
 /// rather than a `static mut Option<Game>` keeps this free of references to a
 /// mutable static, which is the part the compiler is right to complain about.
+///
+/// "No threads to race with" is true of the shipped binary and false of
+/// `cargo test`, which runs the tests below in parallel against this one
+/// global. That is a real race and it really bit; see the `HELM` guard in the
+/// test module for what it cost to find and how it is held off now.
 static mut GAME: *mut Game = core::ptr::null_mut();
 static mut TEXT: *mut String = core::ptr::null_mut();
 
@@ -416,6 +421,38 @@ fn push_str_json(s: &mut String, v: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard};
+
+    /// The C ABI is global by nature: one process, one game, reached through
+    /// functions that take no handle. That is right for the browser, where wasm
+    /// is single-threaded and there is exactly one page. It is wrong for
+    /// `cargo test`, which runs these in parallel threads, because `init` frees
+    /// the previous `Game` while another thread may still hold a reference into
+    /// it.
+    ///
+    /// This is not theoretical and it is not a CI quirk. It surfaced as a
+    /// SIGSEGV *after* all 46 tests had reported ok, and it reproduces locally
+    /// about once in sixty runs at `--test-threads=16`. It cannot affect the
+    /// shipped binary, which has no threads at all. It still had to be fixed:
+    /// a test suite that is itself undefined behaviour is not evidence of
+    /// anything, and "it passed" from a racy harness means only that it passed
+    /// this time.
+    ///
+    /// So every test that touches an exported function takes this guard, and
+    /// the guard is the only thing here that seeds a game. A test that forgets
+    /// it has no way to choose its seed, which turns the omission into
+    /// something you notice while writing the test rather than one run in sixty
+    /// on someone else's machine.
+    static HELM: Mutex<()> = Mutex::new(());
+
+    #[must_use]
+    fn helm(seed: u32) -> MutexGuard<'static, ()> {
+        // Poisoning is deliberately ignored. One failing test should report one
+        // failure, not turn every later test in this module red behind it.
+        let guard = HELM.lock().unwrap_or_else(|e| e.into_inner());
+        init(seed);
+        guard
+    }
 
     /// The page parses these with `JSON.parse`, so a malformed string is a
     /// blank screen with a console error and no other clue. Checking the shape
@@ -461,6 +498,9 @@ mod tests {
 
     #[test]
     fn the_atlas_is_well_formed() {
+        // The atlas does not depend on the seed, but it does read the global,
+        // so it takes the guard like everything else.
+        let _helm = helm(10);
         write_atlas();
         let s = text().clone();
         parses(&s);
@@ -469,7 +509,7 @@ mod tests {
 
     #[test]
     fn the_status_is_well_formed_at_sea_and_in_port() {
-        init(11);
+        let _helm = helm(11);
         write_status();
         parses(&text().clone());
         for d in 0..6 {
@@ -485,7 +525,7 @@ mod tests {
 
     #[test]
     fn a_look_at_an_unseen_hex_is_still_well_formed() {
-        init(12);
+        let _helm = helm(12);
         write_look(0, 0);
         parses(&text().clone());
         write_look(-5, 999);
@@ -494,7 +534,7 @@ mod tests {
 
     #[test]
     fn the_render_buffer_is_the_length_it_says() {
-        init(13);
+        let _helm = helm(13);
         let len = render_len() as usize;
         assert_eq!(len, nav::CELLS * 2);
         let ptr = render_ptr();
@@ -504,7 +544,7 @@ mod tests {
 
     #[test]
     fn orders_reject_nonsense_without_panicking() {
-        init(14);
+        let _helm = helm(14);
         assert_eq!(step(-1), 0);
         assert_eq!(step(6), 0);
         assert_eq!(set_course(-3), 0);
