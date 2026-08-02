@@ -57,7 +57,7 @@ SUBSET_404 = ["--bg", "--text", "--text-muted", "--accent-text"]
 # it, which turns "I picked a nice blue" into a decision someone has to write
 # down. Values are from the Catppuccin Mocha palette.
 MOCHA_EXTRA = {
-    "#6c7086": "overlay0",
+    "#9399b2": "overlay2",
     "#89b4fa": "blue",
     "#a6e3a1": "green",
     "#cba6f7": "mauve",

@@ -468,6 +468,39 @@ mod tests {
         assert!(deepest > 3, "no blue water anywhere, depth maxes at {deepest}");
     }
 
+    /// A chart does not blank itself when you sail away.
+    ///
+    /// This is the property a player notices the absence of rather than the
+    /// presence of, and it is easy to break by accident: any future code that
+    /// clears fog wholesale, or rebuilds it per frame instead of demoting it,
+    /// would re-fog explored water and nothing else here would complain. So
+    /// sail the length of the map and assert no hex ever loses knowledge.
+    #[test]
+    fn exploring_is_never_undone() {
+        let mut fog = vec![UNSEEN; CELLS];
+        let (mut scratch, mut ray) = (Vec::new(), Vec::new());
+        let mut best = vec![UNSEEN; CELLS];
+
+        for col in 0..COLS as i32 {
+            let eye = hex::from_offset(col, (ROWS / 2) as i32);
+            refresh_fov(eye, 5, &mut fog, &mut scratch, &mut ray);
+            for i in 0..CELLS {
+                // Knowledge may dim from visible to remembered, but never below
+                // whatever it once reached.
+                assert!(
+                    fog[i] >= best[i].min(REMEMBERED),
+                    "cell {i} fell back to {} after reaching {}",
+                    fog[i],
+                    best[i]
+                );
+                best[i] = best[i].max(fog[i]);
+            }
+        }
+
+        let known = best.iter().filter(|&&v| v != UNSEEN).count();
+        assert!(known > 0, "sailed the whole map and saw nothing");
+    }
+
     #[test]
     fn sight_is_blocked_by_land() {
         // Find a water hex with land next to it and something beyond.
