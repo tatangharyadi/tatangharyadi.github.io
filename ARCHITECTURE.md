@@ -8,6 +8,15 @@ How this site is put together, and why. For the rules that keep it working, see
 Plain HTML and CSS plus one runtime library, served directly by GitHub Pages from
 `main`. There is no bundler, no package manager, and no lockfile.
 
+**One exception, and it is quarantined.** `game/` is Rust and needs cargo to
+produce `assets/game.wasm`. The binary is committed, so the toolchain is on
+nobody's critical path: visitors, contributors editing prose, and five of the
+eight CI checks all run without Rust installed. It is a separate page, a separate
+stylesheet, a separate script and a separate language, and it is argued for in
+[The simulation](#the-simulation) and in
+[AGENTS.md](AGENTS.md#the-shape-of-the-repo). Everything below still describes
+the rest of the site, which has no build step at all.
+
 This is deliberate rather than incidental. The site is a personal homepage whose
 content changes a few times a year; a toolchain would need reviving every time,
 and a dependency tree would need patching in between. The tradeoff accepted in
@@ -47,12 +56,22 @@ ask.html                a noindex stub. The search moved to index.html#ask and a
                         static host cannot 301, so the old URL says so in markup
 corpus.json             generated search index: one embedding per portfolio passage
 404.html                self-contained not-found page
-css/style.css           all styles
-js/ask.js               the only first-party script; see The search
+game.html               the trading simulation; reached from the job title on the
+                        home page, not from the nav. Crawlable and in the sitemap
+css/style.css           all styles for the site
+css/game.css            all styles for game.html, and only game.html
+js/ask.js               first-party script; see The search
+js/game.js              first-party script; the boundary to assets/game.wasm
+game/                   Rust source for the simulation, and the TSVs it is built
+  data/                 from. Not served. See The simulation
+  src/
+scripts/gen_game_data.py generates game/src/world.rs from game/data/*.tsv
+scripts/build_game.sh   compiles game/ to assets/game.wasm, or --check verifies it
 fragments/              the HTML states htmx fetches; pieces of a page, not pages
   work/                 one per entry in the work index, generated from portfolio.html
   404-links.html        section shortcuts, loaded by 404.html
 vendor/transformers/    Transformers.js and the ORT WebAssembly, served from origin
+assets/game.wasm        the compiled simulation, committed, with its sha256 beside it
 assets/models/          all-MiniLM-L6-v2 weights and tokenizer, likewise
 assets/favicon.svg      favicon
 assets/images/          profile photo (webp) and the 1200x630 social share card
@@ -316,6 +335,61 @@ sends it to `<body>` and re-enabling does not bring it back. On success the inpu
 is focused *before* the gate is hidden, so the pressed control never vanishes from
 under a live focus.
 
+## The simulation
+
+`game.html` is an age-of-sail trading game on a hexagonal grid. Rust in `game/`,
+compiled to `wasm32-unknown-unknown`, drawn by `js/game.js` as inline SVG.
+
+**Why WebAssembly, honestly.** Not for speed. A full turn measured in Chrome is
+46 microseconds: 0.23 for the simulation step and the rest for serialising the
+425-cell viewport and the status block to text the page can read. That is a third
+of a percent of a frame at 60Hz, and any of it would run fine in JavaScript. The
+reason is the other one: the simulation is about 2,000 lines with a world model,
+a market, navigation and fog of war, and it has 46 tests. Rust gives that a type
+system, exhaustive matching and `cargo test`. Claiming a performance need would
+be the easier argument and it would not be true.
+
+**No `wasm-bindgen`, no `wasm-pack`.** The exports are `#[no_mangle] extern "C"`
+functions taking and returning `i32`. Strings cross the boundary as UTF-8 in
+linear memory: the module writes into a buffer and exposes a pointer and a
+length, and `js/game.js` decodes it. The compiled binary therefore has **no
+import section at all**, which is why `WebAssembly.instantiateStreaming(fetch(…))`
+is called with no import object. The whole glue layer is a few dozen lines that
+a reader can hold in their head, in place of a generated one they cannot.
+
+**`memory.grow` detaches every `ArrayBuffer` view in JavaScript.** This is the
+one boundary rule that bites silently: a `Uint8Array` cached over
+`instance.exports.memory.buffer` becomes zero-length the moment the module grows
+its heap, with no error. So `js/game.js` never caches a view. Both readers,
+`renderBytes()` and `takeText()`, re-derive the pointer *and* a fresh view on
+every single call.
+
+**The world is generated, not hand-written.** `game/data/*.tsv` holds coastline
+outlines, port positions, trade data and the goods matrix;
+`scripts/gen_game_data.py` rasterises them into `game/src/world.rs`. Editing
+`world.rs` by hand is the mistake — change a TSV and regenerate, the same bargain
+as the work fragments. The generator asserts three things about the result and
+fails the build otherwise: no two ports in one hex, every port with land in an
+adjoining hex, and all 70 ports reachable from one another by sea. The middle one
+was added after 21 harbours shipped floating in open ocean, because the original
+check only asked whether ports could reach each other by sea and a port in the
+middle of the Pacific passes that easily.
+
+**Position and trade data come from different files on purpose.**
+`game/data/ports.tsv` is a faithful transcription of a 1990 reference table and
+stays the source of record for economy and specialty. Its coordinates are that
+game's own sextant readings rather than geography — it puts London at 65N — so
+`game/data/port_place.tsv` carries real degrees and is the source of record for
+where a port sits. Splitting them means the transcription can still be checked
+against the source line by line, and it uses *less* of the reference than the
+first version did, not more.
+
+**`game.html` is Catppuccin Mocha regardless of system theme,** which is the one
+place on the site that ignores `prefers-color-scheme`. A terminal chart in Latte
+is not a lighter version of the same artifact, it is a different one. The
+deviation is argued in the header of `css/game.css` rather than left to be
+discovered.
+
 ## There is no logo marquee, on purpose
 
 The home page used to end in scrolling rows of Boxicons logos. It was removed
@@ -382,6 +456,9 @@ than loud.
 | `scripts/check_corpus.py` | A stale embedding does not raise, it just retrieves worse; a dead anchor sends a result nowhere; a corpus built for another model is the right shape in the wrong space |
 | `scripts/check_palette.py` | The palette exists in four copies (below) |
 | `scripts/check_repo.py` | Deleting `.nojekyll` breaks paths with no build error; `sitemap.xml` drifts silently; the nav exists in four copies and editing three of them looks fine on the page you are reading |
+| `scripts/gen_game_data.py --check` | Proves `game/src/world.rs` is still what the TSVs produce, and re-runs the three map assertions: a coastline edit that walls a port in, strands one in open ocean or drops two into one hex fails here instead of being found by sailing into it |
+| `scripts/build_game.sh --check` | Verifies `assets/game.wasm` against the hash committed beside it. Needs no Rust |
+| `cargo test --manifest-path game/Cargo.toml` | The 46 simulation tests. Runs in its own job so the one above stays toolchain-free |
 | `npx @google/design.md lint DESIGN.md` | Holds the file at 0 errors and 0 warnings |
 
 **The palette check is the one that earns its keep.** The Catppuccin values are

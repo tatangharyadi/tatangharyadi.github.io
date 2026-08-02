@@ -9,8 +9,8 @@ A static personal site: plain HTML and CSS, no build step, no package manager,
 served by GitHub Pages from `main`. There is nothing to install and nothing to
 compile. Edit the files directly.
 
-**There is exactly one JavaScript file of our own, and it is `js/ask.js`.**
-Everything else — the work index on the home page — is
+**There are exactly two JavaScript files of our own: `js/ask.js` and
+`js/game.js`.** Everything else — the work index on the home page — is
 [htmx](https://htmx.org) asking for static HTML fragments under `fragments/` and
 swapping them in. htmx arrives from a CDN pinned by version and SRI digest.
 
@@ -31,9 +31,36 @@ sent the question, which is precisely the property the search exists to avoid. I
 a plain ES module with no bundler and no package manager, consistent with
 everything else here.
 
+`js/game.js` earns the second exception on narrower grounds, and the grounds are
+worth being precise about because it is the first thing here that breaks a rule
+outright. It is the only consumer of `assets/game.wasm`, and its whole job is
+the boundary: instantiate the module, call exported functions, read strings back
+out of linear memory, draw SVG. The simulation itself is Rust in `game/`. Nothing
+on any other page loads it, and `game.html` loads nothing else.
+
+The rule it breaks is not "no JavaScript" and not "no WebAssembly" — the search
+has shipped WebAssembly since the day it landed. It is **no build step**: `game/`
+needs cargo and a `wasm32-unknown-unknown` target before it produces a byte the
+site can serve. That is a real toolchain and this repo said it would not have
+one. The containment is that the toolchain is never on the critical path for
+anyone: the binary is committed, GitHub Pages serves it as a file like any other,
+and a visitor, a contributor editing prose and CI all run without Rust installed.
+`scripts/build_game.sh --check` verifies the committed binary against a committed
+hash and needs nothing but `sha256sum`.
+
+Be clear about what that hash is worth. It proves the binary has not changed
+since it was committed. It does not prove the binary is what `game/src` compiles
+to, because nothing here reproduces the build. `scripts/check_corpus.py` is
+strictly stronger — it re-derives its claim from the source text. Anyone who
+wants the guarantee has to run `scripts/build_game.sh` themselves and read the
+diff, which is the honest instruction and is in the script's own header.
+
 Do not introduce a bundler, framework or package manager to solve a problem that a
 few lines of CSS would solve. The absence of a toolchain is a design decision, not
-an oversight — see [ARCHITECTURE.md](ARCHITECTURE.md#no-build-step).
+an oversight — see [ARCHITECTURE.md](ARCHITECTURE.md#no-build-step). `game/` is
+the one exception on the whole site and it is deliberately quarantined: it is a
+separate page, a separate stylesheet, a separate script and a separate language.
+A second exception should be argued from scratch, not from this one.
 
 ## Local development
 
