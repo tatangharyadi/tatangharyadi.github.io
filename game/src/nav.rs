@@ -29,6 +29,56 @@ pub fn is_water(h: Hex) -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// Sea room
+// ---------------------------------------------------------------------------
+
+/// How far out `harbour_room` looks. Two hexes is the ship's own length and a
+/// little: it is the water she needs to swing in and to work out of again,
+/// which is what a draught restriction is actually about.
+const ROOM_RADIUS: usize = 2;
+
+/// The most sea room a harbour may have and still count as shallow.
+///
+/// Nineteen hexes lie within two of any cell, so a harbour with eight or fewer
+/// is more land than water: a river mouth, the head of a gulf, a pocket behind
+/// a headland. This number is not a taste: it is the largest value at which
+/// every economy on the map still keeps at least two harbours open to the
+/// deepest hulls, which `every_economy_keeps_a_harbour_for_the_deepest_hulls`
+/// checks by re-deriving it rather than restating it.
+pub const SHALLOW_ROOM: i32 = 8;
+
+/// Water cells within two hexes of this one, not counting the cell itself.
+///
+/// Distance to land cannot answer this. Every port on the map is against the
+/// shore by construction, so all of them read as depth 1 and the figure
+/// separates nothing. What tells a roadstead from a creek is how much water
+/// lies around it, which is this.
+pub fn harbour_room(h: Hex) -> i32 {
+    let mut seen = vec![hex::index(h)];
+    let mut ring = vec![h];
+    let mut water = 0;
+    for _ in 0..ROOM_RADIUS {
+        let mut next = Vec::new();
+        for c in ring.drain(..) {
+            for d in 0..6 {
+                let n = hex::neighbour(c, d);
+                let Some(ni) = hex::index(n) else { continue };
+                if seen.contains(&Some(ni)) {
+                    continue;
+                }
+                seen.push(Some(ni));
+                next.push(n);
+                if !is_land_index(ni) {
+                    water += 1;
+                }
+            }
+        }
+        ring = next;
+    }
+    water
+}
+
+// ---------------------------------------------------------------------------
 // Distance to land
 // ---------------------------------------------------------------------------
 
@@ -302,6 +352,12 @@ pub fn find_path(
     base_hours: f32,
     depth: &[u8],
     max_depth_from_land: i32,
+    // Cells this hull may not enter at all, indexed like `depth`. Harbours too
+    // shallow for her draught, and nothing else. Unlike `max_depth_from_land`
+    // this admits no exception for the goal: a course that ends somewhere she
+    // cannot go is not a course, and refusing it here means no caller can
+    // hand back a route that strands her one hex short.
+    barred: &[bool],
 ) -> Vec<Hex> {
     let Some(goal_i) = hex::index(goal) else {
         return Vec::new();
@@ -343,7 +399,7 @@ pub fn find_path(
         for d in 0..6 {
             let n = hex::neighbour(here, d);
             let Some(ni) = hex::index(n) else { continue };
-            if is_land_index(ni) || done[ni] {
+            if is_land_index(ni) || done[ni] || barred[ni] {
                 continue;
             }
             // The goal is always allowed even if it is deep, so a port can be
@@ -387,6 +443,12 @@ pub fn find_path(
 mod tests {
     use super::*;
     use crate::world::PORTS;
+
+    /// Nothing barred: the shallow-harbour rule is the simulation's, not the
+    /// pathfinder's, and these tests are about the water.
+    fn open_sea() -> Vec<bool> {
+        vec![false; CELLS]
+    }
 
     fn port_hex(i: usize) -> Hex {
         hex::from_offset(PORTS[i].col as i32, PORTS[i].row as i32)
@@ -451,7 +513,7 @@ mod tests {
         let depth = distance_to_land();
         let a = port_hex(0);
         let b = port_hex(1);
-        let path = find_path(&mut Scratch::new(), a, b, 6, 4, 6.0, &depth, 99);
+        let path = find_path(&mut Scratch::new(), a, b, 6, 4, 6.0, &depth, 99, &open_sea());
         assert!(!path.is_empty(), "no route between the first two ports");
         assert_eq!(*path.last().unwrap(), b);
         let mut prev = a;
@@ -479,10 +541,10 @@ mod tests {
             }
         }
         let (i, j, _) = best;
-        let open = find_path(&mut Scratch::new(), port_hex(i), port_hex(j), 6, 4, 6.0, &depth, 99);
+        let open = find_path(&mut Scratch::new(), port_hex(i), port_hex(j), 6, 4, 6.0, &depth, 99, &open_sea());
         assert!(!open.is_empty(), "the two furthest ports are not connected");
 
-        let hugging = find_path(&mut Scratch::new(), port_hex(i), port_hex(j), 6, 0, 6.0, &depth, 1);
+        let hugging = find_path(&mut Scratch::new(), port_hex(i), port_hex(j), 6, 0, 6.0, &depth, 1, &open_sea());
         assert!(
             hugging.len() != open.len() || hugging.is_empty(),
             "a coast-hugging route was identical to the open-water one"

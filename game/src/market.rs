@@ -90,6 +90,8 @@ const COOLDOWN_MONTHS: u8 = 2;
 const FAVOUR_MAX: i32 = 60;
 const FAVOUR_PER_1000_GOLD: i32 = 1;
 const FAVOUR_DISCOUNT_MAX_PERCENT: i32 = 12;
+/// Points of standing lost each month. See `drift`.
+const FAVOUR_DECAY_PER_MONTH: i32 = 1;
 
 /// How many of its economy's goods a port will sell to a stranger, and what the
 /// first investment costs to open one more.
@@ -352,6 +354,19 @@ impl Markets {
     /// counter comes down and the price does not move. Recovery therefore begins
     /// `COOLDOWN_MONTHS` after the *last* trade rather than after the first.
     pub fn drift(&mut self) {
+        // Standing fades with the same month. A factor remembers a good customer
+        // and forgets a former one, and without this the discount was a ratchet:
+        // trade hard at one port for a season and it stayed the cheapest place
+        // on the map for the rest of the game whether you ever returned or not.
+        //
+        // One point a month is deliberately slower than the earning rate, which
+        // is a point per thousand gold traded. Anyone still calling loses nothing
+        // they notice; the decay only bites on abandonment, which is the whole
+        // thing it is meant to price. Sixty points is therefore five years of
+        // being away before a full house of favour is a stranger again.
+        for f in self.favour.iter_mut() {
+            *f = (*f - FAVOUR_DECAY_PER_MONTH).max(0);
+        }
         for (v, cool) in self.index.iter_mut().zip(self.cooldown.iter_mut()) {
             if *cool > 0 {
                 *cool -= 1;
@@ -638,6 +653,37 @@ mod tests {
             m.on_sell(0, 1, 100_000);
         }
         assert_eq!(m.favour_of(0), FAVOUR_MAX);
+    }
+
+    /// Standing fades, floors at nothing, and fades slower than trading earns.
+    ///
+    /// The last clause is the one that matters and is asserted rather than
+    /// argued: a single thousand-gold trade has to be worth more than the month
+    /// it sits inside, or the mechanic would tax the player for playing instead
+    /// of for staying away.
+    #[test]
+    fn favour_decays_month_by_month_and_stops_at_nothing() {
+        let mut m = Markets::new();
+        m.on_buy(0, 0, 10_000);
+        assert_eq!(m.favour_of(0), 10);
+        m.drift();
+        assert_eq!(m.favour_of(0), 9, "a month away costs a point");
+        for _ in 0..20 {
+            m.drift();
+        }
+        assert_eq!(m.favour_of(0), 0, "standing runs out rather than going negative");
+
+        let mut kept = Markets::new();
+        kept.on_buy(1, 0, 1_000);
+        kept.drift();
+        assert_eq!(
+            kept.favour_of(1),
+            0,
+            "the smallest trade exactly offsets the month, and nothing is owed"
+        );
+        kept.on_buy(1, 0, 2_000);
+        kept.drift();
+        assert_eq!(kept.favour_of(1), 1, "trading outpaces the decay");
     }
 
     /// The point of the whole mechanic: two ports of one economy are no longer

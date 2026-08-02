@@ -48,7 +48,13 @@ const HEX_H = 1.5 * SIZE;
 // not.
 // Index 7 is a king's ship: a triangle, because a man-of-war under a press of
 // sail is the one thing out here that is bigger than you.
-const GLYPH = ["~", "≈", "#", "⌂", "@", "X", "o", "▲"];
+// Indices 8, 9 and 10 are the same three with more than one on the hex. A hex
+// draws one glyph, so without these a crowded hex and a quiet one look
+// identical and the count in the status column cannot be reconciled with the
+// chart. Each doubles its own mark rather than introducing a new shape: the
+// reader has already learnt o and X and ▲, and a stack is a quantity of the
+// thing they know, not a different thing.
+const GLYPH = ["~", "≈", "#", "⌂", "@", "X", "o", "▲", "XX", "oo", "▲▲"];
 
 // q e / a d / z c, laid out the way the six hex directions actually point.
 // The indices are hex::DIRECTIONS order: 0 E, 1 NE, 2 NW, 3 W, 4 SW, 5 SE.
@@ -291,7 +297,7 @@ function inSight(s) {
   const parts = [];
   if (s.pirates > 0) parts.push(`${s.pirates} strange sail`);
   if (s.navy > 0) parts.push(s.navy === 1 ? "a king's ship" : `${s.navy} king's ships`);
-  if (s.merchants > 0) parts.push(`${s.merchants} trader`);
+  if (s.merchants > 0) parts.push(s.merchants === 1 ? "a trader" : `${s.merchants} traders`);
   return parts.length === 0 ? "nothing" : parts.join(", ");
 }
 
@@ -368,7 +374,11 @@ function mendButton(s) {
     short ? `too few hands to mend, ${s.crewMin} needed`
       : s.damage === 0 ? "sound, nothing to mend"
       : s.mendable === 0 ? "no lumber aboard"
-      : `mend ${s.mendable}%, ${s.mendable} lumber and a day`);
+      // Named for who does the work and priced in what it actually costs,
+      // because the button beside it in a shipyard is the same repair bought
+      // in a different currency. "20 lumber and a day" against "800 gold and
+      // two days" is a choice; "mend" against "repair" is a guess.
+      : `carpenter: ${s.mendable}% for ${s.mendable} lumber and a day`);
   b.id = "order-mend";
   if (short || s.mendable === 0) b.setAttribute("aria-disabled", "true");
   b.addEventListener("click", () => order(() => wasm.mend()));
@@ -411,6 +421,16 @@ function drawHere(s) {
 
   const port = atlas.ports[s.port];
   body.appendChild(el("p", null, `${port.name}. ${port.economy}.`));
+
+  // The one ship the chart can never draw. Your own mark is painted last and
+  // covers whatever shares your hex, so a trader moored alongside you in a
+  // harbour is invisible there by construction. Ports are where they gather,
+  // so this is not a rare case, and it was the missing hull that made the
+  // count in the status column look wrong.
+  if (s.merchantHere) {
+    body.appendChild(el("p", "dim",
+      "A trader is moored alongside. The chandler here undersells her, but the guns are an option."));
+  }
 
   // Standing, spelled out. The discount tops out at twelve percent, which is
   // small enough that a player would read it as noise in the price index
@@ -531,14 +551,16 @@ function drawHere(s) {
     yard.appendChild(b);
   });
   const fix = el("button", null,
-    s.repairCost === 0 ? "sound, nothing to repair" : `repair, ${s.repairCost.toLocaleString("en")}`);
+    s.repairCost === 0 ? "sound, nothing to repair"
+      : `shipwright: all of it for ${s.repairCost.toLocaleString("en")} gold and two days`);
   fix.id = "yard-repair";
   fix.addEventListener("click", () => order(() => wasm.repair()));
   yard.appendChild(fix);
   // Beside the paid repair on purpose: timber you already carry against gold
   // you would have to find is a choice, and it is only a choice if both are
-  // in the same place.
-  yard.appendChild(mendButton(s));
+  // in the same place. Sound, there is no choice to put, so the pair collapses
+  // to the one line rather than showing two buttons that say the same nothing.
+  if (s.damage > 0) yard.appendChild(mendButton(s));
   body.appendChild(yard);
 }
 
@@ -566,7 +588,8 @@ function drawShipyard(s, body) {
     li.appendChild(el("p", "ship--blurb", o.blurb));
     li.appendChild(el("p", "dim",
       `${o.rig} · ${o.hold} in the hold · up to ${o.maxGuns} guns · ` +
-      (o.bluewater ? "will cross an ocean" : "keeps the land in sight")));
+      (o.bluewater ? "will cross an ocean" : "keeps the land in sight") +
+      (o.deep ? " · draws too much for the shallowest harbours" : "")));
     if (o.locked) li.appendChild(el("p", "bad", o.locked));
     list.appendChild(li);
   }
@@ -580,10 +603,15 @@ function drawShipyard(s, body) {
 function drawKnown(s) {
   const list = $("known");
   list.replaceChildren();
+  // Marked in the list rather than removed from it. A harbour she cannot enter
+  // is still a harbour you know, still worth looking at, and still somewhere a
+  // smaller hull would take you; dropping it would read as forgetting.
+  const barred = new Set(s.barred);
   for (const i of s.known) {
     const port = atlas.ports[i];
     const li = el("li");
-    li.appendChild(el("span", null, port.name));
+    li.appendChild(el("span", null,
+      barred.has(i) ? `${port.name} (too shallow)` : port.name));
 
     const actions = el("span");
     const look = el("button", null, "look");
@@ -636,6 +664,14 @@ function drawThere() {
   }
   if (t.port >= 0) {
     body.appendChild(el("p", null, `${t.name}. ${t.economy}.`));
+    // Said before the course button below it, not after, because the course is
+    // the thing it is an answer to. Nothing is greyed out here, so the button
+    // still offers itself and the log still refuses it; this is the warning
+    // that stops that being the first the reader hears of it.
+    if (t.barred) {
+      body.appendChild(el("p", "dim",
+        "Too shallow for her draught. A smaller hull could work in."));
+    }
   } else {
     body.appendChild(el("p", null, t.land ? "Land." : "Open water."));
   }

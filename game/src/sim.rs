@@ -22,6 +22,17 @@ pub const CODE_SHIP: u8 = 4;
 pub const CODE_PIRATE: u8 = 5;
 pub const CODE_MERCHANT: u8 = 6;
 pub const CODE_NAVY: u8 = 7;
+// A hex holds one glyph, so before these existed a crowded hex looked exactly
+// like a quiet one and the "in sight" count in the status column disagreed with
+// what a reader could count on the chart. Traders cluster at ports, which is
+// where every voyage starts, so the first thing a new player saw was a number
+// that did not add up.
+//
+// The stack is not counted out, only marked. Three raiders and four are the
+// same decision; one and more-than-one is not.
+pub const CODE_PIRATES: u8 = 8;
+pub const CODE_MERCHANTS: u8 = 9;
+pub const CODE_NAVIES: u8 = 10;
 
 const PIRATE_COUNT: usize = 24;
 /// How close a pirate has to be before it stops wandering and starts hunting.
@@ -288,6 +299,31 @@ pub struct Offer {
     pub locked: Option<String>,
 }
 
+/// Which harbours are shut to a hull that draws too much water.
+///
+/// A harbour counts as shallow when it has `nav::SHALLOW_ROOM` or less water
+/// within two hexes: a creek, a river mouth, the head of a gulf. Capitals are
+/// exempt whatever the coastline says, and that is not a fudge. A capital is
+/// where the yards are, so a capital that barred the hull it had just sold you
+/// would be a trap rather than a constraint, and the exemption is also the
+/// honest reading: a port big enough to build a galleon has water enough to
+/// float one.
+fn shallow_harbours() -> Vec<bool> {
+    let mut out = vec![false; CELLS];
+    for p in PORTS.iter() {
+        if p.capital {
+            continue;
+        }
+        let h = hex::from_offset(p.col as i32, p.row as i32);
+        if nav::harbour_room(h) <= nav::SHALLOW_ROOM {
+            if let Some(i) = hex::index(h) {
+                out[i] = true;
+            }
+        }
+    }
+    out
+}
+
 pub struct Game {
     pub ship: Ship,
     pub gold: i32,
@@ -301,6 +337,15 @@ pub struct Game {
 
     pub fog: Vec<u8>,
     depth: Vec<u8>,
+    /// Harbours with too little sea room for a deep-draught hull, indexed like
+    /// `depth`. Fixed at construction: it is a property of the coastline and
+    /// nothing in play moves a headland.
+    shallow_harbour: Vec<bool>,
+    /// All false. Handed to the pathfinder for a hull that draws little enough
+    /// to enter anywhere, which is most of them. Kept as a field rather than
+    /// built on demand because `find_path` takes a slice and the alternative is
+    /// allocating a bool per water cell on every leg a pirate sails.
+    open_water: Vec<bool>,
     pub markets: Markets,
     pirates: Vec<Pirate>,
     merchants: Vec<Merchant>,
@@ -337,6 +382,8 @@ impl Game {
             reputation: 0,
             fog: vec![UNSEEN; CELLS],
             depth,
+            shallow_harbour: shallow_harbours(),
+            open_water: vec![false; CELLS],
             markets: Markets::new(),
             pirates: Vec::new(),
             merchants: Vec::new(),
@@ -576,9 +623,29 @@ impl Game {
     // -- movement ----------------------------------------------------------
 
     pub fn port_here(&self) -> Option<usize> {
-        PORTS.iter().position(|p| {
-            hex::from_offset(p.col as i32, p.row as i32) == self.at
-        })
+        self.port_at(self.at)
+    }
+
+    /// The port on a given hex, if there is one. `port_here` in the general
+    /// case, which the draught rule needs because it asks about a harbour the
+    /// ship is not in and is refusing to enter.
+    pub fn port_at(&self, h: Hex) -> Option<usize> {
+        PORTS
+            .iter()
+            .position(|p| hex::from_offset(p.col as i32, p.row as i32) == h)
+    }
+
+    /// Would the hull she is in now be turned away from this harbour?
+    ///
+    /// Asked of a port rather than a hex because that is what the page has to
+    /// print: a destination the player is about to choose. The answer moves
+    /// when the ship does, which is why it is computed rather than stored.
+    pub fn barred_port(&self, port: usize) -> bool {
+        if !self.ship.class.is_deep_draught() {
+            return false;
+        }
+        let h = hex::from_offset(PORTS[port].col as i32, PORTS[port].row as i32);
+        hex::index(h).is_some_and(|i| self.shallow_harbour[i])
     }
 
     /// Sail one hex. Returns false and says why if it cannot be done.
@@ -593,6 +660,16 @@ impl Game {
         };
         if nav::is_land_index(ti) {
             self.say("Shoal water and rock. You bear away.".into());
+            return false;
+        }
+        // The bar, checked on the hex about to be entered rather than on
+        // arrival, so a deep hull is turned back at the harbour mouth instead
+        // of being told she has run aground after the fact.
+        if self.ship.class.is_deep_draught() && self.shallow_harbour[ti] {
+            self.say(format!(
+                "{} is too shallow for her draught. You stand off.",
+                self.port_at(target).map_or("That harbour", |p| PORTS[p].name)
+            ));
             return false;
         }
 
@@ -732,7 +809,12 @@ impl Game {
             self.say("You are already there.".into());
             return false;
         }
-        self.lay_course(goal, "the open sea")
+        // Named if the hex happens to be a harbour, because a course laid by
+        // clicking the chart can land on one and every refusal below prints this
+        // string. "The open sea is too shallow for her draught" is a sentence no
+        // reader can act on.
+        let what = self.port_at(goal).map_or("the open sea", |p| PORTS[p].name);
+        self.lay_course(goal, what)
     }
 
     fn lay_course(&mut self, goal: hex::Hex, what: &str) -> bool {
@@ -744,6 +826,20 @@ impl Game {
             self.ship.base_hours(),
             self.ship.bluewater_rating(),
         );
+        // Hoisted for the same reason: a field borrow sits alongside the
+        // mutable one, where a `self.barred()` method would borrow all of self.
+        let barred: &[bool] = if self.ship.class.is_deep_draught() {
+            &self.shallow_harbour
+        } else {
+            &self.open_water
+        };
+        // Said here rather than left to the empty path below, because "no route
+        // the rigging will stand" is the wrong answer to a draught problem and
+        // would send a reader off to buy sails they do not need.
+        if hex::index(goal).is_some_and(|i| barred[i]) {
+            self.say(format!("{what} is too shallow for her draught. She would sit on the mud."));
+            return false;
+        }
         let path = nav::find_path(
             &mut self.pathfinder,
             from,
@@ -753,6 +849,7 @@ impl Game {
             hours,
             &self.depth,
             rating,
+            barred,
         );
         if path.is_empty() {
             self.say(format!(
@@ -1023,8 +1120,12 @@ impl Game {
                     // Run the same pathfinder the player's autopilot uses,
                     // limited to a short horizon so a fleet of them stays
                     // affordable.
+                    // Nothing barred: a raider's draught is not modelled, and a
+                    // chase that stopped at a creek mouth would be a rule the
+                    // player could see the effect of without ever being told it.
                     let path = nav::find_path(
                         &mut self.pathfinder, here, goal, month, 2, 6.0, &self.depth, 8,
+                        &self.open_water,
                     );
                     path.first().and_then(|&n| {
                         (0..6).find(|&d| hex::normalise(hex::neighbour(here, d)) == n)
@@ -2033,15 +2134,30 @@ impl Game {
         for m in &self.merchants {
             if let Some(idx) = hex::index(m.at) {
                 if self.fog[idx] == VISIBLE {
-                    self.render[idx * 2] = CODE_MERCHANT;
+                    self.render[idx * 2] = match self.render[idx * 2] {
+                        CODE_MERCHANT | CODE_MERCHANTS => CODE_MERCHANTS,
+                        _ => CODE_MERCHANT,
+                    };
                 }
             }
         }
 
+        // A raider arriving on a hex that already holds one marks the stack. Only
+        // raiders count toward that: a pirate standing over a trader is a raider
+        // on his own, and the trader is not the news.
         for p in &self.pirates {
             if let Some(idx) = hex::index(p.at) {
                 if self.fog[idx] == VISIBLE {
-                    self.render[idx * 2] = if p.navy { CODE_NAVY } else { CODE_PIRATE };
+                    let crowded = matches!(
+                        self.render[idx * 2],
+                        CODE_PIRATE | CODE_NAVY | CODE_PIRATES | CODE_NAVIES
+                    );
+                    self.render[idx * 2] = match (p.navy, crowded) {
+                        (false, false) => CODE_PIRATE,
+                        (false, true) => CODE_PIRATES,
+                        (true, false) => CODE_NAVY,
+                        (true, true) => CODE_NAVIES,
+                    };
                 }
             }
         }
@@ -2186,6 +2302,7 @@ mod tests {
             s.base_hours(),
             &g.depth,
             s.bluewater_rating(),
+            if s.class.is_deep_draught() { &g.shallow_harbour } else { &g.open_water },
         );
         if path.is_empty() {
             return None;
@@ -2471,6 +2588,10 @@ mod tests {
     /// leave. Fully rigged, every class in the game reaches every port that
     /// trades, so the choice of hull is a choice about speed, hold and guns
     /// rather than about which half of the world you are allowed to see.
+    ///
+    /// This is about rigging and offing only. Draught is a separate limit with
+    /// a deliberately weaker guarantee, since a rule that barred nothing would
+    /// not be a rule; see `every_economy_keeps_a_harbour_for_the_deepest_hulls`.
     #[test]
     fn no_class_is_shut_out_of_any_market() {
         let g = Game::new(1);
@@ -2485,6 +2606,115 @@ mod tests {
                 missed
             );
         }
+    }
+
+    /// The draught rule bars somewhere, and never everywhere.
+    ///
+    /// Two claims, and both are load-bearing in opposite directions. A rule
+    /// that shut no harbour would be a paragraph of comment doing nothing, and
+    /// a rule that shut a whole economy would make the largest hulls a trap
+    /// rather than a trade-off: the galleon is the ship you buy to cross an
+    /// ocean, and arriving to find nowhere to sell is not a choice you made.
+    ///
+    /// Two open harbours per economy rather than one, because one would leave a
+    /// region with a single quayside where every price you move is a price you
+    /// then have to trade against.
+    #[test]
+    fn every_economy_keeps_a_harbour_for_the_deepest_hulls() {
+        let g = Game::new(1);
+        let mut open = [0; 8];
+        let mut barred = 0;
+        for (i, p) in PORTS.iter().enumerate() {
+            if !Markets::trades(i) {
+                continue;
+            }
+            let h = hex::from_offset(p.col as i32, p.row as i32);
+            if g.shallow_harbour[hex::index(h).unwrap()] {
+                assert!(!p.capital, "{} is a capital and must never be barred", p.name);
+                barred += 1;
+            } else {
+                open[p.econ as usize] += 1;
+            }
+        }
+        assert!(barred > 0, "no harbour is shallow, so the rule does nothing");
+        for (e, n) in open.iter().enumerate() {
+            assert!(
+                *n >= 2,
+                "{} keeps only {n} harbour(s) open to a deep hull",
+                crate::world::ECONOMIES[e]
+            );
+        }
+    }
+
+    /// A deep hull is turned back at the harbour mouth, and a shallow one is not.
+    ///
+    /// Driven through `step` rather than by reading the mask, because the mask
+    /// being right and the refusal being wired are two different facts and only
+    /// the second one is what a player meets.
+    #[test]
+    fn a_deep_draught_hull_is_refused_where_a_coastal_one_is_not() {
+        let mut g = Game::new(1);
+        let (approach, dir) = (0..PORTS.len())
+            .filter_map(|i| {
+                let h = hex::from_offset(PORTS[i].col as i32, PORTS[i].row as i32);
+                let idx = hex::index(h)?;
+                if !g.shallow_harbour[idx] {
+                    return None;
+                }
+                // Approach from any water hex beside her.
+                (0..6).find_map(|d| {
+                    let n = hex::normalise(hex::neighbour(h, d));
+                    let ni = hex::index(n)?;
+                    if nav::is_land_index(ni) || g.shallow_harbour[ni] {
+                        return None;
+                    }
+                    // The direction that takes her back in.
+                    let back = (0..6)
+                        .find(|&b| hex::normalise(hex::neighbour(n, b)) == hex::normalise(h))?;
+                    Some((n, back))
+                })
+            })
+            .next()
+            .expect("no shallow harbour with water beside it");
+
+        g.at = approach;
+        g.ship = Ship::of_class(Class::Balsa, GOODS.len());
+        assert!(g.step(dir), "a coastal hull may enter");
+
+        g.at = approach;
+        g.ship = Ship::of_class(Class::Galleon, GOODS.len());
+        assert!(!g.step(dir), "a galleon may not");
+        assert!(
+            g.chronicle().last().unwrap().contains("draught"),
+            "she was refused without being told why: {:?}",
+            g.chronicle().last()
+        );
+    }
+
+    /// A course clicked on the chart names the harbour it is refused by.
+    ///
+    /// `set_course_hex` knows only a hex, so it used to hand the refusal the
+    /// words "the open sea" whatever it was pointed at. A port is a water cell,
+    /// so clicking a shallow harbour produced "the open sea is too shallow for
+    /// her draught": true of nothing, and no help at all to someone deciding
+    /// which hull to buy.
+    #[test]
+    fn a_course_clicked_on_a_shallow_harbour_names_it() {
+        let mut g = Game::new(1);
+        let port = (0..PORTS.len())
+            .find(|&i| {
+                let h = hex::from_offset(PORTS[i].col as i32, PORTS[i].row as i32);
+                hex::index(h).is_some_and(|idx| g.shallow_harbour[idx]) && h != g.at
+            })
+            .expect("no shallow harbour");
+        let h = hex::from_offset(PORTS[port].col as i32, PORTS[port].row as i32);
+        g.fog[hex::index(h).unwrap()] = nav::REMEMBERED;
+        g.ship = Ship::of_class(Class::Galleon, GOODS.len());
+
+        assert!(!g.set_course_hex(PORTS[port].col as i32, PORTS[port].row as i32));
+        let said = g.chronicle().last().unwrap().clone();
+        assert!(said.contains(PORTS[port].name), "she was refused by an unnamed place: {said:?}");
+        assert!(!said.contains("open sea"), "still the old wording: {said:?}");
     }
 
     /// The boat you start in is the one exception, and it is the point of her.
@@ -2754,6 +2984,59 @@ mod tests {
     /// fight removes an element and the queued indices above it went stale.
     /// Under `panic = "abort"` that is a blank page and a console trap, so it
     /// gets a test of its own rather than a comment.
+    /// The chart says how many, not just what.
+    ///
+    /// This is the bug the stack codes exist for: the status column counts
+    /// hulls and the chart draws hexes, so before these a reader who counted
+    /// the glyphs got a smaller number than the one printed beside them and had
+    /// no way to tell which was lying.
+    #[test]
+    fn a_crowded_hex_draws_a_different_mark_from_a_lone_one() {
+        let mut g = Game::new(1);
+        let water = (0..6)
+            .map(|d| hex::normalise(hex::neighbour(g.at, d)))
+            .find(|&h| hex::index(h).is_some_and(|i| !nav::is_land_index(i)))
+            .expect("nowhere to float a trader");
+        let idx = hex::index(water).unwrap();
+        let trader = |at| Merchant {
+            at,
+            class: Class::Carrack,
+            bound: 0,
+            cargo: 0,
+            units: 1,
+            gold: 100,
+            hours: 0.0,
+            stuck: 0,
+        };
+
+        g.merchants.clear();
+        g.pirates.clear();
+        g.look();
+        assert_eq!(g.fog[idx], VISIBLE, "the test hex is not in sight");
+
+        g.merchants.push(trader(water));
+        assert_eq!(g.render()[idx * 2], CODE_MERCHANT);
+
+        g.merchants.push(trader(water));
+        assert_eq!(g.render()[idx * 2], CODE_MERCHANTS, "two traders, one mark");
+
+        // A raider over them is still the news, and alone until a second joins.
+        g.pirates.push(Pirate {
+            at: water,
+            class: Class::Carrack,
+            strength: 10,
+            hours: 0.0,
+            hunting: true,
+            name: "the Test Sail",
+            last_seen: None,
+            memory: 0,
+            beaten: false,
+            met: false,
+            navy: false,
+        });
+        assert_eq!(g.render()[idx * 2], CODE_PIRATE, "a raider over traders is one raider");
+    }
+
     #[test]
     fn two_pirates_on_the_same_hex_do_not_break_the_engagement() {
         for seed in 1..40u32 {

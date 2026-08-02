@@ -233,6 +233,13 @@ pub struct Spec {
     /// is only so much deck.
     pub crew_min: i32,
     pub crew_max: i32,
+    /// Draws too much water for a harbour with no sea room around it.
+    ///
+    /// A hull property, stated rather than inferred from the rig, because the
+    /// two are not the same thing: a galleon is deep because she is big, and
+    /// she is blue-water because of what is above the deck. Reading one off
+    /// the other would tie a change in rigging to where she may anchor.
+    pub deep_draught: bool,
 }
 
 /// Economy indices, as a bitmask, matching the order of `world::ECONOMIES`.
@@ -268,6 +275,7 @@ pub const SPECS: [Spec; 6] = [
         yards: MED | NEU | AME | WAF | EAF | ARA | SEA | FAR,
         needs_invested: 0,
         crew_min: 3, crew_max: 12,
+        deep_draught: false,
     },
     Spec {
         name: "Latina",
@@ -281,6 +289,7 @@ pub const SPECS: [Spec; 6] = [
         yards: MED | WAF | EAF | ARA,
         needs_invested: 0,
         crew_min: 6, crew_max: 24,
+        deep_draught: false,
     },
     Spec {
         name: "Redonda",
@@ -294,6 +303,7 @@ pub const SPECS: [Spec; 6] = [
         yards: MED | NEU | AME | WAF,
         needs_invested: 0,
         crew_min: 8, crew_max: 30,
+        deep_draught: false,
     },
     Spec {
         name: "Carrack",
@@ -307,6 +317,7 @@ pub const SPECS: [Spec; 6] = [
         yards: MED | NEU | AME | SEA,
         needs_invested: 0,
         crew_min: 15, crew_max: 60,
+        deep_draught: false,
     },
     Spec {
         name: "Galleon",
@@ -320,6 +331,7 @@ pub const SPECS: [Spec; 6] = [
         yards: NEU | AME | FAR,
         needs_invested: 15_000,
         crew_min: 25, crew_max: 100,
+        deep_draught: true,
     },
     Spec {
         name: "Heavy Galleon",
@@ -333,6 +345,7 @@ pub const SPECS: [Spec; 6] = [
         yards: MED | NEU,
         needs_invested: 40_000,
         crew_min: 35, crew_max: 130,
+        deep_draught: true,
     },
 ];
 
@@ -361,6 +374,11 @@ impl Class {
             return false;
         }
         self.spec().yards & (1 << econ) != 0
+    }
+
+    /// Does she draw too much to enter a harbour with no sea room?
+    pub fn is_deep_draught(self) -> bool {
+        self.spec().deep_draught
     }
 
     /// Can she leave soundings? True only where the class reaches rigging 4.

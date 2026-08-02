@@ -349,7 +349,7 @@ JavaScript. The reason is the other one: the simulation is about 6,900 hand-writ
 lines (a count that excludes `game/src/world.rs`, which is generated and would
 flatter it) with a world model, a market, navigation, fog of war, hunters that
 remember you, a crew that eats and is paid, and a reputation the world reads, and
-it has 116 tests. Rust gives that
+it has 121 tests. Rust gives that
 a type system, exhaustive matching and `cargo test`. Claiming a performance need
 would be the easier argument and it would not be true.
 
@@ -412,6 +412,30 @@ pathfinder and the wind model that every hull can carry enough to cross the
 emptiest gap on the map three times over. That last one is the same standard as
 `no_class_is_shut_out_of_any_market`: it measures the game rather than restating
 a constant, so tuning a ration cannot quietly strand a class.
+
+**Draught is the one limit that runs the other way.** Rigging buys offing: the
+better the rig, the further from land a hull may work, and fully rigged every
+class reaches every market. Draught takes something back at the other end of the
+scale, because otherwise the largest hull is strictly the best one and the choice
+of ship stops being a choice. A galleon draws too much for a harbour with no sea
+room around it, where sea room is water within two hexes and the threshold is
+eight, and that number was measured rather than picked: it is the largest value
+at which every economy still keeps at least two harbours open to the deepest
+hulls, which `every_economy_keeps_a_harbour_for_the_deepest_hulls` re-derives
+instead of restating. Capitals are exempt whatever their coastline, since a yard
+that sold you a hull it then barred would be a trap rather than a trade-off.
+
+The bar is enforced in the pathfinder and not only on entry. `find_path` takes a
+mask of cells the hull may not enter and admits no exception for the goal, so a
+course that ends or passes somewhere she cannot go is never returned at all. The
+alternative, refusing the last step, laid a course that stalled one hex short of
+the quay with no explanation.
+
+Favour decays on the same clock, a point a month against a point earned per
+thousand gold traded. Earning outpaces decay by a wide margin, so it costs a
+working trader nothing they can feel; it only bites on abandonment, which is the
+thing it exists to price. Without it the discount was a ratchet, and a season of
+hard trading made one quayside permanently the cheapest on the map.
 
 **No `wasm-bindgen`, no `wasm-pack`.** The exports are `#[no_mangle] extern "C"`
 functions taking and returning `i32`. Strings cross the boundary as UTF-8 in

@@ -460,6 +460,11 @@ pub extern "C" fn write_status() {
             s.push_str(&ship::guns_at(spec.gun_max).to_string());
             s.push_str(",\"bluewater\":");
             s.push_str(if o.class.is_bluewater() { "true" } else { "false" });
+            // Stated on the offer, because it is the one thing about a big hull
+            // that takes something away and the yard is the last place a reader
+            // can act on it. Finding out at the harbour mouth is too late.
+            s.push_str(",\"deep\":");
+            s.push_str(if o.class.is_deep_draught() { "true" } else { "false" });
             s.push_str(",\"locked\":");
             match &o.locked {
                 Some(why) => push_str_json(&mut s, why),
@@ -530,6 +535,24 @@ pub extern "C" fn write_status() {
     }
     s.push(']');
 
+    // The charted harbours this hull cannot enter. A subset of `known`, sent
+    // alongside it rather than folded into it, because the page draws the same
+    // list either way and the bar is a property of the ship rather than of the
+    // port: buy a galleon and the list changes without a harbour moving.
+    s.push_str(",\"barred\":[");
+    let mut first = true;
+    for i in 0..PORTS.len() {
+        if !g.discovered(i) || !g.barred_port(i) {
+            continue;
+        }
+        if !first {
+            s.push(',');
+        }
+        first = false;
+        s.push_str(&i.to_string());
+    }
+    s.push(']');
+
     s.push_str(",\"chronicle\":[");
     for (i, line) in g.chronicle().iter().enumerate() {
         if i > 0 {
@@ -572,6 +595,7 @@ pub extern "C" fn write_look(col: i32, row: i32) {
             push_str_json(&mut s, PORTS[p].name);
             s.push_str(",\"economy\":");
             push_str_json(&mut s, Markets::economy_name(p));
+            kv_b(&mut s, "barred", g.barred_port(p));
         }
         None => s.push_str("-1"),
     }
@@ -806,6 +830,7 @@ mod tests {
             "\"storeNames\"",
             "\"storePrices\"",
             "\"storePricesAfloat\"",
+            "\"barred\"",
         ] {
             assert!(s.contains(key), "the status no longer carries {key}");
         }
