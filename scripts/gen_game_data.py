@@ -9,9 +9,17 @@ prove the committed output still matches its input.
 
 What it actually checks is the interesting part. Rasterising a coastline by
 hand is exactly the kind of work that looks finished and is not, so the script
-asserts that every one of the 70 ports is water, and that all 70 sit in a
-single connected ocean. A stray vertex that seals off the Red Sea stops being
-a subtle gameplay bug and starts being a build failure.
+asserts three things about the map it just built: no two ports share a hex,
+every port has land in an adjoining hex, and all 70 sit in a single connected
+ocean. A stray vertex that seals off the Red Sea stops being a subtle gameplay
+bug and starts being a build failure.
+
+The middle one was added after the fact and is worth the note. The first
+version of this map checked only that ports could reach each other by sea,
+which a port in the middle of the Pacific passes without difficulty, and 21 of
+the 70 harbours shipped with no shore anywhere near them. An assertion that
+only tests the thing you were already thinking about is not much of an
+assertion.
 """
 
 import sys
@@ -108,16 +116,43 @@ def inside(polygon, lon, lat):
 # --------------------------------------------------------------------------
 
 def load_ports():
+    """Trade data from ports.tsv, position from port_place.tsv.
+
+    Two files because the reference table is authoritative about one and not
+    the other. Its coordinates are the old game's sextant readings and put
+    London in the Norwegian Sea; its economies and specialities are the trade
+    matrix, which is what the table is for. See port_place.tsv for the long
+    version. Every port must appear in both, exactly once.
+    """
     out = []
-    for name, lat, lon, econ, spec in rows(DATA / "ports.tsv", ["name","lat","lon","economy","specialty"]):
+    for name, _lat, _lon, econ, spec in rows(
+        DATA / "ports.tsv", ["name", "lat", "lon", "economy", "specialty"]
+    ):
         econ = ECON_ALIASES.get(econ, econ)
-        out.append({
-            "name": name,
-            "lat": int(lat),
-            "lon": int(lon),
-            "econ": econ,
-            "spec": spec,
-        })
+        out.append({"name": name, "econ": econ, "spec": spec})
+
+    places = {}
+    for name, lat, lon, _note in rows(
+        DATA / "port_place.tsv", ["port", "lat", "lon", "note"]
+    ):
+        if name in places:
+            fail(f"port_place.tsv lists {name} twice")
+        places[name] = (float(lat), float(lon))
+
+    named = {p["name"] for p in out}
+    if len(named) != len(out):
+        fail("ports.tsv lists the same port twice")
+    if named != set(places):
+        missing = sorted(named - set(places))
+        extra = sorted(set(places) - named)
+        fail(
+            "ports.tsv and port_place.tsv disagree about which ports exist. "
+            f"Missing a position: {missing or 'none'}. "
+            f"Positioned but not a port: {extra or 'none'}."
+        )
+
+    for p in out:
+        p["lat"], p["lon"] = places[p["name"]]
     return out
 
 
@@ -224,6 +259,31 @@ def check_one_ocean(land, ports):
             "A coastline vertex in game/data/coast.tsv has sealed them off."
         )
     return len(seen)
+
+
+def check_ashore(land, ports):
+    """Every port must have land in an adjoining hex.
+
+    This is the assertion whose absence let the first version of the map ship
+    with 21 harbours floating in open water: the old check only asked whether
+    ports could reach one another by sea, and a port in the middle of the
+    Pacific passes that easily. A harbour is a place where the sea meets the
+    shore, so require the shore.
+    """
+    adrift = []
+    for p in ports:
+        if not any(
+            land[r * COLS + c] == ord("#") for c, r in neighbours(p["col"], p["row"])
+        ):
+            lon, lat = cell_centre(p["col"], p["row"])
+            adrift.append(f"{p['name']} ({lat:+.0f}, {lon:+.0f})")
+    if adrift:
+        fail(
+            f"{len(adrift)} port(s) have no land in any adjoining hex, so they "
+            f"are harbours in open ocean: {', '.join(sorted(adrift))}. Either "
+            "the position in game/data/port_place.tsv is wrong, or "
+            "game/data/coast.tsv has no outline for the island it sits on."
+        )
 
 
 def collisions(ports):
@@ -347,12 +407,15 @@ def main():
         fail(f"port_nudge.tsv names ports that do not exist: {unknown}")
 
     land, carved = build_land(coast, ports, nudges)
-    water_cells = check_one_ocean(land, ports)
 
+    # Order matters for the error you get. Collisions first, because two ports
+    # in one hex makes every later message name the wrong port.
     clashes = collisions(ports)
     if clashes:
         fail("two ports share one hex, which the map cannot draw: "
              + "; ".join(clashes))
+    check_ashore(land, ports)
+    water_cells = check_one_ocean(land, ports)
 
     text = emit(land, ports, goods, econs, table, coast, water_cells)
 

@@ -4,8 +4,10 @@
 # 2592 cells, and a hand-corrected character grid of that size is not something
 # a reviewer can check by reading. An outline is: a vertex is a place, you can
 # see that it is wrong, and you can move it. scripts/gen_game_data.py rasterises
-# these into the hex grid and asserts that all 70 ports end up reachable from
-# one another by sea, so a coastline that walls a port in fails the build rather
+# these into the hex grid and then asserts three things about the result: that
+# no two ports share a hex, that every port has land in an adjoining hex, and
+# that all 70 are reachable from one another by sea. A coastline that walls a
+# port in, or that leaves one floating in open ocean, fails the build rather
 # than shipping quietly.
 #
 # These are hand-placed from ordinary geographic knowledge at roughly 5-degree
@@ -16,6 +18,17 @@
 #
 # Winding does not matter; the rasteriser uses an even-odd crossing test.
 # Format:  name <TAB> lon,lat lon,lat ...
+#
+# One consequence of a crossing test on a coarse grid is worth knowing about,
+# because it bites silently. A cell becomes land only if the cell's centre
+# falls inside an outline, so anything smaller than a hex can miss every centre
+# and vanish. Sri Lanka and Hispaniola did exactly that, and Colombo and Santo
+# Domingo were left as harbours in open sea. Where a real island is smaller
+# than 5 degrees the outline below is a box drawn around it, sized to catch one
+# cell centre and no more. That is a lie about the island's size and an honest
+# statement of its position, which is the trade the grid forces. Hawaii, the
+# Marianas and Cape Verde are all in that category and are named for what they
+# stand in for.
 
 Africa	-17,21 -16,28 -10,31 0,36 10,37 20,32 32,31 35,24 39,15 43,12 51,12 48,5 42,-1 40,-10 35,-20 33,-26 28,-33 20,-35 15,-27 12,-18 9,-1 9,4 0,5 -8,4 -14,10 -17,15
 Eurasia	-9,37 -9,43 -2,48 2,51 5,53 8,55 12,55 10,58 5,62 12,68 20,70 30,70 40,68 60,70 80,73 100,76 140,72 170,68 180,66 170,60 160,55 145,45 140,50 130,43 127,38 122,30 110,20 105,10 100,5 95,15 90,22 88,21 80,15 77,8 72,20 67,25 57,25 50,27 48,30 57,22 53,17 45,13 43,15 39,21 34,29 35,36 30,37 27,40 23,38 19,40 13,45 12,44 18,40 15,38 10,43 5,43 3,42 0,39 -5,36
@@ -25,12 +38,12 @@ Iceland	-24,64 -14,65 -15,66 -24,66
 Scandinavia_Baltic	15,55 25,57 30,60 25,65 18,62
 Japan	130,32 140,36 142,43 138,38 135,34
 Madagascar	44,-12 50,-15 48,-25 44,-22
-Sri_Lanka	80,6 82,7 81,9 79,9
+Sri_Lanka	79,5 83,6 83,10 79,10
 North_America	-168,65 -140,70 -100,70 -80,63 -60,50 -70,45 -75,35 -81,25 -90,29 -97,26 -97,20 -90,20 -83,10 -79,9 -105,20 -115,30 -125,40 -125,48 -135,58 -150,60
 Greenland	-45,60 -20,70 -20,82 -60,82 -70,76 -55,65
-South_America	-79,9 -60,5 -50,0 -35,-6 -39,-18 -48,-25 -58,-35 -62,-40 -65,-55 -75,-45 -71,-30 -76,-15 -81,-5 -79,2
+South_America	-79,9 -75,11 -71,12 -62,11 -60,5 -50,0 -35,-6 -39,-18 -48,-25 -58,-35 -62,-40 -65,-55 -75,-45 -71,-30 -76,-15 -81,-5 -79,2
 Cuba	-85,22 -75,20 -77,23 -84,23
-Hispaniola	-74,18 -68,18 -69,20 -73,20
+Hispaniola	-74,16 -68,16 -68,20 -74,20
 Australia	114,-22 122,-18 130,-12 142,-11 146,-19 153,-28 150,-38 140,-38 130,-32 115,-34
 New_Guinea	131,-1 141,-3 150,-10 140,-9 132,-8
 Sumatra_Java	95,5 105,-6 114,-8 100,0
@@ -41,12 +54,18 @@ Antarctica	-180,-90 180,-90 180,-72 90,-70 0,-72 -90,-73 -180,-75
 
 # Inland seas, carved out of the land above. A leading "-" subtracts.
 #
-# These exist because the source's port coordinates are stylised, not surveyed:
-# it places Azov at N55 E30 and Trebizond at N45 E30, which on a real atlas is
-# Belarus and Ukraine, and it puts Baghdad at N30 E50, which is open Gulf. The
-# map has to match the game's geography rather than the world's, so the water
-# is cut to reach the ports the data actually names.
+# The Black Sea, the Red Sea and the Gulf are all narrower than the outlines
+# that surround them, so painting Eurasia and Africa alone seals them shut and
+# strands Azov, Trebizond, Mecca and Baghdad behind a wall of rasterised land.
+# Cutting them back out is what makes those four sailable at all.
+#
+# The Sea of Okhotsk is here for the same reason but was once wrong in the
+# other direction: it reached to 66N, which removed the Siberian shore along
+# with the sea and left Tauisk afloat with no coast to tie up against.
 -Black_Sea	18,41 38,41 38,58 18,58
 -Red_Sea	33,13 43,13 43,30 33,30
 -Persian_Gulf	47,19 57,19 57,33 47,33
--Sea_of_Okhotsk	138,48 160,48 160,66 138,66
+-Sea_of_Okhotsk	138,45 160,45 160,60 138,60
+Mariana_Islands	143,10 148,10 148,15 143,15
+Hawaii	-156,15 -151,15 -151,20 -156,20
+Cape_Verde	-26,15 -21,15 -21,20 -26,20

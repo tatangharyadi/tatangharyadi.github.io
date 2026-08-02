@@ -11,34 +11,34 @@ pub const LAND: &[u8] = b"\
 ........................................................................\
 ......................##########........................................\
 .......................#########...................############.........\
-.....############.......#######......~####~#######~###################..\
-....################......##........~~##########################..~.###.\
-.........#############.............#~.##....####################....#...\
-..........#############...........##~###..~.####################........\
-..........~############...........~##~~#....###################.##......\
-...........##########~............###.~#~.~.##################..........\
-...........##########.............~~.~~~..###################...........\
-............#########..............#~~##~..##..##############...........\
-.............####..#.............##########...~#############.~..........\
-..............###..##............##########~...~.~#########~............\
-................##...............##########..##~...##..###~.............\
-..............~.~................###########.......#...##...#.....~.....\
-...~..............~.~~..........~.##########~#....~......~..............\
-...................~#~###.............#######......~......##............\
-...................~#######.......~.~.######.......~~..~#.###.##........\
-....................#########.........#####~..............#...###.......\
-.....................########.........######~.................###.......\
-.....................#######..........#####.~#.........~.....~###.......\
-........~............######.~..........~###..#...........~.#~#####......\
-......................####.............###..~..............########.....\
-....................~.###...............##.................##.####......\
+.....############.......#######.......####~#######~###################..\
+....################......##.........##################################.\
+.........#############.............#..~#....####################.~..#...\
+..........#############...........#~~#~#....####################........\
+...........############............###~#...~###################.........\
+...........~##########............#~~~~#.~.~##################..........\
+...........#########~.............~~~.~...###################...........\
+............#########.............~#~#~#.~.##~.##############~..........\
+.............####..#.............##########....~############............\
+..............##~..##...........~##########~...~..~#######~~............\
+....~#..........~#..~#~........#.##########..##...~##..##~..............\
+.................~..~.~........~.###########.~....~~...##...#...~#......\
+....................~###..........#~##########.....~#..~................\
+....................#####.............#######...........~.##.~..........\
+....................#######...........#####~............#.###~##........\
+....................~########~........~####~.............~#...###~......\
+.....................########.........######..................###.......\
+.....................#######..........#####.~#..............~####.......\
+.....................######~...........###~..#.............#######......\
+.....................~####.............###.................########.....\
+......................###~.............~##.................##.####......\
 .....................###........................................##......\
-.....................##....~...............................~............\
-.....................#~..................~..............................\
+.....................##.................................................\
+.....................##.................................................\
 ......................#.................................................\
 ........................................................................\
 ........................................................................\
-........................~...............................................\
+........................................................................\
 ...........................#############################################\
 ########################################################################\
 ########################################################################\
@@ -56,75 +56,75 @@ pub struct Port {
 }
 
 pub const PORTS: [Port; 70] = [
-    Port { name: "Acapulco", col: 14, row: 15, econ: -1, specialty: -1 },
-    Port { name: "Aden", col: 44, row: 16, econ: 5, specialty: 12 },
-    Port { name: "Alexandria", col: 40, row: 11, econ: 0, specialty: 16 },
+    Port { name: "Acapulco", col: 16, row: 14, econ: -1, specialty: -1 },
+    Port { name: "Aden", col: 45, row: 15, econ: 5, specialty: 12 },
+    Port { name: "Alexandria", col: 41, row: 11, econ: 0, specialty: 16 },
     Port { name: "Algiers", col: 36, row: 11, econ: 0, specialty: -1 },
-    Port { name: "Amboina", col: 61, row: 21, econ: 6, specialty: 2 },
-    Port { name: "Antwerp", col: 36, row: 6, econ: 1, specialty: 7 },
-    Port { name: "Argin", col: 34, row: 18, econ: 3, specialty: -1 },
-    Port { name: "Azov", col: 42, row: 7, econ: 1, specialty: -1 },
-    Port { name: "Baghdad", col: 46, row: 12, econ: 5, specialty: 24 },
-    Port { name: "Bordeaux", col: 36, row: 7, econ: 1, specialty: 6 },
-    Port { name: "Calicut", col: 51, row: 17, econ: 6, specialty: 0 },
-    Port { name: "Cape Town", col: 41, row: 27, econ: -1, specialty: -1 },
-    Port { name: "Caracas", col: 21, row: 17, econ: 2, specialty: -1 },
-    Port { name: "Ceylon", col: 52, row: 18, econ: 6, specialty: 1 },
-    Port { name: "Chanchan", col: 20, row: 24, econ: -1, specialty: -1 },
-    Port { name: "Cochin", col: 51, row: 18, econ: 6, specialty: -1 },
-    Port { name: "Copiapo", col: 22, row: 27, econ: -1, specialty: -1 },
-    Port { name: "Da Nang", col: 57, row: 16, econ: -1, specialty: -1 },
-    Port { name: "Diu", col: 49, row: 13, econ: 5, specialty: -1 },
-    Port { name: "Eureka", col: 10, row: 8, econ: -1, specialty: -1 },
-    Port { name: "Genoa", col: 37, row: 8, econ: 0, specialty: -1 },
-    Port { name: "Goa", col: 50, row: 16, econ: 6, specialty: 19 },
-    Port { name: "Guam", col: 66, row: 15, econ: -1, specialty: -1 },
-    Port { name: "Guatemala", col: 18, row: 16, econ: 2, specialty: -1 },
-    Port { name: "Hamburg", col: 37, row: 5, econ: 1, specialty: 18 },
-    Port { name: "Hormuz", col: 47, row: 13, econ: 5, specialty: 3 },
+    Port { name: "Amboina", col: 61, row: 18, econ: 6, specialty: 2 },
+    Port { name: "Antwerp", col: 36, row: 7, econ: 1, specialty: 7 },
+    Port { name: "Argin", col: 32, row: 13, econ: 3, specialty: -1 },
+    Port { name: "Azov", col: 43, row: 8, econ: 1, specialty: -1 },
+    Port { name: "Baghdad", col: 45, row: 11, econ: 5, specialty: 24 },
+    Port { name: "Bordeaux", col: 35, row: 9, econ: 1, specialty: 6 },
+    Port { name: "Calicut", col: 51, row: 15, econ: 6, specialty: 0 },
+    Port { name: "Cape Town", col: 39, row: 24, econ: -1, specialty: -1 },
+    Port { name: "Caracas", col: 22, row: 15, econ: 2, specialty: -1 },
+    Port { name: "Ceylon", col: 51, row: 16, econ: 6, specialty: 1 },
+    Port { name: "Chanchan", col: 20, row: 19, econ: -1, specialty: -1 },
+    Port { name: "Cochin", col: 50, row: 15, econ: 6, specialty: -1 },
+    Port { name: "Copiapo", col: 21, row: 23, econ: -1, specialty: -1 },
+    Port { name: "Da Nang", col: 57, row: 14, econ: -1, specialty: -1 },
+    Port { name: "Diu", col: 50, row: 13, econ: 5, specialty: -1 },
+    Port { name: "Eureka", col: 11, row: 9, econ: -1, specialty: -1 },
+    Port { name: "Genoa", col: 37, row: 9, econ: 0, specialty: -1 },
+    Port { name: "Goa", col: 50, row: 14, econ: 6, specialty: 19 },
+    Port { name: "Guam", col: 64, row: 15, econ: -1, specialty: -1 },
+    Port { name: "Guatemala", col: 17, row: 15, econ: 2, specialty: -1 },
+    Port { name: "Hamburg", col: 38, row: 7, econ: 1, specialty: 18 },
+    Port { name: "Hormuz", col: 47, row: 12, econ: 5, specialty: 3 },
     Port { name: "Injiga", col: 42, row: 4, econ: -1, specialty: -1 },
-    Port { name: "Istanbul", col: 40, row: 9, econ: 0, specialty: 24 },
-    Port { name: "Jamaica", col: 20, row: 16, econ: 2, specialty: -1 },
-    Port { name: "Java", col: 57, row: 22, econ: 6, specialty: 0 },
-    Port { name: "Kailua", col: 3, row: 16, econ: -1, specialty: -1 },
-    Port { name: "Leveque", col: 59, row: 26, econ: -1, specialty: -1 },
-    Port { name: "Lisbon", col: 34, row: 8, econ: 0, specialty: 7 },
-    Port { name: "London", col: 36, row: 5, econ: 1, specialty: 18 },
-    Port { name: "Luanda", col: 39, row: 22, econ: -1, specialty: -1 },
-    Port { name: "Macao", col: 58, row: 14, econ: 7, specialty: -1 },
-    Port { name: "Madang", col: 8, row: 22, econ: -1, specialty: -1 },
-    Port { name: "Majorca", col: 38, row: 10, econ: 0, specialty: 9 },
-    Port { name: "Malacca", col: 55, row: 18, econ: 6, specialty: 0 },
-    Port { name: "Marseille", col: 37, row: 10, econ: 0, specialty: -1 },
+    Port { name: "Istanbul", col: 41, row: 9, econ: 0, specialty: 24 },
+    Port { name: "Jamaica", col: 20, row: 14, econ: 2, specialty: -1 },
+    Port { name: "Java", col: 57, row: 19, econ: 6, specialty: 0 },
+    Port { name: "Kailua", col: 4, row: 14, econ: -1, specialty: -1 },
+    Port { name: "Leveque", col: 60, row: 21, econ: -1, specialty: -1 },
+    Port { name: "Lisbon", col: 34, row: 10, econ: 0, specialty: 7 },
+    Port { name: "London", col: 35, row: 7, econ: 1, specialty: 18 },
+    Port { name: "Luanda", col: 38, row: 19, econ: -1, specialty: -1 },
+    Port { name: "Macao", col: 58, row: 13, econ: 7, specialty: -1 },
+    Port { name: "Madang", col: 65, row: 19, econ: -1, specialty: -1 },
+    Port { name: "Majorca", col: 36, row: 10, econ: 0, specialty: 9 },
+    Port { name: "Malacca", col: 56, row: 17, econ: 6, specialty: 0 },
+    Port { name: "Marseille", col: 36, row: 9, econ: 0, specialty: -1 },
     Port { name: "Mecca", col: 43, row: 13, econ: 5, specialty: 24 },
-    Port { name: "Mombasa", col: 44, row: 20, econ: 4, specialty: 14 },
+    Port { name: "Mombasa", col: 43, row: 18, econ: 4, specialty: 14 },
     Port { name: "Mozambique", col: 44, row: 21, econ: 4, specialty: 10 },
-    Port { name: "Muscat", col: 47, row: 14, econ: 5, specialty: -1 },
-    Port { name: "Nagasaki", col: 61, row: 12, econ: 7, specialty: 11 },
-    Port { name: "Naples", col: 39, row: 10, econ: 0, specialty: 18 },
-    Port { name: "Nova Granada", col: 19, row: 18, econ: -1, specialty: -1 },
-    Port { name: "Oslo", col: 37, row: 4, econ: 1, specialty: 22 },
-    Port { name: "Panama", col: 19, row: 17, econ: 2, specialty: -1 },
-    Port { name: "Pernambuco", col: 28, row: 22, econ: 2, specialty: -1 },
+    Port { name: "Muscat", col: 47, row: 13, econ: 5, specialty: -1 },
+    Port { name: "Nagasaki", col: 61, row: 11, econ: 7, specialty: 11 },
+    Port { name: "Naples", col: 38, row: 10, econ: 0, specialty: 18 },
+    Port { name: "Nova Granada", col: 20, row: 15, econ: -1, specialty: -1 },
+    Port { name: "Oslo", col: 38, row: 6, econ: 1, specialty: 22 },
+    Port { name: "Panama", col: 20, row: 16, econ: 2, specialty: -1 },
+    Port { name: "Pernambuco", col: 29, row: 19, econ: 2, specialty: -1 },
     Port { name: "Pisa", col: 38, row: 9, econ: 0, specialty: 24 },
-    Port { name: "Rio de Janeiro", col: 24, row: 31, econ: -1, specialty: -1 },
-    Port { name: "Rio Grande", col: 27, row: 26, econ: -1, specialty: -1 },
+    Port { name: "Rio de Janeiro", col: 27, row: 22, econ: -1, specialty: -1 },
+    Port { name: "Rio Grande", col: 25, row: 24, econ: -1, specialty: -1 },
     Port { name: "Ruwen", col: 43, row: 19, econ: -1, specialty: -1 },
-    Port { name: "San Jorge", col: 36, row: 18, econ: 3, specialty: 14 },
-    Port { name: "Santo Domingo", col: 21, row: 16, econ: 2, specialty: 13 },
-    Port { name: "Seville", col: 34, row: 10, econ: 0, specialty: -1 },
+    Port { name: "San Jorge", col: 35, row: 16, econ: 3, specialty: 14 },
+    Port { name: "Santo Domingo", col: 22, row: 14, econ: 2, specialty: 13 },
+    Port { name: "Seville", col: 34, row: 11, econ: 0, specialty: -1 },
     Port { name: "Siber", col: 50, row: 4, econ: -1, specialty: -1 },
-    Port { name: "Sofala", col: 44, row: 23, econ: 4, specialty: 10 },
-    Port { name: "Sumatra", col: 55, row: 21, econ: 6, specialty: 0 },
-    Port { name: "Tanisk", col: 66, row: 5, econ: -1, specialty: -1 },
-    Port { name: "Ternate", col: 60, row: 22, econ: 6, specialty: 4 },
-    Port { name: "Trebizond", col: 42, row: 9, econ: 0, specialty: 16 },
-    Port { name: "Tunis", col: 37, row: 11, econ: 0, specialty: -1 },
+    Port { name: "Sofala", col: 42, row: 22, econ: 4, specialty: 10 },
+    Port { name: "Sumatra", col: 55, row: 16, econ: 6, specialty: 0 },
+    Port { name: "Tanisk", col: 65, row: 6, econ: -1, specialty: -1 },
+    Port { name: "Ternate", col: 61, row: 17, econ: 6, specialty: 4 },
+    Port { name: "Trebizond", col: 43, row: 9, econ: 0, specialty: 16 },
+    Port { name: "Tunis", col: 38, row: 11, econ: 0, specialty: -1 },
     Port { name: "Valencia", col: 35, row: 10, econ: 0, specialty: 18 },
     Port { name: "Venice", col: 38, row: 8, econ: 0, specialty: 23 },
-    Port { name: "Veracruz", col: 16, row: 15, econ: 2, specialty: -1 },
-    Port { name: "Verde", col: 32, row: 16, econ: -1, specialty: -1 },
-    Port { name: "Virginia", col: 21, row: 9, econ: -1, specialty: -1 },
+    Port { name: "Veracruz", col: 16, row: 13, econ: 2, specialty: -1 },
+    Port { name: "Verde", col: 31, row: 15, econ: -1, specialty: -1 },
+    Port { name: "Virginia", col: 20, row: 10, econ: -1, specialty: -1 },
     Port { name: "Zeiton", col: 59, row: 13, econ: 7, specialty: 17 },
 ];
 
@@ -232,8 +232,8 @@ pub const SELL: [[i16; 8]; 26] = [
     [320, 340, 115, 140, 120, -1, 75, 50], // Carpet
 ];
 
-/// Landmasses rasterised into LAND, for the record: 25.
-pub const LANDMASSES: [&str; 25] = [
+/// Landmasses rasterised into LAND, for the record: 28.
+pub const LANDMASSES: [&str; 28] = [
     "Africa",
     "Eurasia",
     "Britain",
@@ -259,4 +259,7 @@ pub const LANDMASSES: [&str; 25] = [
     "-Red_Sea",
     "-Persian_Gulf",
     "-Sea_of_Okhotsk",
+    "Mariana_Islands",
+    "Hawaii",
+    "Cape_Verde",
 ];
