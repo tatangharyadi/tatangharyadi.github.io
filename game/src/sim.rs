@@ -256,6 +256,22 @@ struct Merchant {
     stuck: i32,
 }
 
+/// A sum in gold, grouped in threes, the way the page prints it.
+fn coin(n: i32) -> String {
+    let digits = n.unsigned_abs().to_string();
+    let mut out = String::with_capacity(digits.len() + digits.len() / 3 + 1);
+    if n < 0 {
+        out.push('-');
+    }
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i) % 3 == 0 {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
+}
+
 /// What a yard is asking for one class, and why you may not have her.
 ///
 /// Every class the port could ever build is listed, priced and reasoned about,
@@ -1439,6 +1455,10 @@ impl Game {
     }
 
     // -- the shipyard ------------------------------------------------------
+    //
+    // Sums here are grouped in threes, because the page prints the same sums
+    // beside them through `toLocaleString` and a bare `33400` next to a
+    // `33,400` reads as a different number.
 
     /// Everything on offer at this port, largest last.
     ///
@@ -1462,10 +1482,11 @@ impl Game {
                 } else if spec.needs_invested > invested {
                     Some(format!(
                         "The yard builds these to order for its own partners. {} invested here, of {}.",
-                        invested, spec.needs_invested
+                        coin(invested),
+                        coin(spec.needs_invested)
                     ))
                 } else if self.gold < price {
-                    Some(format!("{price} gold, and you have {}.", self.gold))
+                    Some(format!("{} gold, and you have {}.", coin(price), coin(self.gold)))
                 } else if self.ship.cargo() > Ship::capacity_of(class) {
                     Some(format!(
                         "She holds {} and you have {} aboard. Sell down first.",
@@ -1720,6 +1741,16 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sums_are_grouped_the_way_the_page_groups_them() {
+        assert_eq!(coin(0), "0");
+        assert_eq!(coin(999), "999");
+        assert_eq!(coin(1_000), "1,000");
+        assert_eq!(coin(33_400), "33,400");
+        assert_eq!(coin(1_234_567), "1,234,567");
+        assert_eq!(coin(-2_500), "-2,500");
+    }
 
     fn port_named(name: &str) -> usize {
         PORTS.iter().position(|p| p.name == name).expect(name)

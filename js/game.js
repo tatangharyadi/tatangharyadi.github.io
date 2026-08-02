@@ -446,7 +446,7 @@ function drawShipyard(s, body) {
   body.appendChild(list);
   if (s.yard[0] && s.yard[0].tradeIn > 0) {
     body.appendChild(el("p", "dim",
-      `Prices are after ${s.yard[0].tradeIn.toLocaleString("en")} allowed against your ${s.shipName}.`));
+      `Prices are after ${s.yard[0].tradeIn.toLocaleString("en")} gold allowed against your ${s.shipName}.`));
   }
 }
 
