@@ -33,7 +33,7 @@
    * a separate grey-blue for the deeps read as a third kind of thing rather than
    * as more of the same water. */
   --sea-shallow: #89b4fa;
-  --shore: #a6e3a1;
+  --land: #11111b;
   --harbour: #f9e2af;
   --ship: #f5e0dc;
   --raider: #f38ba8;
@@ -504,18 +504,29 @@ input[type="number"] {
  *
  * That only reads if remembered is unmistakably *drawn*, so the dim state has a
  * contrast floor rather than a pleasing opacity. The floor is 3:1, the figure for
- * a graphical mark, and the binding case is the raider on land: dim glyph over
- * dim tile compresses toward the background from both sides at once and measures
- * 3.13:1, which is what set the fill alphas below rather than any preference
- * about how blue the sea should look. Lit, the same pair is 4.50:1.
+ * a graphical mark, and the binding case is a raider on the brightest tile: dim
+ * glyph over dim tile compresses toward the background from both sides at once.
+ * That case is what set the fill alphas below, rather than any preference about
+ * how blue the sea should look.
+ *
+ * Every figure in this file was measured by rasterising these rules -- fill
+ * alpha, element opacity and the saturate() filter together -- into a canvas and
+ * reading the composited pixels back, not by compositing on paper. Doing it on
+ * paper got the background wrong once already: the chart sits on --bg, not on
+ * --bg-chrome, and the darker assumption flattered every tile by roughly a
+ * factor of two and hid a real failure at 2.79:1.
  *
  * What the tiles are NOT is the terrain cue. No two Catppuccin accents are more
  * than 1.83:1 apart -- the palette is near-iso-luminant by construction -- so a
  * land fill and a water fill cannot clear 3:1 against each other and no choice of
- * hues would fix it. The tiles are therefore a redundant second channel, in the
- * same sense as the saturate() below: terrain keeps its glyph (~ shallow, = deep,
- * # land) and a click reports it in words. The one hex where a mark hides the
- * terrain glyph is the reason write_look() reports depth as text. */
+ * hues would fix it. Measured at the alphas below, land against the shallows is
+ * 1.08:1 and the shallows against the deeps 1.22:1; sweeping the land alpha from
+ * 0.10 to 0.24 never got land past 1.26:1 of the shallows, because it crosses them
+ * in luminance around 0.19 rather than staying clear of them. The tiles
+ * are therefore a redundant second channel, in the same sense as the saturate()
+ * below: terrain keeps its glyph (~ shallow, = deep, # land) and a click reports
+ * it in words. The one hex where a mark hides the terrain glyph is the reason
+ * write_look() reports depth as text. */
 .tile,
 .glyph {
   user-select: none;
@@ -563,28 +574,52 @@ input[type="number"] {
 
 /* Terrain, as an area.
  *
- * One hue for water at two strengths and one for land, rather than three separate
- * hues, because depth is a quantity and drawing it as a quantity of the same blue
- * is what makes the shelf legible at a glance. The alphas are low because the
- * glyphs have to stay readable on top of them: composited over the page
- * background these land at relative luminance 0.028, 0.014 and 0.036, which is
- * where the 3.13:1 worst case above comes from. Raising land to 0.30 buys a
- * better coastline and costs the raider his floor. */
-.tile.terrain-0 { fill: var(--sea-shallow); fill-opacity: 0.22; }
-.tile.terrain-1 { fill: var(--sea-shallow); fill-opacity: 0.11; }
-.tile.terrain-2 { fill: var(--shore); fill-opacity: 0.24; }
-
-/* Terrain texture, in one neutral ink.
+ * Water is one hue at two strengths, because depth is a quantity and drawing it as
+ * a quantity of the same blue is what makes the shelf legible at a glance.
  *
- * Not the terrain's own hue: the tile underneath is already that hue, and a green
- * # on a green tile measures about 1:1. Draining these to one ink also buys the
- * thing the chart most needed, which is that colour in a glyph now means
- * something is *there*. --text-muted measures 4.68:1 lit and 3.41:1 dim over the
- * worst tile. */
+ * Land is drawn dark rather than green, and that one decision is what makes the
+ * rest of this file affordable. Every mark on the chart is a light colour, so the
+ * tile a mark stands on wants to be dark, and green is bright: a green shore at
+ * 0.24 drew a handsome coastline and put a remembered raider standing on it at
+ * 2.79:1, under the floor. Dimming the green to 0.13 bought the raider 3.18:1 and
+ * cost the coastline, which was then so faint it barely reported the terrain it
+ * existed to report. Tinting toward crust instead inverts the tradeoff: at 0.6 the
+ * raider measures 3.72:1, better than the faint green ever managed, while land
+ * reads as solid mass against luminous water. Land against the shallows goes from
+ * 1.08:1 to 1.59:1 in the bargain.
+ *
+ * The water alphas are still set by what stands on them, and the shallows are now
+ * the binding tile: a remembered raider over shallow water is the worst case
+ * anywhere on the chart, at 3.11:1. That is why 0.19 and not more, and it is why
+ * depth is the faintest distinction here. Of the two channels the fill is the one
+ * that can afford to give way, because a fill one step too faint still only
+ * reinforces what the glyph already said, whereas a mark under its floor is a ship
+ * you cannot see. */
+.tile.terrain-0 { fill: var(--sea-shallow); fill-opacity: 0.19; }
+.tile.terrain-1 { fill: var(--sea-shallow); fill-opacity: 0.10; }
+.tile.terrain-2 { fill: var(--land); fill-opacity: 0.6; }
+
+/* Terrain texture: one neutral ink, drawn small.
+ *
+ * Not the terrain's own hue, because the tile underneath is already that hue and a
+ * green # on a green tile measures about 1:1. One ink also buys the thing the
+ * chart most needed, which is that colour in a glyph now means something is
+ * *there*.
+ *
+ * These are meant to recede so the traffic stands out, and the honest way to do
+ * that is size rather than a fainter ink. Ink is floor-bound: --text-muted is the
+ * quietest Catppuccin value that still clears 3:1 over all three tiles, at 3.40:1
+ * dim and 5.05:1 lit, and the next step down the ramp -- overlay2 -- measures
+ * 2.84:1 dim on the shallows and stops being a cue at all. Since the fills are
+ * near-iso-luminant, this glyph is the only thing telling land from water without
+ * colour vision, so it cannot be the channel that gives way. Size is not
+ * floor-bound in the same way: 10px against the marks' 15px reads as texture under
+ * traffic while every contrast figure above holds exactly. */
 .glyph.mark-0,
 .glyph.mark-1,
 .glyph.mark-2 {
   fill: var(--text-muted);
+  font-size: 10px;
 }
 
 .glyph.mark-3 { fill: var(--harbour); }
