@@ -108,6 +108,12 @@ pub extern "C" fn set_course(port: i32) -> i32 {
     game().set_course(port as usize) as i32
 }
 
+/// Lay a course to an arbitrary charted hex, in odd-r offset coordinates.
+#[no_mangle]
+pub extern "C" fn set_course_hex(col: i32, row: i32) -> i32 {
+    game().set_course_hex(col, row) as i32
+}
+
 #[no_mangle]
 pub extern "C" fn under_way() -> i32 {
     game().under_way() as i32

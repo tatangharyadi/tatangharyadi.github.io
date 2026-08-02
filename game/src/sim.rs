@@ -23,6 +23,18 @@ pub const CODE_PIRATE: u8 = 5;
 const PIRATE_COUNT: usize = 24;
 /// How close a pirate has to be before it stops wandering and starts hunting.
 const HUNT_RANGE: i32 = 5;
+/// Hexes from land still counted as the coastal shelf, where raiders will not
+/// give chase. Beyond it is the offing, and the offing is theirs.
+const SHELF: i32 = 2;
+/// How near a port has to be before it goes on the chart.
+///
+/// Deliberately shorter than the fog-of-war horizon, and they are not the same
+/// question. A hex is five degrees, so a lookout who can make out water four
+/// hexes off can see roughly from Lisbon to Naples, and letting that count as
+/// charting meant eight harbours went on the chart before the ship had left
+/// the quay, one line after the log said the chart was blank. Seeing that
+/// there is sea over there is not the same as knowing whose harbour it is.
+const CHART_RANGE: i32 = 2;
 const HOURS_PER_DAY: f32 = 24.0;
 const DAYS_PER_MONTH: i32 = 30;
 const START_GOLD: i32 = 3_000;
@@ -176,7 +188,12 @@ impl Game {
             }
             let h = hex::from_offset(p.col as i32, p.row as i32);
             if let Some(idx) = hex::index(h) {
-                if self.fog[idx] == VISIBLE {
+                // Both conditions, not either. The fog test is what stops a
+                // port being charted through a headland; the range test is what
+                // stops the whole western Mediterranean being charted at once.
+                if self.fog[idx] == VISIBLE
+                    && hex::wrapped_distance(self.at, h) <= CHART_RANGE
+                {
                     found.push(i);
                 }
             }
@@ -296,6 +313,41 @@ impl Game {
             return false;
         }
         let goal = hex::from_offset(PORTS[port].col as i32, PORTS[port].row as i32);
+        self.lay_course(goal, PORTS[port].name)
+    }
+
+    /// Lay a course to any charted hex, which is what clicking the map does.
+    ///
+    /// A course to open water is worth having and not only a convenience: the
+    /// whole point of better rigging is the offing it opens up, and a reader
+    /// who can only ever aim at a harbour never sees that. The one thing this
+    /// will not do is aim at somewhere never seen, for the same reason
+    /// `set_course` will not: a master cannot plot a route through water he has
+    /// no chart of.
+    pub fn set_course_hex(&mut self, col: i32, row: i32) -> bool {
+        if self.lost {
+            return false;
+        }
+        let goal = hex::from_offset(col, row);
+        let Some(idx) = hex::index(goal) else {
+            return false;
+        };
+        if self.fog[idx] == UNSEEN {
+            self.say("You cannot lay a course through water you have never seen.".into());
+            return false;
+        }
+        if nav::is_land_index(idx) {
+            self.say("That is dry land.".into());
+            return false;
+        }
+        if goal == self.at {
+            self.say("You are already there.".into());
+            return false;
+        }
+        self.lay_course(goal, "the open sea")
+    }
+
+    fn lay_course(&mut self, goal: hex::Hex, what: &str) -> bool {
         // Hoisted, because the pathfinder's scratch is borrowed mutably for the
         // length of the call and `self.ship.base_hours()` is a borrow of self.
         let (from, month) = (self.at, self.month);
@@ -316,16 +368,11 @@ impl Game {
         );
         if path.is_empty() {
             self.say(format!(
-                "There is no route to {} that the rigging will stand. Better rigging, or a nearer port.",
-                PORTS[port].name
+                "There is no route to {what} that the rigging will stand. Better rigging, or a nearer mark."
             ));
             return false;
         }
-        self.say(format!(
-            "Course laid for {}: {} hexes.",
-            PORTS[port].name,
-            path.len()
-        ));
+        self.say(format!("Course laid for {what}: {} hexes.", path.len()));
         self.course = path;
         self.course.reverse();
         true
@@ -422,7 +469,21 @@ impl Game {
                 self.pirates[idx].hours -= step_hours;
 
                 let here = self.pirates[idx].at;
-                let sees = hex::wrapped_distance(here, player) <= HUNT_RANGE;
+                // Close enough to see, and far enough out to dare. Raiders work
+                // the open sea, not the harbour approaches, so a ship on the
+                // coastal shelf is left alone.
+                //
+                // This is a balance fix with a real measurement behind it. When
+                // hunting ignored the shelf, a run of twelve hexes out of Lisbon
+                // drew two boardings, and an unarmed trader loses a third of her
+                // gold each time. Compounded over an ordinary voyage that is
+                // three thousand gold down to single figures: not a hard game, an
+                // arithmetically unplayable one. Tying the danger to the offing
+                // instead gives a safe coastal trade to start from and makes the
+                // blue-water rigging worth buying for what it earns, not just for
+                // where it lets you go.
+                let sees = hex::wrapped_distance(here, player) <= HUNT_RANGE
+                    && self.offshore() > SHELF;
                 self.pirates[idx].hunting = sees;
 
                 let dir = if sees {
@@ -773,6 +834,64 @@ mod tests {
         assert!(lit > 1, "the ship is blind in harbour");
         let dark = g.fog.iter().filter(|v| **v == UNSEEN).count();
         assert!(dark > CELLS / 2, "the chart starts too full");
+    }
+
+    /// The opening used to chart eight harbours from the quayside at Lisbon,
+    /// one line after the log announced that the chart was blank, because port
+    /// discovery rode on the fog horizon and a hex is five degrees across.
+    #[test]
+    fn a_new_game_charts_only_its_own_neighbourhood() {
+        for seed in 1..40u32 {
+            let g = Game::new(seed);
+            // The real invariant is the distance one below. This cap is only a
+            // tripwire, and it is not 1 or 2 because western Europe genuinely
+            // is that crowded at five degrees to the hex: five harbours lie
+            // within two hexes of Lisbon, and a master sailing out of Lisbon
+            // would know all five. The bug was charting Naples, not Seville.
+            let charted = g.discovered.iter().filter(|d| **d).count();
+            assert!(
+                charted <= 8,
+                "seed {seed} charted {charted} ports before the ship had moved"
+            );
+            for (i, p) in PORTS.iter().enumerate() {
+                if !g.discovered[i] {
+                    continue;
+                }
+                let h = hex::from_offset(p.col as i32, p.row as i32);
+                assert!(
+                    hex::wrapped_distance(g.at, h) <= CHART_RANGE,
+                    "{} was charted from {} hexes away",
+                    p.name,
+                    hex::wrapped_distance(g.at, h)
+                );
+            }
+        }
+    }
+
+    /// Raiders keep off the coastal shelf. Without this an unarmed trader loses
+    /// a third of her gold per boarding often enough that three thousand gold
+    /// compounds down to single figures over an ordinary voyage.
+    #[test]
+    fn pirates_do_not_hunt_a_ship_on_the_shelf() {
+        let mut g = Game::new(7);
+        assert!(
+            g.offshore() <= SHELF,
+            "a port should sit on the shelf, not in the offing"
+        );
+        g.pirates.clear();
+        // Well inside HUNT_RANGE, and given plenty of time to close.
+        g.pirates.push(Pirate {
+            at: hex::normalise(hex::neighbour(g.at, 0)),
+            strength: 10,
+            hours: 0.0,
+            hunting: true,
+        });
+        let gold_before = g.gold;
+        for _ in 0..40 {
+            g.move_pirates(24.0);
+        }
+        assert!(!g.pirates[0].hunting, "a raider gave chase inshore");
+        assert_eq!(gold_before, g.gold, "an inshore ship was robbed");
     }
 
     /// Two pirates on one hex used to be an out-of-bounds index, because a won

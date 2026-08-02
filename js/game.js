@@ -390,6 +390,17 @@ function drawThere() {
   }
   body.appendChild(el("p", "dim",
     `${t.distance} hexes off. ${t.seen === 2 ? "In sight." : "From memory; you are not looking at it now."}`));
+
+  // Clicking the chart is "look there"; this is the "sail there" that the look
+  // is usually a prelude to. It is a button rather than a second click on the
+  // map because a course is a commitment and a stray click is not, and because
+  // a reader who never touches the map still gets the same power from the port
+  // list beneath. Offered for land and for the hex underfoot too, and refused
+  // in the log with the reason, since nothing here is ever greyed out.
+  const sail = el("button", null, "sail there");
+  sail.id = "there--sail";
+  sail.addEventListener("click", () => order(() => wasm.set_course_hex(t.col, t.row)));
+  body.appendChild(sail);
 }
 
 function lookAt(col, row) {
