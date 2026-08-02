@@ -11,7 +11,7 @@ use crate::market::Markets;
 use crate::nav::{self, CELLS, REMEMBERED, UNSEEN, VISIBLE};
 use crate::reputation;
 use crate::rng::Rng;
-use crate::ship::{Ship, Upgrade};
+use crate::ship::{guns_at, Class, Ship, Upgrade, CLASSES};
 use crate::world::{GOODS, PORTS};
 
 pub const CODE_SHALLOW: u8 = 0;
@@ -77,7 +77,67 @@ const NAVY_NAMES: [&str; 8] = [
 /// approaches precisely because that is where you were going to hide.
 const NAVY_HUNT_RANGE: i32 = 8;
 /// Guns a king's ship carries. Heavier than any raider afloat.
-const NAVY_STRENGTH: (i32, i32) = (34, 64);
+/// Who sails what.
+///
+/// Three fleets, three shapes, and the shape is the point: you can read the
+/// threat off the hull before anyone fires. Weights are relative, not percents.
+///
+/// **Raiders** run small to medium. A pirate wants a ship that overhauls a
+/// trader and outruns a king's ship, which is a Redonda or a Carrack, not a
+/// first-rate. A galleon under the black flag exists and is meant to be the
+/// worst thing you meet all game, at two chances in a hundred.
+///
+/// **Traders** carry the least armament that will discourage an opportunist,
+/// because every gun is a ton of cargo they are not paid for. Most of them have
+/// none at all.
+///
+/// **The crown** builds nothing small. Its business is standing up to raiders
+/// and to you, so it starts where the pirates leave off.
+const PIRATE_FLEET: [(Class, u32); 6] = [
+    (Class::Balsa, 10),
+    (Class::Latina, 20),
+    (Class::Redonda, 28),
+    (Class::Carrack, 30),
+    (Class::Galleon, 10),
+    (Class::HeavyGalleon, 2),
+];
+
+const MERCHANT_FLEET: [(Class, u32); 4] = [
+    (Class::Balsa, 15),
+    (Class::Latina, 30),
+    (Class::Redonda, 25),
+    (Class::Carrack, 30),
+];
+
+const NAVY_FLEET: [(Class, u32); 3] = [
+    (Class::Carrack, 30),
+    (Class::Galleon, 50),
+    (Class::HeavyGalleon, 20),
+];
+
+/// Draw a hull from a fleet table.
+fn pick_class(rng: &mut Rng, fleet: &[(Class, u32)]) -> Class {
+    let total: u32 = fleet.iter().map(|(_, w)| w).sum();
+    let mut roll = rng.below(total);
+    for &(class, w) in fleet {
+        if roll < w {
+            return class;
+        }
+        roll -= w;
+    }
+    fleet[fleet.len() - 1].0
+}
+
+/// How many guns a hunter of this class runs out.
+///
+/// Fully gunned, because a raider or a king's ship has no cargo to protect and
+/// no reason to leave a port empty. The spread is the crew: the same hull is
+/// worth more or less depending on who is aboard.
+fn hunter_guns(rng: &mut Rng, class: Class) -> i32 {
+    let full = guns_at(class.spec().gun_max);
+    let spread = (full / 4).max(1);
+    (full - spread + rng.range(0, 2 * spread + 1)).max(2)
+}
 /// How far off they come over the horizon when they are sent for.
 const NAVY_ARRIVES_AT: i32 = 12;
 
@@ -114,7 +174,12 @@ const CHRONICLE_KEEP: usize = 64;
 /// shorter than the dance required to borrow around that.
 fn relade(rng: &mut Rng, m: &mut Merchant, ports: &[usize]) {
     m.cargo = rng.below(GOODS.len() as u32) as usize;
-    m.units = rng.range(MERCHANT_UNITS.0, MERCHANT_UNITS.1);
+    // Bounded by the hull, so a Balsa is never found carrying a galleon's
+    // freight. This is most of what a trader's class does: it decides whether
+    // she is worth firing on.
+    m.units = rng
+        .range(MERCHANT_UNITS.0, MERCHANT_UNITS.1)
+        .min(Ship::capacity_of(m.class));
     m.gold = rng.range(200, 2_400);
     m.stuck = 0;
     for _ in 0..8 {
@@ -138,6 +203,9 @@ fn starting_port() -> usize {
 
 struct Pirate {
     at: Hex,
+    /// The hull she is in, which is what the log names when you meet her and
+    /// what her guns were drawn from.
+    class: Class,
     strength: i32,
     /// Hours of sailing banked; pirates move on the same clock the player does
     /// rather than once per player move, so a fast ship really does outrun
@@ -176,6 +244,9 @@ struct Pirate {
 /// generally is.
 struct Merchant {
     at: Hex,
+    /// Her hull. A trader's class decides how much she carries and how little
+    /// she can do about you, and nothing else.
+    class: Class,
     /// The port she is making for.
     bound: usize,
     cargo: usize,
@@ -183,6 +254,22 @@ struct Merchant {
     gold: i32,
     hours: f32,
     stuck: i32,
+}
+
+/// What a yard is asking for one class, and why you may not have her.
+///
+/// Every class the port could ever build is listed, priced and reasoned about,
+/// including the ones you cannot buy today. This is the same shown-but-locked
+/// bargain the goods table makes: a price you cannot meet is a goal, and a
+/// class that is simply absent is indistinguishable from one that never existed.
+pub struct Offer {
+    pub class: Class,
+    /// Gold to hand over after the allowance for your present ship.
+    pub price: i32,
+    /// The allowance itself, so the yard can show its working.
+    pub trade_in: i32,
+    /// Why she cannot be bought, or `None` if she can.
+    pub locked: Option<String>,
 }
 
 pub struct Game {
@@ -607,9 +694,12 @@ impl Game {
             if hex::wrapped_distance(h, self.at) < 8 {
                 continue;
             }
+            let class = pick_class(&mut self.rng, &PIRATE_FLEET);
+            let strength = hunter_guns(&mut self.rng, class);
             self.pirates.push(Pirate {
                 at: h,
-                strength: self.rng.range(8, 40),
+                class,
+                strength,
                 hours: 0.0,
                 hunting: false,
                 name: PIRATE_NAMES[placed % PIRATE_NAMES.len()],
@@ -683,9 +773,12 @@ impl Game {
         while out < wanted {
             let Some(at) = self.navy_station() else { break };
             let name = NAVY_NAMES[(self.rng.below(NAVY_NAMES.len() as u32)) as usize];
+            let class = pick_class(&mut self.rng, &NAVY_FLEET);
+            let strength = hunter_guns(&mut self.rng, class);
             self.pirates.push(Pirate {
                 at,
-                strength: self.rng.range(NAVY_STRENGTH.0, NAVY_STRENGTH.1),
+                class,
+                strength,
                 hours: 0.0,
                 hunting: false,
                 name,
@@ -845,10 +938,11 @@ impl Game {
     fn arrest(&mut self, idx: usize, strength: i32) {
         let guns = self.ship.gun_count();
         let name = self.pirates[idx].name;
+        let hull = self.pirates[idx].class.name();
         self.pirates[idx].met = true;
         self.say(format!(
-            "{name} runs up the king's colours and fires a gun to windward. \
-             {strength} guns, and they are hailing you to bring to."
+            "{name}, a {hull}, runs up the king's colours and fires a gun to \
+             windward. {strength} guns, and they are hailing you to bring to."
         ));
 
         if guns == 0 || self.rng.range(0, guns + strength) >= guns {
@@ -927,13 +1021,14 @@ impl Game {
         // Recognition. The second meeting reads differently from the first, and
         // this one line is most of what makes the memory above land as memory
         // rather than as a pathfinding change nobody can see.
+        let hull = self.pirates[idx].class.name();
         if self.pirates[idx].met {
             self.say(format!(
-                "{name} again. You know that rig. {strength} guns against yours."
+                "{name} again. You know that {hull}. {strength} guns against yours."
             ));
         } else {
             self.say(format!(
-                "A sail closes fast and runs up no colours. {strength} guns against yours."
+                "A {hull} closes fast and runs up no colours. {strength} guns against yours."
             ));
         }
         self.pirates[idx].met = true;
@@ -1051,8 +1146,10 @@ impl Game {
         for _ in 0..MERCHANT_COUNT {
             let from = ports[self.rng.below(ports.len() as u32) as usize];
             let at = hex::from_offset(PORTS[from].col as i32, PORTS[from].row as i32);
+            let class = pick_class(&mut self.rng, &MERCHANT_FLEET);
             let mut m = Merchant {
                 at,
+                class,
                 bound: from,
                 cargo: 0,
                 units: 0,
@@ -1154,8 +1251,10 @@ impl Game {
         let cargo = self.merchants[idx].cargo;
         let purse = self.merchants[idx].gold;
         self.say(format!(
-            "You run out the guns at a trader flying no flag but her own, and she is carrying {} {}.",
-            units, GOODS[cargo]
+            "You run out the guns at a {}, flying no flag but her own, and she is carrying {} {}.",
+            self.merchants[idx].class.name(),
+            units,
+            GOODS[cargo]
         ));
         self.credit(reputation::RAID_MERCHANT);
         // Word goes out on the offence, not on the outcome, and it goes out now
@@ -1164,9 +1263,11 @@ impl Game {
         // at it is a detail for the court.
         self.enforce();
 
-        // A merchant is not defenceless, only badly armed. Enough that a bare
-        // six-gun trader turning raider is a gamble rather than a wage.
-        let escort = 6 + units / 6;
+        // A merchant is not defenceless, only badly armed: she fights the guns
+        // her class was launched with and never buys more, because every gun is
+        // a ton of cargo she is not paid for. The rest is the crew defending
+        // their own freight, which is why a full hold fights harder.
+        let escort = guns_at(self.merchants[idx].class.spec().gun_start) + 4 + units / 8;
         let roll = self.rng.range(0, guns + escort);
         if roll >= guns {
             self.say("She fights her guns better than you expected and hauls off.".into());
@@ -1334,6 +1435,110 @@ impl Game {
             )),
             None => self.say(format!("Invested {cost} in {}.", PORTS[port].name)),
         }
+        true
+    }
+
+    // -- the shipyard ------------------------------------------------------
+
+    /// Everything on offer at this port, largest last.
+    ///
+    /// Empty at a port with no yard, which is most of them, and that emptiness
+    /// is what the page reads to decide whether to draw a shipyard at all.
+    pub fn yard(&self, port: usize) -> Vec<Offer> {
+        if !PORTS[port].capital {
+            return Vec::new();
+        }
+        let econ = PORTS[port].econ;
+        let invested = self.markets.invested_of(port);
+        let allowance = self.ship.trade_in();
+        CLASSES
+            .iter()
+            .filter(|c| c.built_in(econ))
+            .map(|&class| {
+                let spec = class.spec();
+                let price = (spec.price - allowance).max(0);
+                let locked = if class == self.ship.class {
+                    Some("You are in one.".into())
+                } else if spec.needs_invested > invested {
+                    Some(format!(
+                        "The yard builds these to order for its own partners. {} invested here, of {}.",
+                        invested, spec.needs_invested
+                    ))
+                } else if self.gold < price {
+                    Some(format!("{price} gold, and you have {}.", self.gold))
+                } else if self.ship.cargo() > Ship::capacity_of(class) {
+                    Some(format!(
+                        "She holds {} and you have {} aboard. Sell down first.",
+                        Ship::capacity_of(class),
+                        self.ship.cargo()
+                    ))
+                } else {
+                    None
+                };
+                Offer { class, price, trade_in: allowance, locked }
+            })
+            .collect()
+    }
+
+    /// Trade the ship you are in for one of `which`.
+    ///
+    /// The hold does not come with you. A new hull is a new hold, so anything
+    /// aboard has to fit the ship you are buying, and the yard refuses rather
+    /// than quietly tipping your cargo onto the quay. That mirrors `fit()`
+    /// refusing to cut gunports through a full hold, and for the same reason:
+    /// the game never destroys goods the player paid for without being asked.
+    pub fn buy_ship(&mut self, which: i32) -> bool {
+        let Some(port) = self.port_here() else {
+            self.say("There is no shipyard in open water.".into());
+            return false;
+        };
+        let Some(class) = Class::from_index(which) else {
+            return false;
+        };
+        if !PORTS[port].capital {
+            self.say(format!(
+                "{} has no shipyard. Only a capital builds ships.",
+                PORTS[port].name
+            ));
+            return false;
+        }
+        let Some(offer) = self.yard(port).into_iter().find(|o| o.class == class) else {
+            self.say(format!(
+                "No yard in {} builds a {}.",
+                crate::world::ECONOMIES[PORTS[port].econ.max(0) as usize],
+                class.name()
+            ));
+            return false;
+        };
+        if let Some(why) = offer.locked {
+            self.say(why);
+            return false;
+        }
+
+        // Carry the cargo across by hand. The hold vectors are per-ship and the
+        // new one starts empty, so this is the only thing that survives the
+        // sale besides the money.
+        let hold = core::mem::take(&mut self.ship.hold);
+        let paid = core::mem::take(&mut self.ship.paid);
+        self.gold -= offer.price;
+        self.ship = Ship::of_class(class, GOODS.len());
+        self.ship.hold = hold;
+        self.ship.paid = paid;
+
+        let spec = class.spec();
+        let water = if class.is_bluewater() {
+            "She will stand across an open ocean."
+        } else {
+            "She is a coasting ship; keep the land in sight."
+        };
+        self.say(format!(
+            "A {} out of {}, {}, {} guns, {} in the hold. {water}",
+            spec.name,
+            PORTS[port].name,
+            spec.rig,
+            self.ship.gun_count(),
+            self.ship.capacity(),
+        ));
         true
     }
 
@@ -1516,6 +1721,148 @@ impl Game {
 mod tests {
     use super::*;
 
+    fn port_named(name: &str) -> usize {
+        PORTS.iter().position(|p| p.name == name).expect(name)
+    }
+
+    #[test]
+    fn every_economy_has_a_capital_and_no_landfall_does() {
+        let mut seen = [false; 8];
+        for p in PORTS.iter() {
+            if p.capital {
+                assert!(p.econ >= 0, "{} is a capital but does not trade", p.name);
+                seen[p.econ as usize] = true;
+            }
+        }
+        for (i, ok) in seen.iter().enumerate() {
+            assert!(*ok, "{} has nowhere to buy a ship", crate::world::ECONOMIES[i]);
+        }
+    }
+
+    #[test]
+    fn only_a_capital_has_a_shipyard() {
+        let g = Game::new(3);
+        for (i, p) in PORTS.iter().enumerate() {
+            assert_eq!(
+                !g.yard(i).is_empty(),
+                p.capital,
+                "{} disagrees with its own capital flag",
+                p.name
+            );
+        }
+    }
+
+    /// The regional answer, asserted rather than described. Lisbon is a
+    /// Mediterranean yard and builds the lateen craft; London is a northern one
+    /// and does not. If the tables in `ship.rs` are ever flattened into one list
+    /// this is what notices.
+    #[test]
+    fn a_yard_sells_only_what_its_own_region_builds() {
+        let g = Game::new(3);
+        let names = |port: usize| -> Vec<&'static str> {
+            g.yard(port).iter().map(|o| o.class.name()).collect()
+        };
+        let lisbon = names(port_named("Lisbon"));
+        let london = names(port_named("London"));
+        assert!(lisbon.contains(&"Latina"), "the Mediterranean builds lateen craft");
+        assert!(!london.contains(&"Latina"), "the north does not");
+        assert!(london.contains(&"Galleon"), "the north builds ocean ships");
+        assert!(!lisbon.contains(&"Galleon"), "and Lisbon does not");
+        assert_ne!(lisbon, london, "two yards should not stock the same shelf");
+    }
+
+    #[test]
+    fn the_biggest_hulls_need_the_port_invested_in() {
+        let mut g = Game::new(3);
+        let london = port_named("London");
+        g.gold = 1_000_000;
+        let locked = |g: &Game| {
+            g.yard(london)
+                .into_iter()
+                .find(|o| o.class == Class::Galleon)
+                .expect("London builds galleons")
+                .locked
+        };
+        assert!(locked(&g).is_some(), "money alone should not buy a galleon");
+        while g.markets.invested_of(london) < Class::Galleon.spec().needs_invested {
+            let cost = g.markets.investment_cost(london).expect("more to invest in");
+            g.markets.invest(london, cost);
+        }
+        assert!(locked(&g).is_none(), "an invested partner should get her galleon");
+    }
+
+    #[test]
+    fn buying_a_ship_carries_the_cargo_across() {
+        let mut g = Game::new(3);
+        g.gold = 1_000_000;
+        g.ship.hold[0] = 20;
+        g.ship.paid[0] = 400;
+        let lisbon = port_named("Lisbon");
+        g.at = hex::from_offset(PORTS[lisbon].col as i32, PORTS[lisbon].row as i32);
+        assert!(g.buy_ship(Class::Latina.index() as i32));
+        assert_eq!(g.ship.class, Class::Latina);
+        assert_eq!(g.ship.hold[0], 20, "the cargo was left on the quay");
+        assert_eq!(g.ship.paid[0], 400, "what it cost was forgotten");
+    }
+
+    #[test]
+    fn the_yard_refuses_a_hull_too_small_for_the_hold() {
+        let mut g = Game::new(3);
+        g.gold = 1_000_000;
+        let lisbon = port_named("Lisbon");
+        g.at = hex::from_offset(PORTS[lisbon].col as i32, PORTS[lisbon].row as i32);
+        assert!(g.buy_ship(Class::Carrack.index() as i32));
+        g.ship.hold[0] = g.ship.capacity();
+        let before = g.gold;
+        assert!(!g.buy_ship(Class::Balsa.index() as i32), "should refuse the downgrade");
+        assert_eq!(g.ship.class, Class::Carrack);
+        assert_eq!(g.gold, before, "a refused sale should cost nothing");
+    }
+
+    #[test]
+    fn a_ship_cannot_be_bought_where_there_is_no_yard() {
+        let mut g = Game::new(3);
+        g.gold = 1_000_000;
+        let seville = port_named("Seville");
+        assert!(!PORTS[seville].capital);
+        g.at = hex::from_offset(PORTS[seville].col as i32, PORTS[seville].row as i32);
+        assert!(!g.buy_ship(Class::Latina.index() as i32));
+        assert_eq!(g.ship.class, Class::Balsa);
+    }
+
+    /// The player starts in the smallest hull there is, so the first shipyard
+    /// visit is a real decision. If that ever stops being true, the opening
+    /// purse and the price of a Latina both need looking at again.
+    #[test]
+    fn the_voyage_begins_in_a_boat_that_cannot_cross_an_ocean() {
+        let g = Game::new(1);
+        assert_eq!(g.ship.class, Class::Balsa);
+        assert!(!g.ship.class.is_bluewater());
+    }
+
+    /// Reachability, which is the one way this feature could quietly brick the
+    /// game: a blue-water hull the player can never legally arrive at.
+    #[test]
+    fn a_blue_water_yard_is_reachable_by_a_coasting_ship() {
+        let g = Game::new(1);
+        let coastal = crate::ship::Ship::of_class(Class::Carrack, GOODS.len()).bluewater_rating();
+        for (i, p) in PORTS.iter().enumerate() {
+            if !p.capital {
+                continue;
+            }
+            let sells_blue = g.yard(i).iter().any(|o| o.class.is_bluewater());
+            if !sells_blue {
+                continue;
+            }
+            assert!(
+                g.depth[hex::index(hex::from_offset(p.col as i32, p.row as i32)).unwrap()]
+                    <= coastal as u8,
+                "{} sells ocean ships but lies beyond a coasting ship's offing",
+                p.name
+            );
+        }
+    }
+
     #[test]
     fn a_new_game_starts_in_a_port_and_can_see_out_of_it() {
         let g = Game::new(1);
@@ -1594,6 +1941,7 @@ mod tests {
             // Well inside HUNT_RANGE, and given plenty of time to close.
             g.pirates.push(Pirate {
                 at: hex::normalise(hex::neighbour(g.at, 0)),
+                class: Class::Carrack,
                 strength: 10,
                 hours: 0.0,
                 hunting: true,
@@ -1634,6 +1982,7 @@ mod tests {
             for _ in 0..3 {
                 g.pirates.push(Pirate {
                     at: g.at,
+                    class: Class::Carrack,
                     strength: 10,
                     hours: 0.0,
                     hunting: true,
@@ -1696,6 +2045,7 @@ mod tests {
         }
         g.pirates.push(Pirate {
             at: spot?,
+            class: Class::Carrack,
             strength: 10,
             hours: 0.0,
             hunting: false,
@@ -2032,6 +2382,7 @@ mod tests {
         g.merchants.clear();
         g.pirates.push(Pirate {
             at: hex::normalise(hex::neighbour(g.at, 0)),
+            class: Class::Carrack,
             strength: 40,
             hours: 0.0,
             hunting: false,
@@ -2066,6 +2417,7 @@ mod tests {
             g.pirates.clear();
             g.pirates.push(Pirate {
                 at: g.at,
+                class: Class::Carrack,
                 strength: 40,
                 hours: 0.0,
                 hunting: true,

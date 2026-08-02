@@ -4,74 +4,78 @@
 # reused, and this game ships under its own name.
 # economy '-' means the port does not trade and serves only as a landfall.
 # One source row, Ruwen, is written '5S E35'; read as S5 E35.
-name	lat	lon	economy	specialty
-Acapulco	15	-110	-	-
-Aden	10	40	Arabia	Quartz
-Alexandria	35	20	Mediterranean	Cotton
-Algiers	35	0	Mediterranean	-
-Amboina	-15	125	S.E. Asia	Nutmeg
-Antwerp	60	0	N. Europe	Sugar
-Argin	0	-10	West Africa	-
-Azov	55	30	N. Europe	-
-Baghdad	30	50	Arabia	Artwork
-Bordeaux	55	0	N. Europe	Grapes
-Calicut	5	75	S.E. Asia	Pepper
-Cape Town	-45	25	-	-
-Caracas	5	-75	Americas	-
-Ceylon	0	80	S.E. Asia	Cinnamon
-Chanchan	-30	-80	-	-
-Cochin	0	75	S.E. Asia	-
-Copiapo	-45	-70	-	-
-Da Nang	10	105	-	-
-Diu	25	65	Arabia	-
-Eureka	50	-130	-	-
-Genoa	50	10	Mediterranean	-
-Goa	10	70	S.E. Asia	Cloth
-Guam	15	150	-	-
-Guatemala	10	-90	Americas	-
-Hamburg	65	5	N. Europe	Wool
-Hormuz	25	55	Arabia	Pimento
-Injiga	70	30	-	-
-Istanbul	45	20	Mediterranean	Artwork
-Jamaica	10	-80	Americas	-
-Java	-20	105	S.E. Asia	Pepper
-Kailua	10	-165	-	-
-Leveque	-40	115	-	-
-Lisbon	50	-10	Mediterranean	Sugar
-London	65	0	N. Europe	Wool
-Luanda	-20	15	-	-
-Macao	20	110	Far East	-
-Madang	-20	-140	-	-
-Majorca	40	10	Mediterranean	Grain
-Malacca	0	95	S.E. Asia	Pepper
-Marseille	40	5	Mediterranean	-
-Mecca	25	35	Arabia	Artwork
-Mombasa	-10	40	East Africa	Ivory
-Mozambique	-15	40	East Africa	Gold
-Muscat	20	55	Arabia	-
-Nagasaki	30	125	Far East	Silver
-Naples	45	10	Mediterranean	Wool
-Nova Granada	0	-85	-	-
-Oslo	65	5	N. Europe	Wood
-Panama	5	-85	Americas	-
-Pernambuco	-20	-40	Americas	-
-Pisa	45	10	Mediterranean	Artwork
-Rio de Janeiro	-65	-60	-	-
-Rio Grande	-40	-45	-	-
-Ruwen	-5	35	-	-
-San Jorge	0	0	West Africa	Ivory
-Santo Domingo	10	-75	Americas	Coral
-Seville	40	-10	Mediterranean	-
-Siber	70	70	-	-
-Sofala	-25	40	East Africa	Gold
-Sumatra	-15	95	S.E. Asia	Pepper
-Tanisk	65	150	-	-
-Ternate	-20	120	S.E. Asia	Cloves
-Trebizond	45	30	Mediterranean	Cotton
-Tunis	40	5	Mediterranean	-
-Valencia	40	-5	Mediterranean	Wool
-Venice	50	10	Mediterranean	Porcelain
-Veracruz	15	-100	Americas	-
-Verde	10	-20	-	-
-Virginia	45	-75	-	-
-Zeiton	25	115	Far East	Raw Silk
+# capital 'yes' means the port has a shipyard. Every economy has exactly one,
+# except the Mediterranean, which has two because it is twice the size of any
+# other and Lisbon is where the player starts. A yard sells only the classes
+# its own economy builds; see SPECS in game/src/ship.rs.
+name	lat	lon	economy	specialty	capital
+Acapulco	15	-110	-	-	-
+Aden	10	40	Arabia	Quartz	-
+Alexandria	35	20	Mediterranean	Cotton	-
+Algiers	35	0	Mediterranean	-	-
+Amboina	-15	125	S.E. Asia	Nutmeg	-
+Antwerp	60	0	N. Europe	Sugar	-
+Argin	0	-10	West Africa	-	-
+Azov	55	30	N. Europe	-	-
+Baghdad	30	50	Arabia	Artwork	-
+Bordeaux	55	0	N. Europe	Grapes	-
+Calicut	5	75	S.E. Asia	Pepper	-
+Cape Town	-45	25	-	-	-
+Caracas	5	-75	Americas	-	-
+Ceylon	0	80	S.E. Asia	Cinnamon	-
+Chanchan	-30	-80	-	-	-
+Cochin	0	75	S.E. Asia	-	-
+Copiapo	-45	-70	-	-	-
+Da Nang	10	105	-	-	-
+Diu	25	65	Arabia	-	-
+Eureka	50	-130	-	-	-
+Genoa	50	10	Mediterranean	-	-
+Goa	10	70	S.E. Asia	Cloth	-
+Guam	15	150	-	-	-
+Guatemala	10	-90	Americas	-	-
+Hamburg	65	5	N. Europe	Wool	-
+Hormuz	25	55	Arabia	Pimento	yes
+Injiga	70	30	-	-	-
+Istanbul	45	20	Mediterranean	Artwork	-
+Jamaica	10	-80	Americas	-	-
+Java	-20	105	S.E. Asia	Pepper	-
+Kailua	10	-165	-	-	-
+Leveque	-40	115	-	-	-
+Lisbon	50	-10	Mediterranean	Sugar	yes
+London	65	0	N. Europe	Wool	yes
+Luanda	-20	15	-	-	-
+Macao	20	110	Far East	-	-
+Madang	-20	-140	-	-	-
+Majorca	40	10	Mediterranean	Grain	-
+Malacca	0	95	S.E. Asia	Pepper	yes
+Marseille	40	5	Mediterranean	-	-
+Mecca	25	35	Arabia	Artwork	-
+Mombasa	-10	40	East Africa	Ivory	yes
+Mozambique	-15	40	East Africa	Gold	-
+Muscat	20	55	Arabia	-	-
+Nagasaki	30	125	Far East	Silver	yes
+Naples	45	10	Mediterranean	Wool	-
+Nova Granada	0	-85	-	-	-
+Oslo	65	5	N. Europe	Wood	-
+Panama	5	-85	Americas	-	-
+Pernambuco	-20	-40	Americas	-	-
+Pisa	45	10	Mediterranean	Artwork	-
+Rio de Janeiro	-65	-60	-	-	-
+Rio Grande	-40	-45	-	-	-
+Ruwen	-5	35	-	-	-
+San Jorge	0	0	West Africa	Ivory	yes
+Santo Domingo	10	-75	Americas	Coral	yes
+Seville	40	-10	Mediterranean	-	-
+Siber	70	70	-	-	-
+Sofala	-25	40	East Africa	Gold	-
+Sumatra	-15	95	S.E. Asia	Pepper	-
+Tanisk	65	150	-	-	-
+Ternate	-20	120	S.E. Asia	Cloves	-
+Trebizond	45	30	Mediterranean	Cotton	-
+Tunis	40	5	Mediterranean	-	-
+Valencia	40	-5	Mediterranean	Wool	-
+Venice	50	10	Mediterranean	Porcelain	yes
+Veracruz	15	-100	Americas	-	-
+Verde	10	-20	-	-	-
+Virginia	45	-75	-	-	-
+Zeiton	25	115	Far East	Raw Silk	-

@@ -234,8 +234,10 @@ function drawWho(s) {
   fact(dl, "gold", s.gold.toLocaleString("en"));
   fact(dl, "date", `${s.day} ${MONTHS[s.month]} ${s.year}`);
   fact(dl, "position", latlon(s.col, s.row));
+  fact(dl, "ship", `${s.shipName} · ${s.shipRig}`);
   fact(dl, "hull", `${TIERS[s.hull]} · ${s.cargo}/${s.capacity} in hold`);
-  fact(dl, "rigging", `${TIERS[s.rigging]} · ${s.bluewater} hex offing`);
+  fact(dl, "rigging",
+    `${TIERS[s.rigging]} · ${s.shipBluewater ? "blue water" : `${s.bluewater} hex offing`}`);
   fact(dl, "guns", s.guns === 0 ? "none" : `${s.guns}`);
   fact(dl, "damage", `${s.damage}%`, s.damage > 50 ? "bad" : null);
   fact(dl, "offing", `${s.offshore} from land`,
@@ -387,12 +389,21 @@ function drawHere(s) {
       `${s.invested.toLocaleString("en")} sunk into this harbour so far.`));
   }
 
-  body.appendChild(el("h3", "panel--sub", "the yard"));
+  drawShipyard(s, body);
+
+  body.appendChild(el("h3", "panel--sub", "the shipwright"));
   const yard = el("div", "helm--orders");
   s.upgrades.forEach((u, i) => {
+    // A tier at its ceiling reads differently from a tier you cannot afford,
+    // and only the class can lift the first. Saying "as far as a Latina goes"
+    // is the whole signpost back to the shipyard.
+    const capped = u.tier >= u.ceiling;
     const b = el("button", null,
-      u.cost < 0 ? `${u.name} at ${TIERS[u.tier]}` : `${u.name} → ${TIERS[u.tier + 1]}, ${u.cost.toLocaleString("en")}`);
+      capped
+        ? `${u.name} at ${TIERS[u.tier]}, as far as a ${s.shipName} goes`
+        : `${u.name} → ${TIERS[u.tier + 1]}, ${u.cost.toLocaleString("en")}`);
     b.id = `yard-${u.name}`;
+    if (capped) b.setAttribute("aria-disabled", "true");
     b.addEventListener("click", () => order(() => wasm.upgrade(i)));
     yard.appendChild(b);
   });
@@ -402,6 +413,41 @@ function drawHere(s) {
   fix.addEventListener("click", () => order(() => wasm.repair()));
   yard.appendChild(fix);
   body.appendChild(yard);
+}
+
+/** The shipyard, at the nine capitals that have one. */
+function drawShipyard(s, body) {
+  if (!s.yard.length) return;
+  body.appendChild(el("h3", "panel--sub", "the shipyard"));
+  const list = el("ul", "helm--ships");
+  // list-style: none removes list semantics in Safari with VoiceOver, so the
+  // role goes back on explicitly. Same rule as .work--index on the home page.
+  list.setAttribute("role", "list");
+  for (const o of s.yard) {
+    const li = el("li");
+    const b = el("button");
+    b.id = `ship-${o.class}`;
+    // Never `disabled`. A locked hull is shown with its price and its reason,
+    // the same bargain a shut good gets: a price you cannot meet is a goal,
+    // and pressing it puts the reason in the chronicle.
+    if (o.locked) b.setAttribute("aria-disabled", "true");
+    b.appendChild(el("span", "ship--name", o.name));
+    b.appendChild(el("span", "ship--price",
+      o.price === 0 ? "no charge" : `${o.price.toLocaleString("en")} gold`));
+    b.addEventListener("click", () => order(() => wasm.buy_ship(o.class)));
+    li.appendChild(b);
+    li.appendChild(el("p", "ship--blurb", o.blurb));
+    li.appendChild(el("p", "dim",
+      `${o.rig} · ${o.hold} in the hold · up to ${o.maxGuns} guns · ` +
+      (o.bluewater ? "will cross an ocean" : "keeps the land in sight")));
+    if (o.locked) li.appendChild(el("p", "bad", o.locked));
+    list.appendChild(li);
+  }
+  body.appendChild(list);
+  if (s.yard[0] && s.yard[0].tradeIn > 0) {
+    body.appendChild(el("p", "dim",
+      `Prices are after ${s.yard[0].tradeIn.toLocaleString("en")} allowed against your ${s.shipName}.`));
+  }
 }
 
 function drawKnown(s) {
