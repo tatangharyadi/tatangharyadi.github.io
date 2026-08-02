@@ -250,6 +250,23 @@ a {
   text-align: right;
 }
 
+/* The same rule as the one in css/style.css, restated because game.html loads
+ * this stylesheet and no other. `display: none` would take the element out of
+ * the accessibility tree, which is the one thing it must stay in: the only use
+ * here is the market's last column header, which names a column of buttons that
+ * needs no visible caption but must still have a name to be a header at all. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* here: the market. A table, because it is one. */
 .market {
   width: 100%;

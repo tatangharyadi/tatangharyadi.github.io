@@ -1355,8 +1355,9 @@ impl Game {
             self.reputation = reputation::answered_for(self.reputation);
             let now = reputation::standing(self.reputation);
             self.say(format!(
-                "You are boarded and taken in. The court has {fine} in gold and \
-                 {units} units condemned, and lets you keep the ship."
+                "You are boarded and taken in. The court has {} in gold and \
+                 {units} units condemned, and lets you keep the ship.",
+                coin(fine)
             ));
             if now != was {
                 self.say(format!("You leave the prize court {now}."));
@@ -1453,7 +1454,8 @@ impl Game {
                     units += take;
                 }
                 self.say(format!(
-                    "You have nothing to answer with. They take {taken_gold} in gold and {units} units, and let you go."
+                    "You have nothing to answer with. They take {} in gold and {units} units, and let you go.",
+                    coin(taken_gold)
                 ));
             }
             let parting = self.rng.range(5, 15);
@@ -1516,7 +1518,8 @@ impl Game {
                 units += take;
             }
             self.say(format!(
-                "They are the better gunners. {taken_gold} in gold and {units} units go over the side to them."
+                "They are the better gunners. {} in gold and {units} units go over the side to them.",
+                coin(taken_gold)
             ));
             let wound = self.rng.range(8, 24);
             self.hurt(wound, "The mainmast is wounded.");
@@ -1768,8 +1771,10 @@ impl Game {
         self.traded[good] = true;
         self.markets.on_buy(port, good, cost);
         self.say(format!(
-            "Bought {take} {} at {unit} for {cost}.",
-            GOODS[good]
+            "Bought {take} {} at {} for {}.",
+            GOODS[good],
+            coin(unit),
+            coin(cost)
         ));
         true
     }
@@ -1813,13 +1818,15 @@ impl Game {
         };
         if glut {
             self.say(format!(
-                "{} grows here. They take your {take} at {unit} a unit out of politeness: {verdict}.",
+                "{} grows here. They take your {take} at {} a unit out of politeness: {verdict}.",
                 GOODS[good],
+                coin(unit),
             ));
         } else {
             self.say(format!(
-                "Sold {take} {} at {unit}: {verdict}.",
-                GOODS[good]
+                "Sold {take} {} at {}: {verdict}.",
+                GOODS[good],
+                coin(unit)
             ));
         }
         true
@@ -2038,7 +2045,11 @@ impl Game {
             return false;
         };
         if self.gold < cost {
-            self.say(format!("A share in {} costs {cost}.", PORTS[port].name));
+            self.say(format!(
+                "A share in {} costs {}.",
+                PORTS[port].name,
+                coin(cost)
+            ));
             return false;
         }
         let before: Vec<usize> = (0..GOODS.len())
@@ -2050,10 +2061,16 @@ impl Game {
             .find(|g| self.markets.is_open(port, *g) && !before.contains(g));
         match opened {
             Some(g) => self.say(format!(
-                "Invested {cost} in {}. They open the {} trade to you.",
-                PORTS[port].name, GOODS[g]
+                "Invested {} in {}. They open the {} trade to you.",
+                coin(cost),
+                PORTS[port].name,
+                GOODS[g]
             )),
-            None => self.say(format!("Invested {cost} in {}.", PORTS[port].name)),
+            None => self.say(format!(
+                "Invested {} in {}.",
+                coin(cost),
+                PORTS[port].name
+            )),
         }
         true
     }
@@ -2215,8 +2232,10 @@ impl Game {
         };
         if self.gold < cost {
             self.say(format!(
-                "The yard at {} wants {cost} for that. You have {}.",
-                PORTS[port].name, self.gold
+                "The yard at {} wants {} for that. You have {}.",
+                PORTS[port].name,
+                coin(cost),
+                coin(self.gold)
             ));
             return false;
         }
@@ -2250,13 +2269,20 @@ impl Game {
         }
         let cost = self.ship.repair_cost();
         if self.gold < cost {
-            self.say(format!("The repair is {cost} and you have {}.", self.gold));
+            self.say(format!(
+                "The repair is {} and you have {}.",
+                coin(cost),
+                coin(self.gold)
+            ));
             return false;
         }
         self.gold -= cost;
         self.ship.damage = 0;
         self.advance(48.0);
-        self.say(format!("Two days in the yard and {cost} gone. She is sound."));
+        self.say(format!(
+            "Two days in the yard and {} gone. She is sound.",
+            coin(cost)
+        ));
         true
     }
 

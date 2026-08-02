@@ -539,10 +539,27 @@ function drawHere(s) {
 
   const wrap = el("div", "market--scroll");
   const table = el("table", "market");
-  const head = el("tr");
-  ["good", "hold", "buys at", "pays", ""].forEach((h) => head.appendChild(el("th", null, h)));
+  // A real thead, and scope="col" on every header. Without the scope a screen
+  // reader has to guess which header belongs to a cell, and on a table this
+  // long it announces the prices without saying what they are prices for --
+  // which is the whole content of the panel. The last column holds the buy and
+  // sell buttons, and an empty header is not a header: a nameless th leaves
+  // those cells unassociated and the rule still fails. So it is named and the
+  // name is hidden visually, which is also the honest arrangement -- the column
+  // does mean something, it just does not need a caption a sighted reader would
+  // have to look at.
+  const head = el("thead");
+  const headRow = el("tr");
+  ["good", "hold", "buys at", "pays", "trade"].forEach((h, i) => {
+    const th = el("th", null);
+    th.setAttribute("scope", "col");
+    th.appendChild(el("span", i === 4 ? "visually-hidden" : null, h));
+    headRow.appendChild(th);
+  });
+  head.appendChild(headRow);
   table.appendChild(head);
 
+  const rows = el("tbody");
   for (const row of s.market) {
     const tr = el("tr");
     tr.appendChild(el("td", null, atlas.goods[row.good]));
@@ -575,8 +592,9 @@ function drawHere(s) {
       actions.appendChild(b);
     }
     tr.appendChild(actions);
-    table.appendChild(tr);
+    rows.appendChild(tr);
   }
+  table.appendChild(rows);
   wrap.appendChild(table);
   body.appendChild(wrap);
 
