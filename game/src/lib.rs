@@ -27,7 +27,7 @@ pub mod sim;
 pub mod world;
 
 use market::Markets;
-use ship::Upgrade;
+use ship::{Ship, Upgrade};
 use sim::Game;
 use world::{ECONOMIES, GOODS, PORTS};
 
@@ -156,6 +156,16 @@ pub extern "C" fn upgrade(which: i32) -> i32 {
     game().upgrade(which) as i32
 }
 
+/// Trade the present ship for a class, by its index in `ship::CLASSES`.
+///
+/// Refuses for any of the reasons the yard listing already gives, so the page
+/// can call it on a locked row and get the explanation in the chronicle rather
+/// than having to duplicate the rules.
+#[no_mangle]
+pub extern "C" fn buy_ship(class: i32) -> i32 {
+    game().buy_ship(class) as i32
+}
+
 #[no_mangle]
 pub extern "C" fn repair() -> i32 {
     game().repair() as i32
@@ -260,6 +270,12 @@ pub extern "C" fn write_status() {
     kv_i(&mut s, "col", col, false);
     kv_i(&mut s, "row", row, false);
     kv_i(&mut s, "damage", g.ship.damage, false);
+    kv_i(&mut s, "shipClass", g.ship.class.index() as i32, false);
+    s.push_str(",\"shipName\":");
+    push_str_json(&mut s, g.ship.class.name());
+    s.push_str(",\"shipRig\":");
+    push_str_json(&mut s, g.ship.class.spec().rig);
+    kv_b(&mut s, "shipBluewater", g.ship.class.is_bluewater());
     kv_i(&mut s, "hull", g.ship.hull as i32, false);
     kv_i(&mut s, "rigging", g.ship.rigging as i32, false);
     kv_i(&mut s, "gunTier", g.ship.guns as i32, false);
@@ -330,12 +346,52 @@ pub extern "C" fn write_status() {
         push_str_json(&mut s, u.name());
         s.push_str(",\"tier\":");
         s.push_str(&g.ship.tier_of(u).to_string());
+        s.push_str(",\"ceiling\":");
+        s.push_str(&g.ship.ceiling(u).to_string());
         s.push_str(",\"cost\":");
         match g.ship.upgrade_cost(u) {
             Some(c) => s.push_str(&c.to_string()),
             None => s.push_str("-1"),
         }
         s.push('}');
+    }
+    s.push(']');
+
+    // The shipyard. Empty everywhere but a capital, which is how the page knows
+    // whether to draw one at all. Locked rows come through with their reason
+    // attached rather than omitted, for the same reason a shut good does.
+    s.push_str(",\"yard\":[");
+    if let Some(p) = port {
+        for (i, o) in g.yard(p).into_iter().enumerate() {
+            if i > 0 {
+                s.push(',');
+            }
+            let spec = o.class.spec();
+            s.push_str("{\"class\":");
+            s.push_str(&o.class.index().to_string());
+            s.push_str(",\"name\":");
+            push_str_json(&mut s, spec.name);
+            s.push_str(",\"blurb\":");
+            push_str_json(&mut s, spec.blurb);
+            s.push_str(",\"rig\":");
+            push_str_json(&mut s, spec.rig);
+            s.push_str(",\"price\":");
+            s.push_str(&o.price.to_string());
+            s.push_str(",\"tradeIn\":");
+            s.push_str(&o.trade_in.to_string());
+            s.push_str(",\"hold\":");
+            s.push_str(&Ship::capacity_of(o.class).to_string());
+            s.push_str(",\"maxGuns\":");
+            s.push_str(&ship::guns_at(spec.gun_max).to_string());
+            s.push_str(",\"bluewater\":");
+            s.push_str(if o.class.is_bluewater() { "true" } else { "false" });
+            s.push_str(",\"locked\":");
+            match &o.locked {
+                Some(why) => push_str_json(&mut s, why),
+                None => s.push_str("null"),
+            }
+            s.push('}');
+        }
     }
     s.push(']');
 
@@ -646,6 +702,12 @@ mod tests {
             "\"investCost\"",
             "\"openGoods\"",
             "\"stockedGoods\"",
+            "\"shipClass\"",
+            "\"shipName\"",
+            "\"shipRig\"",
+            "\"shipBluewater\"",
+            "\"ceiling\"",
+            "\"yard\"",
         ] {
             assert!(s.contains(key), "the status no longer carries {key}");
         }

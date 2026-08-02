@@ -374,6 +374,49 @@ input[type="number"] {
   margin-top: 0.5rem;
 }
 
+/* The shipyard. A list rather than a row of buttons because each hull needs
+   two lines of prose next to its price: the player is choosing between six
+   ships at once and the choice is not made on cost alone. No colours of its
+   own, so check_palette.py has nothing new to police here. */
+.helm--ships {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.helm--ships li {
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.helm--ships button {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  text-align: left;
+}
+
+.helm--ships .ship--name {
+  font-weight: 600;
+}
+
+.helm--ships .ship--price {
+  white-space: nowrap;
+}
+
+/* An unbuyable hull is still legible: this is a shown-but-locked row, not a
+   hidden one, so it dims rather than disappears. */
+.helm--ships button[aria-disabled="true"] {
+  opacity: 0.62;
+}
+
+.helm--ships .ship--blurb,
+.helm--ships p {
+  margin: 0.2rem 0 0;
+}
+
 .panel--ports {
   list-style: none;
   margin: 0;

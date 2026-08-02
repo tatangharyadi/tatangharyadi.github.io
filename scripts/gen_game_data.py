@@ -125,11 +125,15 @@ def load_ports():
     version. Every port must appear in both, exactly once.
     """
     out = []
-    for name, _lat, _lon, econ, spec in rows(
-        DATA / "ports.tsv", ["name", "lat", "lon", "economy", "specialty"]
+    for name, _lat, _lon, econ, spec, cap in rows(
+        DATA / "ports.tsv", ["name", "lat", "lon", "economy", "specialty", "capital"]
     ):
         econ = ECON_ALIASES.get(econ, econ)
-        out.append({"name": name, "econ": econ, "spec": spec})
+        if cap not in ("yes", "-"):
+            fail(f"ports.tsv gives {name} capital {cap!r}; expected 'yes' or '-'")
+        if cap == "yes" and econ == "-":
+            fail(f"ports.tsv makes {name} a capital, but it does not trade")
+        out.append({"name": name, "econ": econ, "spec": spec, "capital": cap == "yes"})
 
     places = {}
     for name, lat, lon, _note in rows(
@@ -340,14 +344,18 @@ def emit(land, ports, goods, econs, table, coast, water_cells):
     a("    pub econ: i8,")
     a("    /// Index into GOODS for the good this port is known for, or -1.")
     a("    pub specialty: i16,")
+    a("    /// Has a shipyard. Only a capital sells ships; everywhere else you")
+    a("    /// sail in with what you have. Never true of a port that does not trade.")
+    a("    pub capital: bool,")
     a("}")
     a("")
     a(f"pub const PORTS: [Port; {len(ports)}] = [")
     for p in ports:
         e = econ_index.get(p["econ"], -1) if p["econ"] != "-" else -1
         s = good_index.get(p["spec"], -1) if p["spec"] != "-" else -1
+        c = "true" if p["capital"] else "false"
         a(f"    Port {{ name: {rust_str(p['name'])}, col: {p['col']}, "
-          f"row: {p['row']}, econ: {e}, specialty: {s} }},")
+          f"row: {p['row']}, econ: {e}, specialty: {s}, capital: {c} }},")
     a("];")
     a("")
 
