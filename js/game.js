@@ -235,10 +235,30 @@ function drawWho(s) {
   fact(dl, "date", `${s.day} ${MONTHS[s.month]} ${s.year}`);
   fact(dl, "position", latlon(s.col, s.row));
   fact(dl, "ship", `${s.shipName} · ${s.shipRig}`);
-  fact(dl, "hull", `${TIERS[s.hull]} · ${s.cargo}/${s.capacity} in hold`);
+  // Stores are counted into the hold because they are stowed in it. Printing
+  // the cargo figure alone would say 5/40 to a player with no room left, which
+  // is the one number on this panel a trader plans against.
+  fact(dl, "hull", `${TIERS[s.hull]} · ${s.cargo + s.stores}/${s.capacity} in hold`);
   fact(dl, "rigging",
     `${TIERS[s.rigging]} · ${s.shipBluewater ? "blue water" : `${s.bluewater} hex offing`}`);
-  fact(dl, "guns", s.guns === 0 ? "none" : `${s.guns}`);
+  // A broadside there is nobody to serve is the only figure here that would
+  // otherwise lie, so short-handed guns are printed as both numbers.
+  fact(dl, "guns",
+    s.guns === 0 ? "none"
+      : s.gunsWorked === s.guns ? `${s.guns}`
+      : `${s.gunsWorked} of ${s.guns} worked`,
+    s.guns > 0 && s.gunsWorked < s.guns ? "bad" : null);
+  fact(dl, "crew", `${s.crew} of ${s.crewMin}–${s.crewMax} · ${s.wages} a month`,
+    s.crew < s.crewMin ? "bad" : null);
+  // Days rather than units, because units are only meaningful against a crew
+  // size the player is about to change. Three days is the same threshold the
+  // Rust warns at, so the panel and the chronicle agree.
+  fact(dl, "stores",
+    s.crew === 0 ? "nobody left to feed"
+      : `${s.food} food, ${s.water} water · ${s.daysOfStores} days`,
+    s.daysOfStores <= 3 ? "bad" : null);
+  fact(dl, "lumber",
+    s.lumber === 0 ? "none" : `${s.lumber} · mends ${s.mendable}%`);
   fact(dl, "damage", `${s.damage}%`, s.damage > 50 ? "bad" : null);
   fact(dl, "offing", `${s.offshore} from land`,
     s.offshore > s.bluewater ? "bad" : null);
@@ -275,6 +295,86 @@ function inSight(s) {
   return parts.length === 0 ? "nothing" : parts.join(", ");
 }
 
+/**
+ * The units-per-order box. One control, shared by the market and the chandler,
+ * because "how many" is one question and two boxes would be two answers to it.
+ *
+ * It is a real `<input type="number">` on purpose: the keyboard handler lets a
+ * reader type by checking the tag name, so anything else here would swallow
+ * the steering keys.
+ */
+function qtyControl() {
+  const qty = el("p");
+  // "how many" rather than "units per order", because the same box now sets
+  // the size of a purchase and the number of hands signed on, and hands are
+  // not units.
+  const label = el("label", null, "how many ");
+  label.htmlFor = "qty";
+  const input = document.createElement("input");
+  input.type = "number";
+  input.id = "qty";
+  input.min = "1";
+  input.value = String(currentQty);
+  input.addEventListener("change", () => {
+    currentQty = Math.max(1, parseInt(input.value, 10) || 1);
+  });
+  qty.appendChild(label);
+  qty.appendChild(input);
+  return qty;
+}
+
+/**
+ * Food, water and lumber, on the quay or out of another ship's hold.
+ *
+ * The same three orders in both places, at two prices, and the price shown is
+ * the one the order will actually charge: the Rust decides that from where the
+ * ship is, and the page reads the matching row rather than working it out.
+ * Selling back is quayside only, so the button simply is not there at sea.
+ */
+function chandler(s, body, afloat) {
+  const prices = afloat ? s.storePricesAfloat : s.storePrices;
+  const row = el("div", "helm--orders");
+  s.storeNames.forEach((name, i) => {
+    const b = el("button", null, `${name}, ${prices[i]} each`);
+    b.id = `store-buy-${name}`;
+    b.addEventListener("click", () => order(() => wasm.provision(i, currentQty)));
+    row.appendChild(b);
+  });
+  body.appendChild(row);
+  if (afloat) return;
+  const back = el("div", "helm--orders");
+  s.storeNames.forEach((name, i) => {
+    const aboard = s[name];
+    const b = el("button", null, `sell ${name}`);
+    b.id = `store-sell-${name}`;
+    // Half of what it cost, and nothing at all if there is none aboard. The
+    // press still goes through so the chronicle can say which of those it was.
+    if (aboard === 0) b.setAttribute("aria-disabled", "true");
+    b.addEventListener("click", () => order(() => wasm.provision(i, -currentQty)));
+    back.appendChild(b);
+  });
+  body.appendChild(back);
+}
+
+/**
+ * Timber and hands against damage, which is the only repair available at sea.
+ *
+ * Both halves have to be there and the button says which one is missing,
+ * because "mend" doing nothing is indistinguishable from a broken page.
+ */
+function mendButton(s) {
+  const short = s.crew < s.crewMin;
+  const b = el("button", null,
+    short ? `too few hands to mend, ${s.crewMin} needed`
+      : s.damage === 0 ? "sound, nothing to mend"
+      : s.mendable === 0 ? "no lumber aboard"
+      : `mend ${s.mendable}%, ${s.mendable} lumber and a day`);
+  b.id = "order-mend";
+  if (short || s.mendable === 0) b.setAttribute("aria-disabled", "true");
+  b.addEventListener("click", () => order(() => wasm.mend()));
+  return b;
+}
+
 /** Buy and sell rows, plus the yard, or an explanation of why there is neither. */
 function drawHere(s) {
   const body = $("here--body");
@@ -290,7 +390,19 @@ function drawHere(s) {
     if (s.merchantHere) {
       body.appendChild(el("p", null,
         "A trader lies alongside, hailing you. Running out the guns would cost you your name."));
+      // She will sell out of her own hold at half as much again. This is the
+      // only way to victual away from a harbour, and it is the difference
+      // between a bad passage and a dead crew.
+      body.appendChild(el("h3", "panel--sub", "her stores, at her price"));
+      chandler(s, body, true);
+      body.appendChild(qtyControl());
     }
+    // A battle happens at sea, so the repair the lumber is for has to be
+    // reachable at sea. The shipwright is a harbour away and the crew are not.
+    body.appendChild(el("h3", "panel--sub", "the carpenter"));
+    const carpenter = el("div", "helm--orders");
+    carpenter.appendChild(mendButton(s));
+    body.appendChild(carpenter);
     if (s.underWay) {
       body.appendChild(el("p", "dim", "A course is laid. Sail on to make the next leg."));
     }
@@ -355,20 +467,31 @@ function drawHere(s) {
   wrap.appendChild(table);
   body.appendChild(wrap);
 
-  const qty = el("p");
-  const label = el("label", null, "units per order ");
-  label.htmlFor = "qty";
-  const input = document.createElement("input");
-  input.type = "number";
-  input.id = "qty";
-  input.min = "1";
-  input.value = String(currentQty);
-  input.addEventListener("change", () => {
-    currentQty = Math.max(1, parseInt(input.value, 10) || 1);
-  });
-  qty.appendChild(label);
-  qty.appendChild(input);
-  body.appendChild(qty);
+  body.appendChild(qtyControl());
+
+  // Every one of the seventy ports has these two, and only nine have a
+  // shipyard. A harbour you could make and not victual out of would strand a
+  // ship as surely as a hull that cannot reach the next market.
+  body.appendChild(el("h3", "panel--sub", "the chandler"));
+  chandler(s, body, false);
+
+  body.appendChild(el("h3", "panel--sub", "the crimp"));
+  const crimp = el("div", "helm--orders");
+  const sign = el("button", null, `sign on hands, ${s.hireCost} each in advance`);
+  sign.id = "crew-hire";
+  if (s.crew >= s.crewMax) sign.setAttribute("aria-disabled", "true");
+  sign.addEventListener("click", () => order(() => wasm.hire(currentQty)));
+  crimp.appendChild(sign);
+  const pay = el("button", null, "pay off hands");
+  pay.id = "crew-discharge";
+  if (s.crew <= 1) pay.setAttribute("aria-disabled", "true");
+  pay.addEventListener("click", () => order(() => wasm.discharge(currentQty)));
+  crimp.appendChild(pay);
+  body.appendChild(crimp);
+  body.appendChild(el("p", "dim",
+    `${s.crew} aboard. She wants ${s.crewMin} to sail well and berths ${s.crewMax}. ` +
+    `They eat ${s.foodPerDay} food and drink ${s.waterPerDay} water a day, ` +
+    `and draw ${s.wages} gold at the turn of the month.`));
 
   body.appendChild(el("h3", "panel--sub", "the counting house"));
   const house = el("div", "helm--orders");
@@ -412,6 +535,10 @@ function drawHere(s) {
   fix.id = "yard-repair";
   fix.addEventListener("click", () => order(() => wasm.repair()));
   yard.appendChild(fix);
+  // Beside the paid repair on purpose: timber you already carry against gold
+  // you would have to find is a choice, and it is only a choice if both are
+  // in the same place.
+  yard.appendChild(mendButton(s));
   body.appendChild(yard);
 }
 
@@ -554,8 +681,20 @@ function status() {
  * carves an exception out of.
  */
 function order(run) {
+  // Every panel is rebuilt from scratch on refresh, so the control that was
+  // just pressed is a different element afterwards and focus would land on
+  // <body>. That is the same failure the stable-`id` rule in AGENTS.md exists
+  // to prevent for htmx, arrived at by a different road, and it is fixed the
+  // same way: look the element back up by the id it kept. Buying stores is the
+  // order that made this matter, because it is the first one a player presses
+  // several times in a row.
+  const had = document.activeElement && document.activeElement.id;
   run();
   refresh();
+  if (had) {
+    const again = $(had);
+    if (again) again.focus();
+  }
 }
 
 function refresh() {
