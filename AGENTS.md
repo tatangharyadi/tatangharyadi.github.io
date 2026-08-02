@@ -142,7 +142,7 @@ not pretend to cover them. **A green CI does not mean a change is verified.**
     for that reason. This is a one-off command, not a dependency — the repo still
     has no `package.json`.
 12. **[CI]** If any colour changed, `python3 scripts/check_palette.py`. The palette
-    is written out in **four** places and nothing but this script keeps them in
+    is written out in **five** places and nothing but this script keeps them in
     step; see the bullet under "Other things not to break".
 
 ## Accessibility invariants
@@ -285,7 +285,7 @@ Three further rules for any change:
 
 - **Fragments carry no colour and no `<head>`.** They are pieces of a page. Putting
   a hex value in one would escape `scripts/check_palette.py`, which reads only the
-  four files that hold the palette. `robots.txt` disallows `/fragments/` for the
+  five files that hold the palette. `robots.txt` disallows `/fragments/` for the
   same reason they are not pages, and they are correctly absent from `sitemap.xml`.
 - **The htmx `<script>` stays pinned by version *and* SRI digest, on every page.** A
   CDN this site does not own must not be able to change what executes here. If you

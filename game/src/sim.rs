@@ -35,6 +35,22 @@ pub const CODE_PIRATES: u8 = 8;
 pub const CODE_MERCHANTS: u8 = 9;
 pub const CODE_NAVIES: u8 = 10;
 
+/// Bytes per hex in the render buffer: terrain, then what is on it, then fog.
+///
+/// Terrain is sent separately from the mark rather than being the first three
+/// values of one code, because the page fills the hex by terrain and draws the
+/// mark on top of it. Packed into a single byte the two channels are exclusive:
+/// a raider reported as a raider says nothing about the water he is sitting in,
+/// and whether that water is shallow or deep is the whole question when you are
+/// deciding to run for it. The terrain byte is written once per frame and the
+/// overlays never touch it, so it always describes the sea floor and not the
+/// traffic.
+pub const STRIDE: usize = 3;
+/// Offsets within one hex's slice.
+pub const AT_TERRAIN: usize = 0;
+pub const AT_MARK: usize = 1;
+pub const AT_FOG: usize = 2;
+
 const PIRATE_COUNT: usize = 24;
 /// How close a pirate has to be before it stops wandering and starts hunting.
 ///
@@ -418,7 +434,7 @@ impl Game {
             commission: None,
             chronicle: Vec::new(),
             rng: Rng::new(seed),
-            render: vec![0; CELLS * 2],
+            render: vec![0; CELLS * STRIDE],
             scratch: Vec::new(),
             ray: Vec::new(),
             pathfinder: nav::Scratch::new(),
@@ -2288,18 +2304,24 @@ impl Game {
 
     // -- rendering ---------------------------------------------------------
 
-    /// Two bytes per hex: what is there, and how well it can be seen.
+    /// [`STRIDE`] bytes per hex: the terrain, what is on it, and how well it can
+    /// be seen.
+    ///
+    /// The mark starts out as the terrain and is overwritten by anything more
+    /// interesting standing on it. That keeps a quiet hex to one glyph while
+    /// giving the page both channels where they differ.
     pub fn render(&mut self) -> &[u8] {
         for i in 0..CELLS {
             let code = if nav::is_land_index(i) {
                 CODE_LAND
-            } else if self.depth[i] > 3 {
+            } else if self.draws_deep(i) {
                 CODE_DEEP
             } else {
                 CODE_SHALLOW
             };
-            self.render[i * 2] = code;
-            self.render[i * 2 + 1] = self.fog[i];
+            self.render[i * STRIDE + AT_TERRAIN] = code;
+            self.render[i * STRIDE + AT_MARK] = code;
+            self.render[i * STRIDE + AT_FOG] = self.fog[i];
         }
 
         for (i, p) in PORTS.iter().enumerate() {
@@ -2308,9 +2330,9 @@ impl Game {
             }
             let h = hex::from_offset(p.col as i32, p.row as i32);
             if let Some(idx) = hex::index(h) {
-                self.render[idx * 2] = CODE_PORT;
-                if self.render[idx * 2 + 1] == UNSEEN {
-                    self.render[idx * 2 + 1] = REMEMBERED;
+                self.render[idx * STRIDE + AT_MARK] = CODE_PORT;
+                if self.render[idx * STRIDE + AT_FOG] == UNSEEN {
+                    self.render[idx * STRIDE + AT_FOG] = REMEMBERED;
                 }
             }
         }
@@ -2320,7 +2342,7 @@ impl Game {
         for m in &self.merchants {
             if let Some(idx) = hex::index(m.at) {
                 if self.fog[idx] == VISIBLE {
-                    self.render[idx * 2] = match self.render[idx * 2] {
+                    self.render[idx * STRIDE + AT_MARK] = match self.render[idx * STRIDE + AT_MARK] {
                         CODE_MERCHANT | CODE_MERCHANTS => CODE_MERCHANTS,
                         _ => CODE_MERCHANT,
                     };
@@ -2335,10 +2357,10 @@ impl Game {
             if let Some(idx) = hex::index(p.at) {
                 if self.fog[idx] == VISIBLE {
                     let crowded = matches!(
-                        self.render[idx * 2],
+                        self.render[idx * STRIDE + AT_MARK],
                         CODE_PIRATE | CODE_NAVY | CODE_PIRATES | CODE_NAVIES
                     );
-                    self.render[idx * 2] = match (p.navy, crowded) {
+                    self.render[idx * STRIDE + AT_MARK] = match (p.navy, crowded) {
                         (false, false) => CODE_PIRATE,
                         (false, true) => CODE_PIRATES,
                         (true, false) => CODE_NAVY,
@@ -2349,8 +2371,8 @@ impl Game {
         }
 
         if let Some(idx) = hex::index(self.at) {
-            self.render[idx * 2] = CODE_SHIP;
-            self.render[idx * 2 + 1] = VISIBLE;
+            self.render[idx * STRIDE + AT_MARK] = CODE_SHIP;
+            self.render[idx * STRIDE + AT_FOG] = VISIBLE;
         }
         &self.render
     }
@@ -2414,6 +2436,16 @@ impl Game {
 
     pub fn offshore(&self) -> i32 {
         hex::index(self.at).map(|i| self.depth[i] as i32).unwrap_or(0)
+    }
+
+    /// Whether a hex draws as deep water, by the same test [`Game::render`] uses.
+    ///
+    /// The chart tells shallow from deep by fill, and fill is a colour, so the
+    /// "there" panel has to be able to say it in words too. Sharing the test with
+    /// the renderer rather than restating the threshold is the point: a panel
+    /// that disagreed with the tile it describes would be worse than silence.
+    pub fn draws_deep(&self, index: usize) -> bool {
+        !nav::is_land_index(index) && self.depth[index] > 3
     }
 }
 
@@ -3482,10 +3514,10 @@ mod tests {
         assert_eq!(g.fog[idx], VISIBLE, "the test hex is not in sight");
 
         g.merchants.push(trader(water));
-        assert_eq!(g.render()[idx * 2], CODE_MERCHANT);
+        assert_eq!(g.render()[idx * STRIDE + AT_MARK], CODE_MERCHANT);
 
         g.merchants.push(trader(water));
-        assert_eq!(g.render()[idx * 2], CODE_MERCHANTS, "two traders, one mark");
+        assert_eq!(g.render()[idx * STRIDE + AT_MARK], CODE_MERCHANTS, "two traders, one mark");
 
         // A raider over them is still the news, and alone until a second joins.
         g.pirates.push(Pirate {
@@ -3501,7 +3533,7 @@ mod tests {
             met: false,
             navy: false,
         });
-        assert_eq!(g.render()[idx * 2], CODE_PIRATE, "a raider over traders is one raider");
+        assert_eq!(g.render()[idx * STRIDE + AT_MARK], CODE_PIRATE, "a raider over traders is one raider");
     }
 
     #[test]
@@ -4157,9 +4189,35 @@ mod tests {
         let mut g = Game::new(10);
         let at = hex::index(g.at).unwrap();
         let buf = g.render();
-        assert_eq!(buf[at * 2], CODE_SHIP);
-        assert_eq!(buf[at * 2 + 1], VISIBLE);
-        assert_eq!(buf.len(), CELLS * 2);
+        assert_eq!(buf[at * STRIDE + AT_MARK], CODE_SHIP);
+        assert_eq!(buf[at * STRIDE + AT_FOG], VISIBLE);
+        assert_eq!(buf.len(), CELLS * STRIDE);
+    }
+
+    /// The point of the third byte: a mark never erases the sea under it.
+    ///
+    /// The ship is the easiest case to reach from a test, and it is also the one
+    /// that matters most, because "what am I floating on" is the question every
+    /// course decision starts from.
+    #[test]
+    fn the_terrain_byte_survives_whatever_stands_on_it() {
+        let mut g = Game::new(10);
+        let at = hex::index(g.at).unwrap();
+        let buf = g.render();
+        assert_eq!(buf[at * STRIDE + AT_MARK], CODE_SHIP);
+
+        // Every hex, everywhere: the terrain channel only ever holds terrain, so
+        // the hex under the ship still reports the water she is floating in.
+        for i in 0..CELLS {
+            assert!(
+                matches!(
+                    buf[i * STRIDE + AT_TERRAIN],
+                    CODE_SHALLOW | CODE_DEEP | CODE_LAND
+                ),
+                "cell {i} terrain byte held {}",
+                buf[i * STRIDE + AT_TERRAIN]
+            );
+        }
     }
 }
 

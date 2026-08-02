@@ -9,7 +9,7 @@
 //!
 //! Two buffers cross the line:
 //!
-//! * the **render buffer**, two bytes per hex, at [`render_ptr`];
+//! * the **render buffer**, [`sim::STRIDE`] bytes per hex, at [`render_ptr`];
 //! * a **text buffer** of UTF-8 JSON, at [`text_ptr`], rewritten by whichever
 //!   query was last called.
 //!
@@ -95,7 +95,7 @@ pub extern "C" fn render_ptr() -> *const u8 {
 
 #[no_mangle]
 pub extern "C" fn render_len() -> i32 {
-    (nav::CELLS * 2) as i32
+    (nav::CELLS * sim::STRIDE) as i32
 }
 
 // -- orders ----------------------------------------------------------------
@@ -615,6 +615,9 @@ pub extern "C" fn write_look(col: i32, row: i32) {
 
     let land = idx.map(nav::is_land_index).unwrap_or(false);
     kv_b(&mut s, "land", land);
+    // Said in words because the chart says it in colour. A reader who cannot tell
+    // the two blues apart clicks the hex and is told.
+    kv_b(&mut s, "deep", idx.map(|i| g.draws_deep(i)).unwrap_or(false));
 
     let port = PORTS
         .iter()
@@ -836,7 +839,7 @@ mod tests {
     fn the_render_buffer_is_the_length_it_says() {
         let _helm = helm(13);
         let len = render_len() as usize;
-        assert_eq!(len, nav::CELLS * 2);
+        assert_eq!(len, nav::CELLS * sim::STRIDE);
         let ptr = render_ptr();
         let slice = unsafe { core::slice::from_raw_parts(ptr, len) };
         assert!(slice.iter().any(|b| *b == sim::CODE_SHIP));

@@ -41,7 +41,19 @@ const SIZE = 13;
 const HEX_W = Math.sqrt(3) * SIZE;
 const HEX_H = 1.5 * SIZE;
 
+// Bytes per hex in the render buffer, matching sim::STRIDE: terrain, mark, fog.
+// The terrain byte is only ever one of the first three codes below; the mark can
+// be any of them, and is the terrain itself where nothing else is standing there.
+const STRIDE = 3;
+
 // Terrain codes, matching the constants in game/src/sim.rs.
+// The first three are terrain and draw in one neutral ink, because the hex is
+// filled with the terrain's own colour underneath them and a green glyph on a
+// green tile is a glyph you cannot see. Shape carries the distinction instead,
+// which it has to anyway: no two Catppuccin hues are 3:1 apart, so fill can be a
+// second channel but never the only one.
+// Everything from index 3 up is something standing on the terrain, and those keep
+// their colours. Colour on this chart now means "something is there".
 // Index 6 is a merchant, and it reads as a rounder, softer mark than the
 // raider's X on purpose: the two are the only things on the chart you can meet,
 // and the one you are allowed to shoot at should not look like the one you are
@@ -122,6 +134,23 @@ function latlon(col, row) {
 // -- the chart --------------------------------------------------------------
 
 /**
+ * The six corners of a pointy-top hex, as an SVG `points` string.
+ *
+ * Corner i sits at 60i - 30 degrees, which is redblobgames' pointy-top layout
+ * and the one the spacing constants above were derived from: it makes the width
+ * sqrt(3) * SIZE and the height 2 * SIZE, so rows overlapping by a quarter of
+ * their height is what 3/2 * SIZE means.
+ */
+function hexPoints(cx, cy) {
+  const pts = [];
+  for (let i = 0; i < 6; i++) {
+    const a = ((60 * i - 30) * Math.PI) / 180;
+    pts.push(`${(cx + SIZE * Math.cos(a)).toFixed(1)},${(cy + SIZE * Math.sin(a)).toFixed(1)}`);
+  }
+  return pts.join(" ");
+}
+
+/**
  * Build the viewport once.
  *
  * Only the glyph and its class change afterwards, which keeps a move to a few
@@ -141,22 +170,24 @@ function buildChart() {
       const x = HEX_W * (vc + 0.5 * (vr & 1) + 0.5);
       const y = HEX_H * vr + SIZE;
 
+      // The tile is the hex itself: it carries the terrain as an area of colour,
+      // and it is also what a click lands on. It used to be a transparent circle
+      // that existed only to be clicked, and making it the real hex costs nothing
+      // and gains a better target, since the hexes tile the plane and circles
+      // leave gaps between them where a click hits nothing.
+      const tile = document.createElementNS(SVG_NS, "polygon");
+      tile.setAttribute("points", hexPoints(x, y));
+      tile.setAttribute("class", "tile seen-0");
+      svg.appendChild(tile);
+
+      // Drawn after the tile, so it sits on top of its own terrain.
       const glyph = document.createElementNS(SVG_NS, "text");
       glyph.setAttribute("x", x.toFixed(1));
       glyph.setAttribute("y", y.toFixed(1));
-      glyph.setAttribute("class", "cell seen-0");
+      glyph.setAttribute("class", "glyph seen-0");
       svg.appendChild(glyph);
 
-      // A transparent circle over each hex, so a click has something to land on
-      // even where the glyph is a single narrow character or nothing at all.
-      const hit = document.createElementNS(SVG_NS, "circle");
-      hit.setAttribute("cx", x.toFixed(1));
-      hit.setAttribute("cy", y.toFixed(1));
-      hit.setAttribute("r", (SIZE * 0.9).toFixed(1));
-      hit.setAttribute("class", "cell--hit");
-      svg.appendChild(hit);
-
-      cells.push({ glyph, hit, col: 0, row: 0 });
+      cells.push({ tile, glyph, col: 0, row: 0 });
     }
   }
 
@@ -169,7 +200,7 @@ function buildChart() {
   svg.appendChild(mark);
 
   svg.addEventListener("click", (event) => {
-    const index = cells.findIndex((c) => c.hit === event.target);
+    const index = cells.findIndex((c) => c.tile === event.target);
     if (index >= 0) lookAt(cells[index].col, cells[index].row);
   });
 }
@@ -204,16 +235,22 @@ function drawChart(shipCol, shipRow) {
       cell.row = row;
 
       if (row < 0 || row >= rows) {
-        cell.glyph.setAttribute("class", "cell seen-0");
+        cell.tile.setAttribute("class", "tile seen-0");
+        cell.glyph.setAttribute("class", "glyph seen-0");
         cell.glyph.textContent = "";
         continue;
       }
 
-      const at = (row * cols + col) * 2;
-      const code = bytes[at];
-      const seen = bytes[at + 1];
-      cell.glyph.textContent = seen === 0 ? "" : GLYPH[code];
-      cell.glyph.setAttribute("class", `cell seen-${seen} code-${code}`);
+      const at = (row * cols + col) * STRIDE;
+      const terrain = bytes[at];
+      const mark = bytes[at + 1];
+      const seen = bytes[at + 2];
+      // Two channels, two elements. The tile is the sea floor and the glyph is
+      // the traffic, and on a quiet hex the glyph is the terrain's own texture
+      // because there is nothing more interesting to say about it.
+      cell.tile.setAttribute("class", `tile seen-${seen} terrain-${terrain}`);
+      cell.glyph.textContent = seen === 0 ? "" : GLYPH[mark];
+      cell.glyph.setAttribute("class", `glyph seen-${seen} mark-${mark}`);
 
       if (looking && looking.col === col && looking.row === row) {
         markX = HEX_W * (vc + 0.5 * (vr & 1) + 0.5);
@@ -784,7 +821,10 @@ function drawThere() {
         "Too shallow for her draught. A smaller hull could work in."));
     }
   } else {
-    body.appendChild(el("p", null, t.land ? "Land." : "Open water."));
+    // Spelled out because the chart draws the same distinction as a fill colour,
+    // and a fill colour is exactly what some readers will not be able to use.
+    body.appendChild(el("p", null,
+      t.land ? "Land." : t.deep ? "Open water, deep." : "Shallow water."));
   }
   body.appendChild(el("p", "dim",
     `${t.distance} hexes off. ${t.seen === 2 ? "In sight." : "From memory; you are not looking at it now."}`));

@@ -9,9 +9,11 @@
  *
  * The tokens below are the same Mocha values css/style.css uses in its dark
  * block, plus the accent hues this page needs and no other page does.
- * scripts/check_palette.py holds css/style.css, 404.html, DESIGN.md and the
- * theme-color metas against each other; it does not read this file, so nothing
- * here can drift the shared palette out of step.
+ * scripts/check_palette.py holds css/style.css, 404.html, DESIGN.md, the
+ * theme-color metas and this file against each other. Every literal hex below
+ * has to be a real Catppuccin Mocha value, and any colour this page uses that no
+ * other page does has to be registered in that script's MOCHA_EXTRA, so a hue
+ * invented here cannot quietly become a sixth palette.
  */
 
 :root {
@@ -24,13 +26,14 @@
   --accent-text: #89dceb;
 
   /* Chart hues. Mocha, named for what they draw rather than for the colour. */
+  /* Water is one hue at two strengths, so there is no --sea-deep: depth is drawn
+   * as less of the same blue rather than as a second colour. The token that used
+   * to be here was overlay2, chosen when the sea was a thin glyph and the problem
+   * was keeping a remembered tilde off the floor. Tiles retired that problem, and
+   * a separate grey-blue for the deeps read as a third kind of thing rather than
+   * as more of the same water. */
   --sea-shallow: #89b4fa;
-  /* overlay2, not overlay0. Deep water has to stay duller than the shallows,
-   * but it is also the darkest thing on the chart, so it sets the floor for how
-   * faint a remembered hex may be drawn. overlay0 measured 3.36:1 lit and 1.62:1
-   * remembered, which is to say invisible: explored ocean looked unexplored. */
-  --sea-deep: #9399b2;
-  --shore: #a6e3a1;
+  --land: #a6e3a1;
   --harbour: #f9e2af;
   --ship: #f5e0dc;
   --raider: #f38ba8;
@@ -487,30 +490,71 @@ input[type="number"] {
 
 /* The chart itself.
  *
- * Three states of knowledge, told apart by opacity first so the distinction
- * survives every kind of colour blindness: lit, remembered, and
- * never seen. Never-seen hexes draw nothing at all, so the blank is the fog:
- * it means unexplored and nothing else.
+ * Two channels, and keeping them apart is the whole design. The tile is a filled
+ * hexagon and says what the sea floor is; the glyph on top says what is standing
+ * on it. Before the tiles existed both shared one character per hex, so a raider
+ * on deep water drew an X and the water underneath simply vanished -- and whether
+ * that water is deep or shallow is precisely what you need to know when you are
+ * deciding whether to run for it.
  *
- * That only reads if remembered is unmistakably *drawn*. The dim state is a
- * chart you have surveyed and sailed away from, not a hint of one, so it has a
- * contrast floor rather than a pleasing opacity: every hue must clear 3:1
- * against the panel at seen-1. The binding case is --sea-deep, the darkest
- * glyph on the chart; at 0.42 it measured 1.62:1 and open water you had already
- * crossed was indistinguishable from open water you had never seen. */
-.cell {
+ * Three states of knowledge cut across both, told apart by opacity first so the
+ * distinction survives every kind of colour blindness: lit, remembered, and never
+ * seen. Never-seen hexes draw nothing at all, tile included, so the blank is the
+ * fog: it means unexplored and nothing else.
+ *
+ * That only reads if remembered is unmistakably *drawn*, so the dim state has a
+ * contrast floor rather than a pleasing opacity. The floor is 3:1, the figure for
+ * a graphical mark, and the binding case is a raider on the brightest tile: dim
+ * glyph over dim tile compresses toward the background from both sides at once.
+ * That case is what set the fill alphas below, rather than any preference about
+ * how blue the sea should look.
+ *
+ * Every figure in this file was measured by rasterising these rules -- fill
+ * alpha, element opacity and the saturate() filter together -- into a canvas and
+ * reading the composited pixels back, not by compositing on paper. Doing it on
+ * paper got the background wrong once already: the chart sits on --bg, not on
+ * --bg-chrome, and the darker assumption flattered every tile by roughly a
+ * factor of two and hid a real failure at 2.79:1.
+ *
+ * What the tiles are NOT is the terrain cue. No two Catppuccin accents are more
+ * than 1.83:1 apart -- the palette is near-iso-luminant by construction -- so a
+ * land fill and a water fill cannot clear 3:1 against each other and no choice of
+ * hues would fix it. Measured at the alphas below, land against the shallows is
+ * 1.08:1 and the shallows against the deeps 1.22:1; sweeping the land alpha from
+ * 0.10 to 0.24 never got land past 1.26:1 of the shallows, because it crosses them
+ * in luminance around 0.19 rather than staying clear of them. The tiles
+ * are therefore a redundant second channel, in the same sense as the saturate()
+ * below: terrain keeps its glyph (~ shallow, = deep, # land) and a click reports
+ * it in words. The one hex where a mark hides the terrain glyph is the reason
+ * write_look() reports depth as text. */
+.tile,
+.glyph {
+  user-select: none;
+}
+
+.glyph {
   font-family: var(--font-mono);
   font-size: 15px;
   text-anchor: middle;
   dominant-baseline: central;
-  user-select: none;
 }
 
-.cell.seen-0 {
+.tile {
+  /* The hex is the click target as well as the fill, so the cursor lives here.
+   * A stroke in the page background separates neighbours: without it the water
+   * tiles merge into one wash and the grid the game is played on disappears. */
+  cursor: pointer;
+  stroke: var(--bg-chrome);
+  stroke-width: 1;
+}
+
+.tile.seen-0,
+.glyph.seen-0 {
   opacity: 0;
 }
 
-.cell.seen-1 {
+.tile.seen-1,
+.glyph.seen-1 {
   opacity: 0.65;
   /* Colour drains out of a chart drawn from memory. This is the second cue, and
    * it exists because opacity alone cannot carry both jobs: once the dim state
@@ -523,38 +567,85 @@ input[type="number"] {
   filter: saturate(0.3);
 }
 
-.cell.seen-2 {
+.tile.seen-2,
+.glyph.seen-2 {
   opacity: 1;
 }
 
-.cell.code-0 { fill: var(--sea-shallow); }
-.cell.code-1 { fill: var(--sea-deep); }
-.cell.code-2 { fill: var(--shore); }
-.cell.code-3 { fill: var(--harbour); }
-.cell.code-4 { fill: var(--ship); }
-.cell.code-5 { fill: var(--raider); }
-.cell.code-6 { fill: var(--trader); }
-.cell.code-7 { fill: var(--crown); }
+/* Terrain, as an area.
+ *
+ * Water is one hue at two strengths, because depth is a quantity and drawing it as
+ * a quantity of the same blue is what makes the shelf legible at a glance.
+ *
+ * Every tile here is a light colour at a low alpha, so every tile is brighter than
+ * the page it sits on. That is not decoration: unexplored water draws no tile at
+ * all, so bare --bg is what a tile is most often adjacent to, and it is also the
+ * colour dimming moves a tile toward. Both of those only behave if the tiles stay
+ * above the background. A land fill *below* it was tried -- crust at 0.6, on the
+ * theory that light marks want a dark tile under them -- and it did buy the marks
+ * headroom, 3.72:1 for a remembered raider. It also measured 1.09:1 against
+ * unexplored, so the most common edge on the chart became almost invisible, ran the
+ * grid stroke to 1.05:1 because that stroke *is* crust, and inverted the fog: with
+ * land under the background, dimming made land brighter, so remembered meant
+ * fainter on water and bolder on land. Three regressions for one gain.
+ *
+ * So the alphas are set by what stands on them, from above. Land is green at 0.13
+ * rather than the 0.24 it started at, because 0.24 put a remembered raider on a
+ * shore at 2.79:1, under the floor; the ceiling is about 0.18, where the raider hits
+ * 3.02:1. 0.13 is a step back from that edge and reads 1.35:1 against unexplored,
+ * which is better than the dark version managed. Water is 0.19, where a remembered
+ * raider over the shallows measures 3.11:1 and is the worst case anywhere on the
+ * chart. Depth is therefore the faintest distinction of the three, and of the two
+ * channels the fill is the one that can afford to give way, because a fill one step
+ * too faint still only reinforces what the glyph already said, whereas a mark under
+ * its floor is a ship you cannot see. */
+.tile.terrain-0 { fill: var(--sea-shallow); fill-opacity: 0.19; }
+.tile.terrain-1 { fill: var(--sea-shallow); fill-opacity: 0.10; }
+.tile.terrain-2 { fill: var(--land); fill-opacity: 0.13; }
+
+/* Terrain texture: one neutral ink, drawn small.
+ *
+ * Not the terrain's own hue, because the tile underneath is already that hue and a
+ * green # on a green tile measures about 1:1. One ink also buys the thing the
+ * chart most needed, which is that colour in a glyph now means something is
+ * *there*.
+ *
+ * These are meant to recede so the traffic stands out, and the honest way to do
+ * that is size rather than a fainter ink. Ink is floor-bound: --text-muted is the
+ * quietest Catppuccin value that still clears 3:1 over all three tiles, at 3.40:1
+ * dim and 5.05:1 lit, and the next step down the ramp -- overlay2 -- measures
+ * 2.84:1 dim on the shallows and stops being a cue at all. Since the fills are
+ * near-iso-luminant, this glyph is the only thing telling land from water without
+ * colour vision, so it cannot be the channel that gives way. Size is not
+ * floor-bound in the same way: 10px against the marks' 15px reads as texture under
+ * traffic while every contrast figure above holds exactly. */
+.glyph.mark-0,
+.glyph.mark-1,
+.glyph.mark-2 {
+  fill: var(--text-muted);
+  font-size: 10px;
+}
+
+.glyph.mark-3 { fill: var(--harbour); }
+.glyph.mark-4 { fill: var(--ship); }
+.glyph.mark-5 { fill: var(--raider); }
+.glyph.mark-6 { fill: var(--trader); }
+.glyph.mark-7 { fill: var(--crown); }
 
 /* More than one on the hex. Same colour as the single, because the colour says
  * what it is and the doubled mark says how many; a stack is a quantity of a
  * thing the reader already knows, not a new thing to learn. Two glyphs are
  * wider than one, so these draw a size down to keep the pair inside its hex. */
-.cell.code-8,
-.cell.code-9,
-.cell.code-10 {
+.glyph.mark-8,
+.glyph.mark-9,
+.glyph.mark-10 {
   font-size: 11px;
   letter-spacing: -0.06em;
 }
 
-.cell.code-8 { fill: var(--raider); }
-.cell.code-9 { fill: var(--trader); }
-.cell.code-10 { fill: var(--crown); }
-
-.cell--hit {
-  fill: transparent;
-  cursor: pointer;
-}
+.glyph.mark-8 { fill: var(--raider); }
+.glyph.mark-9 { fill: var(--trader); }
+.glyph.mark-10 { fill: var(--crown); }
 
 .cell--mark {
   fill: none;
