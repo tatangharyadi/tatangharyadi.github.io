@@ -136,12 +136,29 @@ def check_ids_on_controls(files):
 
 
 def check_htmx_script(files):
-    """The CDN dependency stays pinned by version and digest, on every page."""
+    """The CDN dependency stays pinned by version and digest, wherever it is used.
+
+    "On every page" was the original rule and it was the right one while every
+    page was an htmx page. game.html is not: it fetches nothing over the wire
+    after load, and a page that uses no hx-* attribute has nothing for the
+    library to do. Loading it anyway to satisfy a checker would be the checker
+    dictating the bytes a visitor downloads, which is backwards.
+
+    So the rule is narrowed rather than dropped, and narrowed on evidence the
+    page itself supplies: a page with no hx-* attribute is exempt, and a page
+    with even one is held to the full pin. The failure mode this still catches
+    is the one that matters, which is a page that uses htmx and gets it from an
+    unpinned or undigested URL. The failure mode it gives up is a page that
+    quietly stops using htmx, which is visible in the diff that removes the
+    attributes.
+    """
     pages = [(rel, text) for rel, text in files if "/" not in rel]
     for relpath, text in pages:
         tags = [t for t in re.findall(r"<script\b[^>]*>", text) if "htmx.org" in t]
         if not tags:
-            fail(f"{relpath} does not load htmx")
+            if not re.search(r"\shx-[a-z-]+\s*=", text):
+                continue
+            fail(f"{relpath} uses hx- attributes but does not load htmx")
             continue
         for tag in tags:
             src = attr(tag, "src") or ""

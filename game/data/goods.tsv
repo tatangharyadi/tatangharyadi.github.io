@@ -1,0 +1,214 @@
+# Base prices in gold by economy type. Source as ports.tsv.
+# buy '-'  = no port of that economy sells this good.
+# sell '-' = every port of that economy already sells it, so unloading there
+#            pays badly. That dash is the same-goods penalty, read directly
+#            from the source table rather than invented.
+good	economy	buy	sell
+Pepper	Mediterranean	-	80
+Pepper	N. Europe	-	110
+Pepper	Americas	-	64
+Pepper	West Africa	-	52
+Pepper	East Africa	-	35
+Pepper	Arabia	-	42
+Pepper	SE Asia	3	2
+Pepper	Far East	-	20
+Cinnamon	Mediterranean	-	70
+Cinnamon	N. Europe	-	80
+Cinnamon	Americas	-	40
+Cinnamon	West Africa	-	32
+Cinnamon	East Africa	-	43
+Cinnamon	Arabia	-	30
+Cinnamon	SE Asia	7	3
+Cinnamon	Far East	-	20
+Nutmeg	Mediterranean	-	100
+Nutmeg	N. Europe	-	105
+Nutmeg	Americas	-	32
+Nutmeg	West Africa	-	30
+Nutmeg	East Africa	-	28
+Nutmeg	Arabia	-	28
+Nutmeg	SE Asia	6	3
+Nutmeg	Far East	-	20
+Pimento	Mediterranean	-	110
+Pimento	N. Europe	-	120
+Pimento	Americas	-	25
+Pimento	West Africa	-	35
+Pimento	East Africa	-	30
+Pimento	Arabia	42	15
+Pimento	SE Asia	-	4
+Pimento	Far East	-	30
+Cloves	Mediterranean	-	105
+Cloves	N. Europe	-	108
+Cloves	Americas	-	30
+Cloves	West Africa	-	42
+Cloves	East Africa	-	29
+Cloves	Arabia	-	30
+Cloves	SE Asia	12	4
+Cloves	Far East	-	20
+Olive Oil	Mediterranean	42	-
+Olive Oil	N. Europe	-	55
+Olive Oil	Americas	-	58
+Olive Oil	West Africa	-	60
+Olive Oil	East Africa	-	38
+Olive Oil	Arabia	30	-
+Olive Oil	SE Asia	-	10
+Olive Oil	Far East	-	2
+Grapes	Mediterranean	38	-
+Grapes	N. Europe	47	62
+Grapes	Americas	-	25
+Grapes	West Africa	-	30
+Grapes	East Africa	-	30
+Grapes	Arabia	-	20
+Grapes	SE Asia	-	15
+Grapes	Far East	-	40
+Sugar	Mediterranean	25	45
+Sugar	N. Europe	31	49
+Sugar	Americas	-	48
+Sugar	West Africa	-	50
+Sugar	East Africa	-	50
+Sugar	Arabia	-	50
+Sugar	SE Asia	-	45
+Sugar	Far East	-	42
+Cheese	Mediterranean	-	40
+Cheese	N. Europe	35	-
+Cheese	Americas	-	50
+Cheese	West Africa	-	45
+Cheese	East Africa	-	40
+Cheese	Arabia	-	58
+Cheese	SE Asia	-	62
+Cheese	Far East	-	50
+Grain	Mediterranean	10	20
+Grain	N. Europe	12	-
+Grain	Americas	-	40
+Grain	West Africa	-	35
+Grain	East Africa	-	42
+Grain	Arabia	18	-
+Grain	SE Asia	10	-
+Grain	Far East	-	5
+Gold	Mediterranean	-	1000
+Gold	N. Europe	-	1000
+Gold	Americas	400	-
+Gold	West Africa	750	-
+Gold	East Africa	515	300
+Gold	Arabia	-	890
+Gold	SE Asia	-	1050
+Gold	Far East	-	900
+Silver	Mediterranean	-	120
+Silver	N. Europe	-	120
+Silver	Americas	-	100
+Silver	West Africa	-	80
+Silver	East Africa	-	280
+Silver	Arabia	-	380
+Silver	SE Asia	-	110
+Silver	Far East	30	200
+Quartz	Mediterranean	-	320
+Quartz	N. Europe	-	325
+Quartz	Americas	-	230
+Quartz	West Africa	-	220
+Quartz	East Africa	180	-
+Quartz	Arabia	105	300
+Quartz	SE Asia	-	330
+Quartz	Far East	-	320
+Coral	Mediterranean	-	280
+Coral	N. Europe	-	275
+Coral	Americas	98	270
+Coral	West Africa	-	290
+Coral	East Africa	-	260
+Coral	Arabia	-	350
+Coral	SE Asia	-	105
+Coral	Far East	-	120
+Ivory	Mediterranean	-	300
+Ivory	N. Europe	-	350
+Ivory	Americas	-	220
+Ivory	West Africa	126	200
+Ivory	East Africa	105	195
+Ivory	Arabia	-	290
+Ivory	SE Asia	-	120
+Ivory	Far East	-	140
+Pearl	Mediterranean	-	220
+Pearl	N. Europe	-	220
+Pearl	Americas	-	175
+Pearl	West Africa	-	170
+Pearl	East Africa	-	160
+Pearl	Arabia	-	230
+Pearl	SE Asia	-	120
+Pearl	Far East	170	-
+Cotton	Mediterranean	87	80
+Cotton	N. Europe	-	110
+Cotton	Americas	22	-
+Cotton	West Africa	30	-
+Cotton	East Africa	25	-
+Cotton	Arabia	20	-
+Cotton	SE Asia	15	-
+Cotton	Far East	-	42
+Raw Silk	Mediterranean	-	120
+Raw Silk	N. Europe	-	130
+Raw Silk	Americas	-	50
+Raw Silk	West Africa	-	40
+Raw Silk	East Africa	-	40
+Raw Silk	Arabia	-	80
+Raw Silk	SE Asia	-	85
+Raw Silk	Far East	30	90
+Wool	Mediterranean	45	65
+Wool	N. Europe	48	55
+Wool	Americas	-	21
+Wool	West Africa	-	12
+Wool	East Africa	-	16
+Wool	Arabia	20	-
+Wool	SE Asia	-	16
+Wool	Far East	-	10
+Cloth	Mediterranean	60	-
+Cloth	N. Europe	62	-
+Cloth	Americas	-	80
+Cloth	West Africa	-	84
+Cloth	East Africa	-	89
+Cloth	Arabia	-	85
+Cloth	SE Asia	30	16
+Cloth	Far East	-	92
+Silk	Mediterranean	-	140
+Silk	N. Europe	-	150
+Silk	Americas	-	50
+Silk	West Africa	-	45
+Silk	East Africa	-	48
+Silk	Arabia	-	50
+Silk	SE Asia	-	70
+Silk	Far East	45	-
+Firearms	Mediterranean	100	-
+Firearms	N. Europe	105	-
+Firearms	Americas	-	170
+Firearms	West Africa	-	140
+Firearms	East Africa	-	190
+Firearms	Arabia	-	230
+Firearms	SE Asia	-	205
+Firearms	Far East	-	240
+Wood	Mediterranean	-	60
+Wood	N. Europe	33	58
+Wood	Americas	-	18
+Wood	West Africa	-	35
+Wood	East Africa	28	-
+Wood	Arabia	-	60
+Wood	SE Asia	-	10
+Wood	Far East	-	15
+Porcelain	Mediterranean	60	105
+Porcelain	N. Europe	60	-
+Porcelain	Americas	-	45
+Porcelain	West Africa	-	40
+Porcelain	East Africa	-	35
+Porcelain	Arabia	-	40
+Porcelain	SE Asia	-	35
+Porcelain	Far East	25	-
+Artwork	Mediterranean	280	400
+Artwork	N. Europe	-	400
+Artwork	Americas	-	300
+Artwork	West Africa	-	30
+Artwork	East Africa	-	45
+Artwork	Arabia	160	150
+Artwork	SE Asia	-	160
+Artwork	Far East	140	-
+Carpet	Mediterranean	-	320
+Carpet	N. Europe	-	340
+Carpet	Americas	-	115
+Carpet	West Africa	-	140
+Carpet	East Africa	-	120
+Carpet	Arabia	70	-
+Carpet	SE Asia	-	75
+Carpet	Far East	-	50

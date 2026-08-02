@@ -1,0 +1,27 @@
+# One-hex displacements, applied after port_place.tsv is mapped onto the grid.
+#
+# A hex is 5 degrees, and some harbours are closer together than that. Kochi
+# and Colombo, Palma and Algiers, Genoa and Marseille, Pisa and Naples, Lisbon
+# and Seville, Acapulco and Veracruz all land in the same cell, and two ports
+# in one hex cannot both be drawn or both be sailed to. Nudging is the honest
+# way out: the grid is the constraint, so say which port was moved and why,
+# rather than quietly rounding a coordinate until the clash disappears.
+#
+# In each pair the port moved is the one that really does lie in that direction
+# from the other, so the map stays right about their relative positions even
+# where it cannot be right about both absolute ones. Two of these are moved for
+# a second reason as well: Veracruz and Seville each end up on the coast the
+# port is actually on, which the unnudged cell got wrong.
+#
+# scripts/gen_game_data.py fails the build on any collision it is not given a
+# nudge for, so this file cannot silently fall out of date with the map.
+#
+# dcol and drow are offsets in odd-r offset coordinates.
+port	dcol	drow	why
+Cochin	-1	-1	north-west of Colombo, out into the Arabian Sea
+Algiers	0	+1	south of Majorca, on the Barbary shore
+Marseille	-1	0	west of Genoa, into the Gulf of Lion
+Naples	0	+1	south of Pisa, down the Tyrrhenian
+Seville	0	+1	south-east of Lisbon; due east is Valencia's hex
+Veracruz	0	-1	north-east of Acapulco, and on the Gulf rather than the Pacific
+Tunis	0	+1	south of Naples, across the strait

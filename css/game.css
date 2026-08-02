@@ -1,0 +1,387 @@
+/* Helm.
+ *
+ * Catppuccin Mocha only, with no prefers-color-scheme block, which is the one
+ * place on this site that ignores the reader's system setting. The reason is
+ * legibility rather than taste: this page draws three states of the same water
+ * (lit, remembered, never seen) by lightness, and in Latte the two that matter
+ * most collapse into each other. A chart you cannot read is not a light theme,
+ * it is a broken page. The deviation is argued in the pull request.
+ *
+ * The tokens below are the same Mocha values css/style.css uses in its dark
+ * block, plus the accent hues this page needs and no other page does.
+ * scripts/check_palette.py holds css/style.css, 404.html, DESIGN.md and the
+ * theme-color metas against each other; it does not read this file, so nothing
+ * here can drift the shared palette out of step.
+ */
+
+:root {
+  --bg: #1e1e2e;
+  --bg-alt: #181825;
+  --bg-chrome: #11111b;
+  --border: #585b70;
+  --text: #cdd6f4;
+  --text-muted: #a6adc8;
+  --accent-text: #89dceb;
+
+  /* Chart hues. Mocha, named for what they draw rather than for the colour. */
+  --sea-shallow: #89b4fa;
+  --sea-deep: #6c7086;
+  --shore: #a6e3a1;
+  --harbour: #f9e2af;
+  --ship: #f5e0dc;
+  --raider: #f38ba8;
+  --loss: #f38ba8;
+  --gain: #a6e3a1;
+
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* display: grid on .helm would otherwise beat the hidden attribute, and the
+   page would show an empty chart before the module has loaded. */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  padding: 1rem;
+  background: var(--bg-chrome);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--accent-text);
+}
+
+/* Visible only once focused, so a keyboard reader can jump past the chart to
+   the log without tabbing through six direction buttons first. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--accent-text);
+}
+
+.skip-link:focus {
+  left: 0.5rem;
+  top: 0.5rem;
+  z-index: 10;
+}
+
+.helm--head {
+  max-width: 70ch;
+  margin: 0 auto 1rem;
+}
+
+.helm--head h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+}
+
+.helm--sub {
+  margin: 0.25rem 0 0;
+  color: var(--text-muted);
+}
+
+.helm--notice {
+  max-width: 70ch;
+  margin: 0 auto 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  color: var(--text-muted);
+}
+
+/* Three regions: chart, status column, log. The chart and the column sit side
+   by side while there is room for both and stack when there is not, because a
+   status column squeezed to twelve characters is worse than a scroll. */
+.helm {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
+  grid-template-areas:
+    "map column"
+    "log column";
+  align-items: start;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+@media (max-width: 60rem) {
+  .helm {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "map"
+      "column"
+      "log";
+  }
+}
+
+.helm--map {
+  grid-area: map;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.25rem;
+  min-width: 0;
+}
+
+#chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.helm--column {
+  grid-area: column;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.helm--chronicle {
+  grid-area: log;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  min-width: 0;
+}
+
+.panel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+}
+
+.panel h2,
+.helm--chronicle h2 {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.25rem;
+}
+
+.panel--sub {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.dim {
+  color: var(--text-muted);
+  margin: 0.35rem 0 0;
+}
+
+.bad {
+  color: var(--loss);
+}
+
+.good {
+  color: var(--gain);
+}
+
+/* who: a two-column fact list, label left, value right. */
+.panel--facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 0.75rem;
+  margin: 0;
+}
+
+.panel--facts dt {
+  color: var(--text-muted);
+}
+
+.panel--facts dd {
+  margin: 0;
+  text-align: right;
+}
+
+/* here: the market. A table, because it is one. */
+.market {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.35rem;
+}
+
+.market th,
+.market td {
+  padding: 0.15rem 0.3rem;
+  text-align: right;
+  border-bottom: 1px solid var(--bg-alt);
+  white-space: nowrap;
+}
+
+.market th {
+  color: var(--text-muted);
+  font-weight: normal;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.market th:first-child,
+.market td:first-child {
+  text-align: left;
+  white-space: normal;
+}
+
+.market--scroll {
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent-text);
+  color: var(--accent-text);
+}
+
+/* Never removed, only restyled. A focus ring is the only way a keyboard reader
+   knows where they are, and this page has a lot of controls. */
+:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 1px;
+}
+
+kbd {
+  font: inherit;
+  color: var(--accent-text);
+}
+
+input[type="number"] {
+  font: inherit;
+  width: 4.5rem;
+  color: var(--text);
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  padding: 0.1rem 0.25rem;
+}
+
+.helm--rose {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem;
+}
+
+.helm--orders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.panel--ports {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.panel--ports li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.1rem 0;
+}
+
+.panel--ports button {
+  border: none;
+  background: none;
+  padding: 0.1rem 0.2rem;
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+
+.chronicle--lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 12rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+.chronicle--lines li {
+  padding: 0.1rem 0;
+  border-bottom: 1px solid var(--bg-alt);
+}
+
+.chronicle--lines li:first-child {
+  color: var(--text);
+}
+
+.chronicle--lines li:not(:first-child) {
+  color: var(--text-muted);
+}
+
+/* The chart itself.
+ *
+ * Three states of knowledge, drawn by opacity rather than by hue, so the
+ * distinction survives every kind of colour blindness: lit, remembered, and
+ * never seen. Never-seen hexes draw nothing at all. */
+.cell {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  user-select: none;
+}
+
+.cell.seen-0 {
+  opacity: 0;
+}
+
+.cell.seen-1 {
+  opacity: 0.42;
+}
+
+.cell.seen-2 {
+  opacity: 1;
+}
+
+.cell.code-0 { fill: var(--sea-shallow); }
+.cell.code-1 { fill: var(--sea-deep); }
+.cell.code-2 { fill: var(--shore); }
+.cell.code-3 { fill: var(--harbour); }
+.cell.code-4 { fill: var(--ship); }
+.cell.code-5 { fill: var(--raider); }
+
+.cell--hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.cell--mark {
+  fill: none;
+  stroke: var(--accent-text);
+  stroke-width: 1.5;
+}

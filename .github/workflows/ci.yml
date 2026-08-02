@@ -57,11 +57,29 @@ jobs:
       - name: Search index still matches portfolio.html
         run: python3 scripts/check_corpus.py
 
-      - name: Palette is in step across all four copies
+      - name: Palette is in step across every copy
         run: python3 scripts/check_palette.py
 
       - name: .nojekyll present and sitemap in step
         run: python3 scripts/check_repo.py
+
+      # game/src/world.rs is generated from the TSVs in game/data, the same
+      # bargain as the work fragments above. This step also re-runs the three
+      # map assertions, which is the part worth having: a coastline edit that
+      # walls a port in, leaves one floating in open ocean or drops two into the
+      # same hex fails here rather than being found by sailing into it. One of
+      # those three assertions exists because exactly that happened.
+      - name: Game world is freshly generated from the map data
+        run: python3 scripts/gen_game_data.py --check
+
+      # Verifies assets/game.wasm against the hash committed beside it. Says
+      # less than it looks like it says, and scripts/build_game.sh is candid
+      # about it in the header: this proves the binary has not been altered
+      # since it was committed, not that it is what game/src compiles to. The
+      # honest check is a human running the build without --check and reading
+      # the diff. No Rust toolchain is needed for this step, which is the point.
+      - name: Committed wasm matches its hash
+        run: scripts/build_game.sh --check
 
       # Pinned rather than floating: an unpinned alpha changing under us turns CI
       # red with no change to this repo, which is exactly the maintenance burden
@@ -85,3 +103,20 @@ jobs:
               sys.exit(1)
           print("\nDESIGN.md lint: clean.")
           PY
+
+  # A separate job so the one above stays toolchain-free. Nothing is installed
+  # here either: GitHub's runners ship a stable Rust, and the tests are a
+  # host-native cargo test with no dependencies and no wasm target, so this is
+  # a checkout and a compile.
+  #
+  # This job holds exactly one step on purpose. Everything that does not need
+  # Rust belongs in `check` above, so that a red mark here says "the simulation
+  # is wrong" and nothing else.
+  game:
+    name: Simulation tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: cargo test
+        run: cargo test --manifest-path game/Cargo.toml

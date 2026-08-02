@@ -1,0 +1,100 @@
+# Where each port actually is, in real degrees.
+#
+# Why this file exists. ports.tsv is a faithful transcription of the 1990
+# reference table, and that table's coordinates are the old game's own sextant
+# readings, not geography: it puts London at N65, Rio de Janeiro at S65 and
+# Cape Town at S45. coast.tsv, by contrast, is real coastline. Rasterising one
+# against the other left 21 of the 70 harbours with no land next to them, two
+# of them in open ocean hundreds of miles from anywhere.
+#
+# So the two roles are split. ports.tsv stays the source of record for the
+# things the source table is actually authoritative about, which is the trade
+# data: which economy a port belongs to and what it is known for. This file is
+# the source of record for where it sits. Nothing in ports.tsv changed, so the
+# transcription can still be checked against the source line by line.
+#
+# A side effect worth stating plainly: this uses less of the reference than
+# before, not more. The map is now ordinary geography, and the only thing kept
+# from the table is the goods matrix, which is the part that is a table of
+# facts rather than anyone's creative work.
+#
+# Coordinates are decimal degrees, north and east positive. They are ordinary
+# geographic knowledge, not a dataset, so there is no licence to carry. The
+# grid is 5 degrees a hex, so the bar is the right harbour on the right coast,
+# not survey accuracy; a place named for an inland city is given its historic
+# seaport and the note says which.
+#
+# scripts/gen_game_data.py asserts that every port lands on water, that no two
+# share a hex, and that every one of them has land in an adjoining hex. A
+# harbour with no shore fails the build.
+port	lat	lon	note
+Acapulco	16.9	-99.9	-
+Aden	12.8	45.0	-
+Alexandria	31.2	29.9	-
+Algiers	36.8	3.1	-
+Amboina	-3.7	128.2	Ambon, in the Moluccas
+Antwerp	51.2	4.4	-
+Argin	20.6	-16.5	Arguin, off the Mauritanian coast
+Azov	47.1	39.4	-
+Baghdad	30.5	47.8	Basra, the seaport Baghdad's trade actually left by
+Bordeaux	44.8	-0.6	-
+Calicut	11.3	75.8	Kozhikode
+Cape Town	-33.9	18.4	-
+Caracas	10.6	-66.9	La Guaira, the port of Caracas
+Ceylon	6.9	79.9	Colombo
+Chanchan	-8.1	-79.1	Chan Chan, on the coast by Trujillo
+Cochin	9.9	76.3	Kochi
+Copiapo	-27.1	-70.8	Caldera, the port of Copiapo
+Da Nang	16.1	108.2	-
+Diu	20.7	71.0	-
+Eureka	40.8	-124.2	-
+Genoa	44.4	8.9	-
+Goa	15.5	73.8	-
+Guam	13.4	144.8	-
+Guatemala	13.9	-90.8	San Jose, the Pacific port
+Hamburg	53.5	10.0	-
+Hormuz	27.1	56.5	-
+Injiga	69.0	33.1	The ice-free Murman coast
+Istanbul	41.0	29.0	-
+Jamaica	17.9	-76.8	Port Royal
+Java	-6.1	106.8	Sunda Kelapa, later Jakarta
+Kailua	19.6	-156.0	Kailua-Kona, Hawaii
+Leveque	-16.4	122.9	Cape Leveque, north-west Australia
+Lisbon	38.7	-9.1	-
+London	51.5	-0.1	-
+Luanda	-8.8	13.2	-
+Macao	22.2	113.5	-
+Madang	-5.2	145.8	-
+Majorca	39.6	2.6	Palma
+Malacca	2.2	102.2	-
+Marseille	43.3	5.4	-
+Mecca	21.5	39.2	Jeddah, the port of Mecca
+Mombasa	-4.0	39.7	-
+Mozambique	-15.0	40.7	Ilha de Mocambique
+Muscat	23.6	58.6	-
+Nagasaki	32.7	129.9	-
+Naples	40.8	14.3	-
+Nova Granada	10.4	-75.5	Cartagena de Indias
+Oslo	59.9	10.8	-
+Panama	9.0	-79.5	-
+Pernambuco	-8.1	-34.9	Recife
+Pisa	43.7	10.4	-
+Rio de Janeiro	-22.9	-43.2	-
+Rio Grande	-32.0	-52.1	-
+Ruwen	-6.8	39.3	Dar es Salaam, the landfall for the Rwenzori trade
+San Jorge	5.1	-1.3	Sao Jorge da Mina, on the Gold Coast
+Santo Domingo	18.5	-69.9	-
+Seville	37.4	-6.0	-
+Siber	66.7	72.5	The Ob estuary, the way into Siberia by sea
+Sofala	-20.2	34.7	-
+Sumatra	5.6	95.3	Banda Aceh
+Tanisk	59.8	149.3	Tauisk, on the Sea of Okhotsk
+Ternate	0.8	127.4	-
+Trebizond	41.0	39.7	Trabzon
+Tunis	36.8	10.2	-
+Valencia	39.5	-0.4	-
+Venice	45.4	12.3	-
+Veracruz	19.2	-96.1	-
+Verde	14.9	-23.5	Praia, in the Cape Verde islands
+Virginia	37.2	-76.8	Jamestown
+Zeiton	24.9	118.6	Quanzhou

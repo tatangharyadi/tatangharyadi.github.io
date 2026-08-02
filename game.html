@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Helm | Tatang Haryadi</title>
+    <meta name="description" content="Helm: an age-of-sail trading game on a hexagonal world. The whole simulation is a dependency-free Rust crate compiled to WebAssembly and run in your browser, with no server and no framework." />
+    <!--
+        One theme-color, not the pair every other page carries, and that is on
+        purpose rather than an oversight. This page is Catppuccin Mocha whatever
+        the reader's system says, because a fog-of-war chart in Latte reads as a
+        rendering fault: unseen water and lit water both come out pale, and the
+        thing the page is for stops being legible. scripts/check_palette.py
+        checks index.html and 404.html, so nothing here is being smuggled past
+        it; the deviation is argued in the pull request instead.
+    -->
+    <meta name="theme-color" content="#11111b" />
+    <link rel="canonical" href="https://tatangharyadi.github.io/game.html" />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Tatang Haryadi" />
+    <meta property="og:url" content="https://tatangharyadi.github.io/game.html" />
+    <meta property="og:title" content="Helm" />
+    <meta property="og:description" content="An age-of-sail trading game on a hexagonal world, simulated by a dependency-free Rust crate compiled to WebAssembly." />
+
+    <link rel="stylesheet" href="css/game.css" />
+    <script type="module" src="js/game.js"></script>
+</head>
+
+<body>
+    <a class="skip-link" href="#chronicle">Skip to the log</a>
+
+    <header class="helm--head">
+        <h1>Helm</h1>
+        <p class="helm--sub">
+            A trading voyage, 1502. The simulation is
+            <a href="https://github.com/tatangharyadi/tatangharyadi.github.io/tree/main/game">a Rust crate</a>
+            compiled to WebAssembly: no engine, no framework, no dependencies.
+        </p>
+        <p class="helm--sub"><a href="index.html">Back to the rest of the site</a></p>
+    </header>
+
+    <noscript>
+        <p class="helm--notice">
+            This page is a simulation and needs JavaScript to run the WebAssembly
+            module that drives it. Everything else on this site works without it;
+            this one genuinely cannot.
+        </p>
+    </noscript>
+
+    <p class="helm--notice" id="boot">Loading the chart.</p>
+
+    <main class="helm" id="helm" hidden>
+        <!--
+            The map is a picture of state that is written out in words in the
+            status column beside it, so it is marked decorative. Clicking a hex
+            is a shortcut for a mouse; every hex a reader could want to inspect
+            is also reachable from the port list, and every move is also a
+            button. Nothing here is the only way to do anything.
+        -->
+        <section class="helm--map">
+            <svg id="chart" viewBox="0 0 640 400" role="img" aria-hidden="true" focusable="false"
+                 preserveAspectRatio="xMidYMid meet"></svg>
+        </section>
+
+        <div class="helm--column">
+            <section class="panel" id="who" aria-labelledby="who--title">
+                <h2 id="who--title">who</h2>
+                <dl class="panel--facts" id="who--facts"></dl>
+            </section>
+
+            <section class="panel" id="here" aria-labelledby="here--title">
+                <h2 id="here--title">here</h2>
+                <div id="here--body"></div>
+            </section>
+
+            <section class="panel" id="there" aria-labelledby="there--title">
+                <h2 id="there--title">there</h2>
+                <div id="there--body">
+                    <p class="dim">Click a hex, or pick a port below.</p>
+                </div>
+                <h3 class="panel--sub">ports on the chart</h3>
+                <ul class="panel--ports" id="known" role="list"></ul>
+            </section>
+
+            <section class="panel" id="how" aria-labelledby="how--title">
+                <h2 id="how--title">how</h2>
+                <!--
+                    Real buttons rather than key hints alone. The keys are the
+                    fast way; these are the way that works with a keyboard,
+                    a screen reader or a thumb.
+                -->
+                <div class="helm--rose" role="group" aria-label="Sail one hex">
+                    <button type="button" id="sail-2" data-dir="2"><kbd>q</kbd> NW</button>
+                    <button type="button" id="sail-1" data-dir="1"><kbd>e</kbd> NE</button>
+                    <button type="button" id="sail-3" data-dir="3"><kbd>a</kbd> W</button>
+                    <button type="button" id="sail-0" data-dir="0"><kbd>d</kbd> E</button>
+                    <button type="button" id="sail-4" data-dir="4"><kbd>z</kbd> SW</button>
+                    <button type="button" id="sail-5" data-dir="5"><kbd>c</kbd> SE</button>
+                </div>
+                <div class="helm--orders">
+                    <button type="button" id="order-on"><kbd>space</kbd> sail on</button>
+                    <button type="button" id="order-wait"><kbd>.</kbd> lie to</button>
+                    <button type="button" id="order-new">new voyage</button>
+                </div>
+                <p class="dim">
+                    A laid course is sailed a leg at a time, so weather and pirates
+                    still get their say. Nothing is ever greyed out; an order that
+                    cannot be obeyed is refused in the log, with the reason.
+                </p>
+            </section>
+        </div>
+
+        <section class="helm--chronicle" id="chronicle" aria-labelledby="chronicle--title">
+            <h2 id="chronicle--title">chronicle</h2>
+            <ol class="chronicle--lines" id="chronicle--lines" role="list" aria-live="polite" aria-atomic="false"></ol>
+        </section>
+    </main>
+</body>
+
+</html>

@@ -105,7 +105,22 @@
             <div class="masthead--container">
                 <div class="masthead--identity">
                     <h1 class="masthead--name">Tatang Haryadi</h1>
-                    <p class="masthead--role">Chief Technology Officer</p>
+                    <!-- The job title is a door. game.html is a trading simulation
+                         compiled to WebAssembly from Rust in this repository, and it
+                         is not in the nav on purpose: a hiring manager reading this
+                         page should not have to step over a game to reach the work.
+                         Anyone who hovers the title, tabs through the page or reads
+                         the sitemap finds it, which is the right audience.
+
+                         It stays a plain <a href> so it is a real link: middle-click
+                         opens a tab, the keyboard reaches it with no handler of ours,
+                         and it works with JavaScript off. The only thing hidden is
+                         the underline, and only until hover or focus. -->
+                    <p class="masthead--role">
+                        <a class="masthead--helm" id="masthead-helm" href="game.html"
+                           title="Take the helm"
+                           aria-label="Take the helm: a sailing and trading simulation">Chief Technology Officer</a>
+                    </p>
                     <!-- Concrete before general, deliberately. An earlier version
                          opened with "I accelerate digital transformations and product
                          innovation", which is the register every technology executive
