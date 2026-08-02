@@ -6,6 +6,7 @@
 //! which run the same pathfinder the player's autopilot does and therefore
 //! cost the same to think.
 
+use crate::commission::{self, Commission};
 use crate::hex::{self, Hex};
 use crate::market::Markets;
 use crate::nav::{self, CELLS, REMEMBERED, UNSEEN, VISIBLE};
@@ -268,7 +269,7 @@ struct Merchant {
 }
 
 /// A sum in gold, grouped in threes, the way the page prints it.
-fn coin(n: i32) -> String {
+pub(crate) fn coin(n: i32) -> String {
     let digits = n.unsigned_abs().to_string();
     let mut out = String::with_capacity(digits.len() + digits.len() / 3 + 1);
     if n < 0 {
@@ -324,6 +325,15 @@ fn shallow_harbours() -> Vec<bool> {
     out
 }
 
+/// Hexes between two harbours as the gull flies. Not a sailing distance: there
+/// is land in the way of most pairs and a course round it is longer. Good
+/// enough for pricing an errand, which is all it is used for.
+fn port_distance(a: usize, b: usize) -> i32 {
+    let ha = hex::from_offset(PORTS[a].col as i32, PORTS[a].row as i32);
+    let hb = hex::from_offset(PORTS[b].col as i32, PORTS[b].row as i32);
+    hex::distance(ha, hb)
+}
+
 pub struct Game {
     pub ship: Ship,
     pub gold: i32,
@@ -350,6 +360,20 @@ pub struct Game {
     pirates: Vec<Pirate>,
     merchants: Vec<Merchant>,
     discovered: Vec<bool>,
+    /// Ports the player has actually come to anchor at, which is not what
+    /// `discovered` records: that one is set by the lookout at range. A
+    /// commission is drawn against this, because "somewhere you have never
+    /// been" has to mean ashore.
+    visited: Vec<bool>,
+    /// Goods the player has ever bought, anywhere. The other half of what a
+    /// commission steers by. Set in `buy` and never cleared.
+    traded: Vec<bool>,
+    /// The errand on the table at the port you are standing in. Drawn on
+    /// arrival, thrown away the moment you weigh anchor: an offer nobody is
+    /// there to make is not an offer.
+    offer: Option<Commission>,
+    /// The errand accepted. One at a time, on purpose. See `commission`.
+    commission: Option<Commission>,
     chronicle: Vec<String>,
     rng: Rng,
 
@@ -388,6 +412,10 @@ impl Game {
             pirates: Vec::new(),
             merchants: Vec::new(),
             discovered: vec![false; PORTS.len()],
+            visited: vec![false; PORTS.len()],
+            traded: vec![false; GOODS.len()],
+            offer: None,
+            commission: None,
             chronicle: Vec::new(),
             rng: Rng::new(seed),
             render: vec![0; CELLS * 2],
@@ -408,6 +436,7 @@ impl Game {
         g.ship.water = 8;
 
         g.discovered[start] = true;
+        g.visited[start] = true;
         g.spawn_pirates();
         g.spawn_merchants();
         g.look();
@@ -694,19 +723,146 @@ impl Game {
         self.move_merchants(hours);
         self.move_pirates(hours);
 
+        // Any errand on the table belonged to the port just left. Cleared on
+        // every leg rather than only on departure, so there is no way to carry
+        // an offer out to sea and accept it there.
+        self.offer = None;
+
         if let Some(p) = self.port_here() {
             if !self.discovered[p] {
                 self.discovered[p] = true;
             }
+            self.visited[p] = true;
             // Note the arrival but do not cancel a laid course. Passing through
             // a harbour on the way somewhere else should not end the voyage,
             // and the player asked for the destination, not the first landfall.
             if self.course.is_empty() {
                 self.say(format!("You come to anchor at {}.", PORTS[p].name));
+                // Only to a ship that has actually stopped. A hull standing in
+                // past a harbour under a laid course has nobody ashore.
+                self.offer_commission(p);
             } else {
                 self.say(format!("You stand in past {}.", PORTS[p].name));
             }
         }
+        true
+    }
+
+    // -- commissions -------------------------------------------------------
+
+    /// Roll for an errand at the port just anchored in. See `commission`.
+    fn offer_commission(&mut self, port: usize) {
+        if self.commission.is_some() || !self.rng.chance(commission::OFFER_CHANCE_PERCENT) {
+            return;
+        }
+        // Borrowed out of `self` before the draw, because `Ledger` holds
+        // references into the same struct the generator needs `&mut` of.
+        let deep = self.ship.class.is_deep_draught();
+        let shallow: Vec<bool> = (0..PORTS.len())
+            .map(|p| {
+                let h = hex::from_offset(PORTS[p].col as i32, PORTS[p].row as i32);
+                deep && hex::index(h).is_some_and(|i| self.shallow_harbour[i])
+            })
+            .collect();
+        let ledger = commission::Ledger {
+            visited: &self.visited,
+            discovered: &self.discovered,
+            traded: &self.traded,
+            barred: &|p: usize| shallow[p],
+            distance: &port_distance,
+        };
+        let Some(offer) = commission::draw(&mut self.rng, &self.markets, port, &ledger) else {
+            return;
+        };
+        self.say(format!("A factor comes aboard. {}", offer.wording()));
+        self.offer = Some(offer);
+    }
+
+    pub fn offer(&self) -> Option<&Commission> {
+        self.offer.as_ref()
+    }
+
+    pub fn commission(&self) -> Option<&Commission> {
+        self.commission.as_ref()
+    }
+
+    /// Take the errand on the table. Nothing is paid and nothing is loaded: the
+    /// only thing that changes is that the game now remembers what you agreed
+    /// to and where you agreed to do it.
+    pub fn accept_commission(&mut self) -> bool {
+        let Some(c) = self.offer.take() else {
+            self.say("There is no errand on the table.".into());
+            return false;
+        };
+        if self.commission.is_some() {
+            self.say("You are already under commission.".into());
+            self.offer = Some(c);
+            return false;
+        }
+        self.say(match c.kind {
+            commission::Kind::Deliver => format!(
+                "You take the commission. {} {} for {}, and {} on the quay there.",
+                c.qty, GOODS[c.good], PORTS[c.other].name, coin(c.gold)
+            ),
+            commission::Kind::Collect => format!(
+                "You take the commission. {} {} out of {}, and {} on your return.",
+                c.qty, GOODS[c.good], PORTS[c.other].name, coin(c.gold)
+            ),
+        });
+        self.commission = Some(c);
+        true
+    }
+
+    /// Hand over the parcel and be paid. Refuses rather than part-pays: the
+    /// factor asked for a number and half of it is not the errand.
+    pub fn settle_commission(&mut self) -> bool {
+        let Some(c) = self.commission.clone() else {
+            self.say("You are under no commission.".into());
+            return false;
+        };
+        let Some(here) = self.port_here() else {
+            self.say("You are at sea. There is nobody to pay you.".into());
+            return false;
+        };
+        if here != c.paid_at() {
+            self.say(format!("That parcel is wanted in {}.", PORTS[c.paid_at()].name));
+            return false;
+        }
+        if self.ship.hold[c.good] < c.qty {
+            self.say(format!(
+                "The hold is {} {} short of the commission.",
+                c.qty - self.ship.hold[c.good],
+                GOODS[c.good]
+            ));
+            return false;
+        }
+
+        // The parcel leaves the hold at what it cost, so the ledger of outlay
+        // stays honest for whatever else of that good is still aboard: the
+        // errand pays a fee, it is not a sale at a wonderful price.
+        let have = self.ship.hold[c.good];
+        let avg_cost = if have > 0 { self.ship.paid[c.good] / have } else { 0 };
+        self.ship.hold[c.good] -= c.qty;
+        self.ship.paid[c.good] -= avg_cost * c.qty;
+
+        self.gold += c.gold;
+        self.markets.oblige(here, c.favour);
+        self.commission = None;
+        self.say(format!(
+            "The commission is discharged at {}. {} in gold, and they will remember it.",
+            PORTS[here].name, coin(c.gold)
+        ));
+        true
+    }
+
+    /// Give up the errand. No penalty: it was optional when it was offered and
+    /// nothing about accepting it made it less so.
+    pub fn abandon_commission(&mut self) -> bool {
+        if self.commission.take().is_none() {
+            self.say("You are under no commission.".into());
+            return false;
+        }
+        self.say("You send word that the commission is off.".into());
         true
     }
 
@@ -1606,6 +1762,10 @@ impl Game {
         self.gold -= cost;
         self.ship.hold[good] += take;
         self.ship.paid[good] += cost;
+        // Remembered for the life of the voyage. A commission steers toward
+        // goods this has never been set for, so it must record the trade rather
+        // than the stock: selling the parcel on does not make it unfamiliar.
+        self.traded[good] = true;
         self.markets.on_buy(port, good, cost);
         self.say(format!(
             "Bought {take} {} at {unit} for {cost}.",
@@ -2234,6 +2394,287 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // -- commissions -------------------------------------------------------
+
+    /// A game with the whole chart known and nothing but the start port called
+    /// at, which is the state the exploration bias is supposed to act on.
+    fn charted_but_untravelled() -> Game {
+        let mut g = Game::new(1);
+        g.discovered.iter_mut().for_each(|d| *d = true);
+        g.visited.iter_mut().for_each(|v| *v = false);
+        let start = g.port_here().unwrap();
+        g.visited[start] = true;
+        g
+    }
+
+    fn draw_many(g: &mut Game, here: usize, n: usize) -> Vec<Commission> {
+        let (visited, discovered, traded) =
+            (g.visited.clone(), g.discovered.clone(), g.traded.clone());
+        let ledger = commission::Ledger {
+            visited: &visited,
+            discovered: &discovered,
+            traded: &traded,
+            barred: &|_| false,
+            distance: &port_distance,
+        };
+        (0..n)
+            .filter_map(|_| commission::draw(&mut g.rng, &g.markets, here, &ledger))
+            .collect()
+    }
+
+    fn a_trading_port(not: usize) -> usize {
+        (0..PORTS.len())
+            .find(|&p| p != not && Markets::trades(p))
+            .expect("no port trades")
+    }
+
+    /// The whole reason the feature exists, asserted as the statistical claim it
+    /// actually is rather than as the presence of a field.
+    ///
+    /// A commission that named ports uniformly would be a lottery with extra
+    /// steps: the player would take the ones on their existing circuit and
+    /// ignore the rest, and the map would stay exactly as small as it was. The
+    /// bias is the feature. If this drops to a coin flip the errands are still
+    /// generated, still payable and still worth gold, and the thing they were
+    /// built for has quietly stopped happening, with nothing else to notice.
+    #[test]
+    fn commissions_point_at_harbours_the_player_has_never_seen_the_inside_of() {
+        let mut g = charted_but_untravelled();
+        let here = g.port_here().unwrap();
+        // A quarter of the chart called at, so there is a large pool of both
+        // kinds to choose between and a uniform draw would land near 25%.
+        for p in (0..PORTS.len()).step_by(4) {
+            g.visited[p] = true;
+        }
+        let drawn = draw_many(&mut g, here, 400);
+        assert!(drawn.len() > 300, "the world could barely supply an errand: {}", drawn.len());
+        let fresh = drawn.iter().filter(|c| !g.visited[c.other]).count();
+        assert!(
+            fresh * 10 > drawn.len() * 8,
+            "only {fresh} of {} errands named an unvisited port; the bias is gone",
+            drawn.len()
+        );
+    }
+
+    /// The same claim for the other half of the ask: the parcel should be
+    /// something the player has never bought.
+    #[test]
+    fn commissions_name_goods_the_player_has_never_bought() {
+        let mut g = charted_but_untravelled();
+        let here = g.port_here().unwrap();
+        for good in (0..GOODS.len()).step_by(3) {
+            g.traded[good] = true;
+        }
+        let drawn = draw_many(&mut g, here, 400);
+        let fresh = drawn.iter().filter(|c| !g.traded[c.good]).count();
+        assert!(
+            fresh * 10 > drawn.len() * 8,
+            "only {fresh} of {} errands named an unbought good",
+            drawn.len()
+        );
+    }
+
+    /// The bias is a weight and not a filter, so a player who has been
+    /// everywhere still gets offered work. The alternative is a late game where
+    /// the factors go silent, which reads as a bug.
+    #[test]
+    fn a_player_who_has_been_everywhere_is_still_offered_errands() {
+        let mut g = charted_but_untravelled();
+        g.visited.iter_mut().for_each(|v| *v = true);
+        g.traded.iter_mut().for_each(|t| *t = true);
+        let here = g.port_here().unwrap();
+        assert!(!draw_many(&mut g, here, 40).is_empty());
+    }
+
+    /// An errand to a harbour this hull cannot enter is the same trap as a
+    /// course laid to one, and worse, because it is a trap with a price on it.
+    #[test]
+    fn no_errand_names_a_harbour_the_hull_is_barred_from() {
+        let mut g = charted_but_untravelled();
+        let here = g.port_here().unwrap();
+        let banned = a_trading_port(here);
+        let (visited, discovered, traded) =
+            (g.visited.clone(), g.discovered.clone(), g.traded.clone());
+        let ledger = commission::Ledger {
+            visited: &visited,
+            discovered: &discovered,
+            traded: &traded,
+            barred: &|p: usize| p == banned,
+            distance: &port_distance,
+        };
+        for _ in 0..400 {
+            if let Some(c) = commission::draw(&mut g.rng, &g.markets, here, &ledger) {
+                assert_ne!(c.other, banned, "offered an errand to a barred harbour");
+            }
+        }
+    }
+
+    /// An unseen port cannot be laid a course to, so naming one would be an
+    /// errand the player is unable to start.
+    #[test]
+    fn no_errand_names_an_uncharted_harbour() {
+        let mut g = Game::new(1);
+        let here = g.port_here().unwrap();
+        let known: Vec<bool> = g.discovered.clone();
+        for _ in 0..200 {
+            let drawn = draw_many(&mut g, here, 1);
+            for c in drawn {
+                assert!(known[c.other], "offered an errand to a port not on the chart");
+            }
+        }
+    }
+
+    /// Carrying the parcel to the right quay pays the gold and the standing,
+    /// takes the goods and ends the errand.
+    #[test]
+    fn discharging_a_commission_pays_gold_and_standing() {
+        let mut g = charted_but_untravelled();
+        let here = g.port_here().unwrap();
+        let c = draw_many(&mut g, here, 200)
+            .into_iter()
+            .find(|c| c.kind == commission::Kind::Collect)
+            .expect("no collect errand in two hundred draws");
+        let (good, qty, gold, favour) = (c.good, c.qty, c.gold, c.favour);
+        g.commission = Some(c);
+
+        g.ship.hold[good] = qty + 3;
+        g.ship.paid[good] = 0;
+        let purse = g.gold;
+        let standing = g.markets.favour_of(here);
+
+        assert!(g.settle_commission());
+        assert_eq!(g.gold, purse + gold);
+        assert_eq!(g.ship.hold[good], 3, "the parcel did not leave the hold");
+        assert_eq!(g.markets.favour_of(here), standing + favour);
+        assert!(g.commission().is_none());
+    }
+
+    /// Short of the parcel is a refusal, not a part payment, and the errand
+    /// survives it: the player can go and buy the rest.
+    #[test]
+    fn a_short_hold_cannot_discharge_a_commission() {
+        let mut g = charted_but_untravelled();
+        let here = g.port_here().unwrap();
+        let c = draw_many(&mut g, here, 200)
+            .into_iter()
+            .find(|c| c.kind == commission::Kind::Collect)
+            .expect("no collect errand in two hundred draws");
+        let (good, qty) = (c.good, c.qty);
+        g.commission = Some(c);
+        g.ship.hold[good] = qty - 1;
+        let purse = g.gold;
+
+        assert!(!g.settle_commission());
+        assert_eq!(g.gold, purse);
+        assert!(g.commission().is_some(), "a refusal must not eat the errand");
+        assert_eq!(g.ship.hold[good], qty - 1, "a refusal must not eat the cargo");
+    }
+
+    /// The right cargo at the wrong quay is refused, and the refusal says where
+    /// it is wanted. A player standing in the harbour they bought the goods at
+    /// would otherwise have no way to tell a bug from a rule.
+    #[test]
+    fn the_parcel_is_only_paid_for_at_the_port_that_wants_it() {
+        let mut g = charted_but_untravelled();
+        let here = g.port_here().unwrap();
+        let c = draw_many(&mut g, here, 200)
+            .into_iter()
+            .find(|c| c.kind == commission::Kind::Deliver)
+            .expect("no deliver errand in two hundred draws");
+        // A deliver errand is paid at the far end, and the ship is still here.
+        let (good, qty, other) = (c.good, c.qty, c.other);
+        g.commission = Some(c);
+        g.ship.hold[good] = qty;
+
+        assert!(!g.settle_commission());
+        let said = g.chronicle().last().unwrap();
+        assert!(said.contains(PORTS[other].name), "the refusal did not say where: {said:?}");
+    }
+
+    /// One at a time. The offer is not even drawn while an errand is running,
+    /// so the port panel never shows a second one to weigh against the first.
+    #[test]
+    fn a_ship_already_under_commission_is_offered_no_other() {
+        let mut g = charted_but_untravelled();
+        let here = g.port_here().unwrap();
+        let c = draw_many(&mut g, here, 200).into_iter().next().expect("no errand");
+        g.commission = Some(c);
+        for _ in 0..200 {
+            g.offer_commission(here);
+        }
+        assert!(g.offer().is_none());
+    }
+
+    /// Standing in past a harbour under a laid course is not coming ashore, so
+    /// nobody rows out with an errand.
+    #[test]
+    fn no_factor_boards_a_ship_that_did_not_stop() {
+        let mut g = charted_but_untravelled();
+        let here = g.port_here().unwrap();
+        for _ in 0..200 {
+            g.offer_commission(here);
+            if g.offer().is_some() {
+                break;
+            }
+        }
+        assert!(g.offer().is_some(), "no errand in two hundred landfalls");
+        // Any leg of sailing clears it, which is what the passing-through case
+        // relies on: the offer is thrown away before the arrival block runs.
+        for dir in 0..6 {
+            if g.step(dir) {
+                break;
+            }
+        }
+        assert!(g.offer().is_none(), "an offer followed the ship out of harbour");
+    }
+
+    /// Abandoning costs nothing. An optional errand that can punish you is not
+    /// optional, and this is the line that says so in code.
+    #[test]
+    fn abandoning_a_commission_costs_nothing() {
+        let mut g = charted_but_untravelled();
+        let here = g.port_here().unwrap();
+        let c = draw_many(&mut g, here, 200).into_iter().next().expect("no errand");
+        g.commission = Some(c);
+        let (purse, standing, rep) = (g.gold, g.markets.favour_of(here), g.reputation);
+
+        assert!(g.abandon_commission());
+        assert!(g.commission().is_none());
+        assert_eq!(g.gold, purse);
+        assert_eq!(g.markets.favour_of(here), standing);
+        assert_eq!(g.reputation, rep);
+    }
+
+    /// `discovered` is set by the lookout at range and `visited` only by an
+    /// anchor going down. If the two were the same field the bias would point
+    /// at every harbour the player had ever sailed within sight of, which is
+    /// most of the ones they have already worked.
+    #[test]
+    fn sighting_a_harbour_is_not_the_same_as_calling_at_it() {
+        let g = Game::new(1);
+        let charted = g.discovered.iter().filter(|d| **d).count();
+        let called = g.visited.iter().filter(|v| **v).count();
+        assert_eq!(called, 1, "a new game has been ashore exactly once");
+        assert!(charted >= called, "the lookout cannot see fewer ports than were entered");
+    }
+
+    /// Buying records the good for good, even if the parcel is sold on at the
+    /// next quay. The bias steers by what the player has *tried*, not by what
+    /// happens to be in the hold.
+    #[test]
+    fn selling_a_good_on_does_not_make_it_unfamiliar_again() {
+        let mut g = Game::new(1);
+        let port = g.port_here().unwrap();
+        let good = (0..GOODS.len())
+            .find(|&x| g.markets.is_open(port, x) && g.markets.buy_price(port, x).is_some())
+            .expect("nothing on sale at the start port");
+        assert!(!g.traded[good]);
+        assert!(g.buy(good, 1));
+        assert!(g.traded[good]);
+        g.sell(good, 99);
+        assert!(g.traded[good], "the ledger forgot a good the player has bought");
+    }
 
     #[test]
     fn sums_are_grouped_the_way_the_page_groups_them() {

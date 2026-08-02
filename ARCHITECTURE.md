@@ -349,7 +349,7 @@ JavaScript. The reason is the other one: the simulation is about 6,900 hand-writ
 lines (a count that excludes `game/src/world.rs`, which is generated and would
 flatter it) with a world model, a market, navigation, fog of war, hunters that
 remember you, a crew that eats and is paid, and a reputation the world reads, and
-it has 121 tests. Rust gives that
+it has 134 tests. Rust gives that
 a type system, exhaustive matching and `cargo test`. Claiming a performance need
 would be the easier argument and it would not be true.
 
@@ -436,6 +436,43 @@ thousand gold traded. Earning outpaces decay by a wide margin, so it costs a
 working trader nothing they can feel; it only bites on abandonment, which is the
 thing it exists to price. Without it the discount was a ratchet, and a season of
 hard trading made one quayside permanently the cheapest on the map.
+
+**Commissions are a bias, not a quest log.** Everything above rewards a groove:
+find two ports whose prices disagree and run the leg. `game/src/commission.rs` is
+the counterweight. Roughly one arrival in three, a factor offers to pay well over
+the odds for a parcel moved between here and one other harbour, and the whole
+mechanic is in how those two nouns are drawn. The far port is weighted eight to
+one toward one the player has never been ashore at; the good six to one toward
+one they have never bought. The money is the excuse and the detour is the point.
+
+That needed two facts the simulation had never recorded, and the interesting part
+of the feature is that neither existing field would do. `discovered` is set by the
+lookout at range, which is not the same as having called at a port, so `visited`
+is separate and set only when a voyage actually ends at a quay. Nothing at all
+tracked purchases: the market's own `index` and `cooldown` move on sales as well
+as buys and drift back to neutral, so a good bought once and forgotten looks
+exactly like one never touched. `traded` is set in `buy` and never cleared. Two
+tests pin the distinctions rather than the comments doing it alone, and two more
+assert the statistical claim itself over four hundred draws, because if the bias
+decays to a coin flip the errands still generate, still pay and still read
+correctly, and the only thing that has quietly stopped is the reason they exist.
+
+There is no deadline and no penalty, because an optional errand that can punish
+you is not optional, and a clock would turn a nudge toward the unfamiliar into a
+reason to refuse anything unfamiliar. There is no consigned cargo either: the
+player buys the parcel themselves and it sits in the hold like any other goods,
+which keeps `cargo`, `free_space`, the market table and the whole of `sell` from
+having to learn about a second kind of unit. And there is at most one at a time,
+since a board of six offers is a menu to optimise over, which is precisely the
+behaviour this exists to interrupt.
+
+The accept button is the one control on the site that genuinely replaces itself:
+taking a commission removes the offer that the button belonged to. That is the
+exact failure the stable-`id` invariant exists to prevent, and it was found in the
+browser rather than by a test, with focus landing on `<body>`. The fix is that
+accept and settle share the id `commission-order`, naming the slot rather than the
+verb, and `order()` in `js/game.js` falls back to focusing the panel for the case
+where the section disappears entirely, which is what abandoning does.
 
 **No `wasm-bindgen`, no `wasm-pack`.** The exports are `#[no_mangle] extern "C"`
 functions taking and returning `i32`. Strings cross the boundary as UTF-8 in
