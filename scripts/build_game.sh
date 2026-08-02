@@ -13,6 +13,13 @@
 # It does not prove the .wasm is what game/src compiles to. Anyone who wants
 # that runs this script without --check and looks at the diff, which is the
 # same trust model as scripts/build-corpus.html and no better.
+#
+# For that to be worth attempting, they need to know which rustc produced the
+# committed binary, so the hash file records it on a second line. That line is
+# written by this script rather than kept by hand, because a hand-kept version
+# number is exactly the kind of fact that goes stale without anything noticing.
+# A different rustc will give a different hash and that is not a fault; it is
+# the reason the version is written down.
 
 set -euo pipefail
 
@@ -33,16 +40,20 @@ if [ "${1:-}" = "--check" ]; then
     echo "missing assets/game.wasm or assets/game.wasm.sha256" >&2
     exit 1
   fi
-  want="$(cut -d' ' -f1 <"$hashfile")"
+  # First line only: the second is the toolchain note written below.
+  want="$(head -1 "$hashfile" | cut -d' ' -f1)"
+  toolchain="$(sed -n '2s/^# *//p' "$hashfile")"
   got="$(sha "$wasm")"
   if [ "$want" != "$got" ]; then
     echo "assets/game.wasm does not match its recorded hash." >&2
     echo "  recorded $want" >&2
     echo "  actual   $got" >&2
+    [ -n "$toolchain" ] && echo "  recorded toolchain: $toolchain" >&2
     echo "Rebuild with scripts/build_game.sh and commit both files." >&2
     exit 1
   fi
   echo "assets/game.wasm matches $want"
+  [ -n "$toolchain" ] && echo "recorded toolchain: $toolchain"
   exit 0
 fi
 
@@ -90,7 +101,10 @@ mkdir -p "$here/assets"
 cp "$built" "$wasm"
 
 digest="$(sha "$wasm")"
-printf '%s  game.wasm\n' "$digest" >"$hashfile"
+{
+  printf '%s  game.wasm\n' "$digest"
+  printf '# %s\n' "$("$RUSTC" --version)"
+} >"$hashfile"
 
 bytes=$(wc -c <"$wasm" | tr -d ' ')
 gz=$(gzip -9 -c "$wasm" | wc -c | tr -d ' ')

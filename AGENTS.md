@@ -53,7 +53,11 @@ since it was committed. It does not prove the binary is what `game/src` compiles
 to, because nothing here reproduces the build. `scripts/check_corpus.py` is
 strictly stronger — it re-derives its claim from the source text. Anyone who
 wants the guarantee has to run `scripts/build_game.sh` themselves and read the
-diff, which is the honest instruction and is in the script's own header.
+diff, which is the honest instruction and is in the script's own header. So that
+this is worth attempting, the hash file carries the rustc version that produced
+the committed binary on a second line, written by the script rather than kept by
+hand. A different rustc gives a different hash, and that is not a fault: it is
+why the version is recorded.
 
 Do not introduce a bundler, framework or package manager to solve a problem that a
 few lines of CSS would solve. The absence of a toolchain is a design decision, not

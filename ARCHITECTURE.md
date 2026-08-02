@@ -344,9 +344,10 @@ compiled to `wasm32-unknown-unknown`, drawn by `js/game.js` as inline SVG.
 46 microseconds: 0.23 for the simulation step and the rest for serialising the
 425-cell viewport and the status block to text the page can read. That is a third
 of a percent of a frame at 60Hz, and any of it would run fine in JavaScript. The
-reason is the other one: the simulation is about 2,950 hand-written lines with a
-world model, a market, navigation and fog of war, and it has 46 tests. (That
-count excludes `game/src/world.rs`, which is generated and would flatter it.) Rust gives that a type
+reason is the other one: the simulation is just under 3,000 hand-written lines
+with a world model, a market, navigation and fog of war, and it has 46 tests.
+(That count excludes `game/src/world.rs`, which is generated and would flatter
+it.) Rust gives that a type
 system, exhaustive matching and `cargo test`. Claiming a performance need would
 be the easier argument and it would not be true.
 
