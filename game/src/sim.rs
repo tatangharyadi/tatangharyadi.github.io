@@ -1725,6 +1725,88 @@ mod tests {
         PORTS.iter().position(|p| p.name == name).expect(name)
     }
 
+    /// Every water cell a ship of the given offing may occupy, reachable from
+    /// Lisbon. The graph is undirected, so anything it can reach it can leave.
+    fn sea_within(g: &Game, offing: i32) -> Vec<bool> {
+        let start = hex::index(g.at).unwrap();
+        let mut seen = vec![false; CELLS];
+        let mut stack = vec![start];
+        seen[start] = true;
+        while let Some(i) = stack.pop() {
+            let h = hex::from_offset(i as i32 % crate::world::COLS, i as i32 / crate::world::COLS);
+            for d in 0..6 {
+                let Some(j) = hex::index(hex::normalise(hex::neighbour(h, d))) else {
+                    continue;
+                };
+                if seen[j] || nav::is_land_index(j) || g.depth[j] as i32 > offing {
+                    continue;
+                }
+                seen[j] = true;
+                stack.push(j);
+            }
+        }
+        seen
+    }
+
+    fn ports_outside(g: &Game, offing: i32) -> Vec<&'static str> {
+        let sea = sea_within(g, offing);
+        PORTS
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| Markets::trades(*i))
+            .filter(|(_, p)| {
+                !sea[hex::index(hex::from_offset(p.col as i32, p.row as i32)).unwrap()]
+            })
+            .map(|(_, p)| p.name)
+            .collect()
+    }
+
+    /// No class ceiling strands a market.
+    ///
+    /// This is the way ship classes could quietly brick the game: a hull whose
+    /// rigging cannot be worked up far enough to round some cape, leaving
+    /// harbours it can never reach and, worse, a harbour it can enter but not
+    /// leave. Fully rigged, every class in the game reaches every port that
+    /// trades, so the choice of hull is a choice about speed, hold and guns
+    /// rather than about which half of the world you are allowed to see.
+    #[test]
+    fn no_class_is_shut_out_of_any_market() {
+        let g = Game::new(1);
+        for c in CLASSES {
+            let mut s = crate::ship::Ship::of_class(c, GOODS.len());
+            while s.fit(Upgrade::Rigging) {}
+            let missed = ports_outside(&g, s.bluewater_rating());
+            assert!(
+                missed.is_empty(),
+                "a fully rigged {} cannot reach {:?}",
+                c.name(),
+                missed
+            );
+        }
+    }
+
+    /// The boat you start in is the one exception, and it is the point of her.
+    ///
+    /// A Balsa off the stocks holds the coast at one hex, which is enough for
+    /// the old world and not enough for the Atlantic. Working her rigging up a
+    /// single tier opens the whole map, so the first crossing is something you
+    /// earn in the first hour rather than a wall. Sailing beyond the rating is
+    /// allowed in any case; see `ship::Ship::bluewater_rating`.
+    #[test]
+    fn the_opening_boat_can_work_the_old_world_but_not_yet_cross() {
+        let g = Game::new(1);
+        let new = crate::ship::Ship::of_class(Class::Balsa, GOODS.len());
+        let missed = ports_outside(&g, new.bluewater_rating());
+        assert!(!missed.is_empty(), "nothing is left to sail for");
+        for name in &missed {
+            assert_eq!(
+                crate::world::ECONOMIES[PORTS[port_named(name)].econ as usize],
+                "Americas",
+                "{name} is out of reach and is not across an ocean"
+            );
+        }
+    }
+
     #[test]
     fn every_economy_has_a_capital_and_no_landfall_does() {
         let mut seen = [false; 8];
