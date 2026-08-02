@@ -1,0 +1,52 @@
+# Coastlines, as closed outlines in lon,lat degrees.
+#
+# Why outlines and not a grid of characters. The world is 72x36 hexes, which is
+# 2592 cells, and a hand-corrected character grid of that size is not something
+# a reviewer can check by reading. An outline is: a vertex is a place, you can
+# see that it is wrong, and you can move it. scripts/gen_game_data.py rasterises
+# these into the hex grid and asserts that all 70 ports end up reachable from
+# one another by sea, so a coastline that walls a port in fails the build rather
+# than shipping quietly.
+#
+# These are hand-placed from ordinary geographic knowledge at roughly 5-degree
+# fidelity, which is the granularity the port coordinates come in. They are not
+# derived from any dataset, so there is no licence to carry and no geospatial
+# dependency to install. They are deliberately coarse: this is a chart, not a
+# survey, and at one hex per 5 degrees the Baltic is two cells wide.
+#
+# Winding does not matter; the rasteriser uses an even-odd crossing test.
+# Format:  name <TAB> lon,lat lon,lat ...
+
+Africa	-17,21 -16,28 -10,31 0,36 10,37 20,32 32,31 35,24 39,15 43,12 51,12 48,5 42,-1 40,-10 35,-20 33,-26 28,-33 20,-35 15,-27 12,-18 9,-1 9,4 0,5 -8,4 -14,10 -17,15
+Eurasia	-9,37 -9,43 -2,48 2,51 5,53 8,55 12,55 10,58 5,62 12,68 20,70 30,70 40,68 60,70 80,73 100,76 140,72 170,68 180,66 170,60 160,55 145,45 140,50 130,43 127,38 122,30 110,20 105,10 100,5 95,15 90,22 88,21 80,15 77,8 72,20 67,25 57,25 50,27 48,30 57,22 53,17 45,13 43,15 39,21 34,29 35,36 30,37 27,40 23,38 19,40 13,45 12,44 18,40 15,38 10,43 5,43 3,42 0,39 -5,36
+Britain	-5,50 -5,58 -2,58 1,53 1,51
+Ireland	-10,52 -10,55 -6,55 -6,52
+Iceland	-24,64 -14,65 -15,66 -24,66
+Scandinavia_Baltic	15,55 25,57 30,60 25,65 18,62
+Japan	130,32 140,36 142,43 138,38 135,34
+Madagascar	44,-12 50,-15 48,-25 44,-22
+Sri_Lanka	80,6 82,7 81,9 79,9
+North_America	-168,65 -140,70 -100,70 -80,63 -60,50 -70,45 -75,35 -81,25 -90,29 -97,26 -97,20 -90,20 -83,10 -79,9 -105,20 -115,30 -125,40 -125,48 -135,58 -150,60
+Greenland	-45,60 -20,70 -20,82 -60,82 -70,76 -55,65
+South_America	-79,9 -60,5 -50,0 -35,-6 -39,-18 -48,-25 -58,-35 -62,-40 -65,-55 -75,-45 -71,-30 -76,-15 -81,-5 -79,2
+Cuba	-85,22 -75,20 -77,23 -84,23
+Hispaniola	-74,18 -68,18 -69,20 -73,20
+Australia	114,-22 122,-18 130,-12 142,-11 146,-19 153,-28 150,-38 140,-38 130,-32 115,-34
+New_Guinea	131,-1 141,-3 150,-10 140,-9 132,-8
+Sumatra_Java	95,5 105,-6 114,-8 100,0
+Borneo	109,2 117,5 119,-3 110,-4
+Sulawesi	119,1 125,1 124,-5 120,-5
+Philippines	120,18 124,12 126,7 121,14
+Antarctica	-180,-90 180,-90 180,-72 90,-70 0,-72 -90,-73 -180,-75
+
+# Inland seas, carved out of the land above. A leading "-" subtracts.
+#
+# These exist because the source's port coordinates are stylised, not surveyed:
+# it places Azov at N55 E30 and Trebizond at N45 E30, which on a real atlas is
+# Belarus and Ukraine, and it puts Baghdad at N30 E50, which is open Gulf. The
+# map has to match the game's geography rather than the world's, so the water
+# is cut to reach the ports the data actually names.
+-Black_Sea	18,41 38,41 38,58 18,58
+-Red_Sea	33,13 43,13 43,30 33,30
+-Persian_Gulf	47,19 57,19 57,33 47,33
+-Sea_of_Okhotsk	138,48 160,48 160,66 138,66

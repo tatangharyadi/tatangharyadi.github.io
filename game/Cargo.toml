@@ -1,0 +1,21 @@
+[package]
+name = "helm"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# No dependencies, and none are wanted. The point of this crate is that the
+# whole thing is readable: `cargo tree` prints one line.
+[dependencies]
+
+[lib]
+# cdylib is what produces a .wasm; rlib is what lets `cargo test` link the same
+# code on the host, so the tests run on a real machine rather than nowhere.
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

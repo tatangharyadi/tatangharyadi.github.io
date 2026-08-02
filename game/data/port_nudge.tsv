@@ -1,0 +1,20 @@
+# One-hex displacements, applied after ports.tsv is mapped onto the grid.
+#
+# The source reference rounds port positions to 5 degrees, and at that
+# granularity four pairs collide outright: it gives Hamburg and Oslo the same
+# N65 E5, Naples and Pisa the same N45 E10, Marseille and Tunis the same
+# N40 E5, and Genoa and Venice the same N50 E10. Two ports in one hex cannot
+# both be drawn or both be sailed to.
+#
+# ports.tsv stays a faithful transcription of the source. The correction lives
+# here instead, so the two can be told apart and the reasoning is on the page.
+# In each pair the port moved is the one that really does lie in that direction
+# from the other, so the map ends up slightly more right than the table it came
+# from, not less.
+#
+# dcol and drow are offsets in odd-r offset coordinates.
+port	dcol	drow	why
+Oslo	0	-1	north of Hamburg
+Naples	+1	+1	south-east of Pisa; due south is Majorca's hex
+Tunis	0	+1	south of Marseille, across the strait
+Genoa	-1	0	west of Venice
