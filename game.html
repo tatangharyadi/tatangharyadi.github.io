@@ -103,6 +103,14 @@
                 <div class="helm--orders">
                     <button type="button" id="order-on"><kbd>space</kbd> sail on</button>
                     <button type="button" id="order-wait"><kbd>.</kbd> lie to</button>
+                    <!--
+                        Offered always rather than only when there is somebody
+                        alongside, which is the same rule as every other order
+                        here: the refusal and its reason go in the log. It also
+                        means a reader finds out that piracy is possible, and
+                        what it costs, without having to be told.
+                    -->
+                    <button type="button" id="order-attack"><kbd>f</kbd> run out the guns</button>
                     <button type="button" id="order-new">new voyage</button>
                 </div>
                 <p class="dim">

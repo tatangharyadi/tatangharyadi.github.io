@@ -341,15 +341,43 @@ under a live focus.
 compiled to `wasm32-unknown-unknown`, drawn by `js/game.js` as inline SVG.
 
 **Why WebAssembly, honestly.** Not for speed. A full turn measured in Chrome is
-46 microseconds: 0.23 for the simulation step and the rest for serialising the
-425-cell viewport and the status block to text the page can read. That is a third
+37 microseconds: 0.23 for the simulation step and the rest for serialising the
+425-cell viewport and the status block to text the page can read. That is a fifth
 of a percent of a frame at 60Hz, and any of it would run fine in JavaScript. The
-reason is the other one: the simulation is just under 3,000 hand-written lines
-with a world model, a market, navigation and fog of war, and it has 46 tests.
+reason is the other one: the simulation is about 4,500 hand-written lines
+with a world model, a market, navigation, fog of war, hunters that remember you
+and a reputation the world reads, and it has 71 tests.
 (That count excludes `game/src/world.rs`, which is generated and would flatter
 it.) Rust gives that a type
 system, exhaustive matching and `cargo test`. Claiming a performance need would
 be the easier argument and it would not be true.
+
+Those figures are re-measured rather than inherited. The step cost did not move
+when twenty-four merchants and up to five king's ships started moving every tick,
+which is worth saying because the obvious guess is that it would have.
+
+**One number the whole world reads.** `game/src/reputation.rs` holds a single
+signed score and nothing else, and it earns its own module because it is the only
+value in the simulation read by code other than the code that writes it. Beating
+raiders raises it, firing on a trader lowers it whether or not the attempt
+succeeds, and it fades a point a month toward nought so that fame has to be
+maintained rather than banked. Three separate systems read it. Raiders pick you
+up from further off the more notorious you are. The crown sends one king's ship
+at fifteen points of infamy and one more every twenty after that, to a cap of
+five, and the same function recalls them when your name mends, so the fleet is
+tied to the score in both directions. And a king's ship ignores the shallow-water
+clause that keeps raiders off the coast, which means the real cost of piracy is
+not the number, it is losing the safe inshore trade the number used to buy you.
+
+That is also why winning a fight usually drives a raider off rather than sinking
+her. Before the split, every victory deleted a pirate and a long game emptied the
+ocean, which left nobody for the memory to belong to. Hunters now carry the hex
+they last saw you in and a six-tick countdown on it, so a chase is something you
+can watch coming and something you can shake, and a raider you have already
+beaten is warier of you afterwards. None of that is observable unless the page
+says so, so the status block carries the score, its band, the count out looking
+for you and whether anything currently has you in memory. A mechanic nobody can
+perceive is indistinguishable from one that is not there.
 
 **No `wasm-bindgen`, no `wasm-pack`.** The exports are `#[no_mangle] extern "C"`
 functions taking and returning `i32`. Strings cross the boundary as UTF-8 in

@@ -30,6 +30,8 @@
   --harbour: #f9e2af;
   --ship: #f5e0dc;
   --raider: #f38ba8;
+  --trader: #fab387;
+  --crown: #cba6f7;
   --loss: #f38ba8;
   --gain: #a6e3a1;
 
@@ -374,6 +376,8 @@ input[type="number"] {
 .cell.code-3 { fill: var(--harbour); }
 .cell.code-4 { fill: var(--ship); }
 .cell.code-5 { fill: var(--raider); }
+.cell.code-6 { fill: var(--trader); }
+.cell.code-7 { fill: var(--crown); }
 
 .cell--hit {
   fill: transparent;

@@ -20,6 +20,7 @@
 pub mod hex;
 pub mod market;
 pub mod nav;
+pub mod reputation;
 pub mod rng;
 pub mod ship;
 pub mod sim;
@@ -160,6 +161,18 @@ pub extern "C" fn repair() -> i32 {
     game().repair() as i32
 }
 
+/// Fire on the merchant sharing this hex.
+///
+/// It returns whether the order was *accepted*, not whether it succeeded, which
+/// is the same contract as [`buy`] and [`sell`]: nought means there was nobody
+/// alongside or nothing to shoot with, and the page should say so rather than
+/// animate anything. Losing the fight still returns one, because the attempt
+/// happened and the chronicle has a line about it.
+#[no_mangle]
+pub extern "C" fn attack() -> i32 {
+    game().attack() as i32
+}
+
 // -- text out --------------------------------------------------------------
 
 #[no_mangle]
@@ -255,7 +268,21 @@ pub extern "C" fn write_status() {
     kv_i(&mut s, "currentDir", cdir as i32, false);
     kv_i(&mut s, "currentStrength", cstr, false);
     kv_i(&mut s, "pirates", g.pirates_in_sight() as i32, false);
+    kv_i(&mut s, "merchants", g.merchants_in_sight() as i32, false);
+    kv_i(&mut s, "navy", g.navy_in_sight() as i32, false);
+    // Out looking for you, whether or not any of them is in sight. A hunt you
+    // cannot see is the whole threat, so the count has to be legible before the
+    // first topsail comes over the horizon rather than after.
+    kv_i(&mut s, "navyOut", g.navy_out() as i32, false);
+    kv_i(&mut s, "reputation", g.reputation, false);
+    // `hunted` is the memory made visible. Without it the player has no way to
+    // tell being chased from being near, and a mechanic nobody can perceive is
+    // indistinguishable from one that is not there.
+    kv_b(&mut s, "hunted", g.hunted());
+    kv_b(&mut s, "merchantHere", g.merchant_here().is_some());
     kv_b(&mut s, "lost", g.lost);
+    s.push_str(",\"standing\":");
+    push_str_json(&mut s, g.standing());
     kv_b(&mut s, "underWay", g.under_way());
     kv_i(&mut s, "repairCost", g.ship.repair_cost(), false);
 
@@ -290,13 +317,14 @@ pub extern "C" fn write_status() {
     let mut first = true;
     for good in 0..GOODS.len() {
         let have = g.ship.hold[good];
-        let (buy, sell, glut) = match port {
+        let (buy, sell, glut, cool) = match port {
             Some(p) => (
                 g.markets.buy_price(p, good).unwrap_or(-1),
                 g.markets.sell_price(p, good).unwrap_or(-1),
                 Markets::is_glutted(p, good),
+                g.markets.cooldown_of(p, good),
             ),
-            None => (-1, -1, false),
+            None => (-1, -1, false, 0),
         };
         if have == 0 && buy < 0 && sell < 0 {
             continue;
@@ -315,6 +343,11 @@ pub extern "C" fn write_status() {
         s.push_str(&sell.to_string());
         s.push_str(",\"glut\":");
         s.push_str(if glut { "true" } else { "false" });
+        // Months before this price starts climbing back. A depressed market
+        // with no visible clock on it reads as a bad port rather than a worn
+        // route, which is the opposite of what the cooldown is for.
+        s.push_str(",\"cool\":");
+        s.push_str(&cool.to_string());
         s.push('}');
     }
     s.push(']');
@@ -551,5 +584,31 @@ mod tests {
         assert_eq!(buy(-1, 5), 0);
         assert_eq!(sell(-1, 5), 0);
         assert_eq!(upgrade(9), 0);
+        // In port at the start of a game, so there is nobody alongside to fire
+        // on and the order should be refused rather than swallowed.
+        assert_eq!(attack(), 0);
+    }
+
+    /// A field the page reads and the Rust side stops writing is a silent
+    /// `undefined` in a template string, which renders as the word "undefined"
+    /// and fails nothing. This is the cheapest place to catch that.
+    #[test]
+    fn the_status_carries_everything_the_page_reads() {
+        let _helm = helm(15);
+        write_status();
+        let s = text().clone();
+        parses(&s);
+        for key in [
+            "\"reputation\"",
+            "\"standing\"",
+            "\"merchants\"",
+            "\"hunted\"",
+            "\"merchantHere\"",
+            "\"navy\"",
+            "\"navyOut\"",
+            "\"cool\"",
+        ] {
+            assert!(s.contains(key), "the status no longer carries {key}");
+        }
     }
 }

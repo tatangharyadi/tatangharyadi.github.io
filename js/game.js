@@ -42,7 +42,13 @@ const HEX_W = Math.sqrt(3) * SIZE;
 const HEX_H = 1.5 * SIZE;
 
 // Terrain codes, matching the constants in game/src/sim.rs.
-const GLYPH = ["~", "≈", "#", "⌂", "@", "X"];
+// Index 6 is a merchant, and it reads as a rounder, softer mark than the
+// raider's X on purpose: the two are the only things on the chart you can meet,
+// and the one you are allowed to shoot at should not look like the one you are
+// not.
+// Index 7 is a king's ship: a triangle, because a man-of-war under a press of
+// sail is the one thing out here that is bigger than you.
+const GLYPH = ["~", "≈", "#", "⌂", "@", "X", "o", "▲"];
 
 // q e / a d / z c, laid out the way the six hex directions actually point.
 // The indices are hex::DIRECTIONS order: 0 E, 1 NE, 2 NW, 3 W, 4 SW, 5 SE.
@@ -237,8 +243,34 @@ function drawWho(s) {
   fact(dl, "wind", `${STRENGTH[s.windStrength]} from ${atlas.directions[(s.windDir + 3) % 6]}`);
   fact(dl, "current", s.currentStrength === 0 ? "slack" : `setting ${atlas.directions[s.currentDir]}`);
   fact(dl, "weather", WEATHER[s.weather], s.weather >= 2 ? "bad" : null);
-  fact(dl, "in sight", s.pirates === 0 ? "nothing" : `${s.pirates} strange sail`,
-    s.pirates > 0 ? "bad" : null);
+  fact(dl, "in sight", inSight(s), s.pirates + s.navy > 0 ? "bad" : null);
+  // Both halves of the standing, because neither is enough on its own. The
+  // phrase is what the mechanic actually means and the number is the only way
+  // to see it moving, since a band is thirty-five points wide and a fight is
+  // worth two.
+  fact(dl, "reputation", `${s.standing} (${s.reputation > 0 ? "+" : ""}${s.reputation})`,
+    s.reputation <= -15 ? "bad" : null);
+  // Only shown while it is true, and that is the point: a raider that has lost
+  // sight of you keeps this up for a day and a half, so a warning that stays
+  // lit after you think you are clear is the memory being legible.
+  // Shown whether or not any of them is over the horizon yet, because the
+  // threat is the hunt and not the sighting, and a player who cannot see the
+  // fleet growing has no way to read what raiding actually cost them.
+  if (s.navyOut > 0) {
+    fact(dl, "wanted",
+      s.navyOut === 1 ? "a king's ship is looking for you"
+        : `${s.navyOut} king's ships are looking for you`, "bad");
+  }
+  if (s.hunted) fact(dl, "warning", "you are being hunted", "bad");
+}
+
+/** What the lookout has, counting raiders, traders and the crown separately. */
+function inSight(s) {
+  const parts = [];
+  if (s.pirates > 0) parts.push(`${s.pirates} strange sail`);
+  if (s.navy > 0) parts.push(s.navy === 1 ? "a king's ship" : `${s.navy} king's ships`);
+  if (s.merchants > 0) parts.push(`${s.merchants} trader`);
+  return parts.length === 0 ? "nothing" : parts.join(", ");
 }
 
 /** Buy and sell rows, plus the yard, or an explanation of why there is neither. */
@@ -253,6 +285,10 @@ function drawHere(s) {
 
   if (s.port < 0) {
     body.appendChild(el("p", null, "At sea. Nothing to trade with but the weather."));
+    if (s.merchantHere) {
+      body.appendChild(el("p", null,
+        "A trader lies alongside, hailing you. Running out the guns would cost you your name."));
+    }
     if (s.underWay) {
       body.appendChild(el("p", "dim", "A course is laid. Sail on to make the next leg."));
     }
@@ -273,7 +309,11 @@ function drawHere(s) {
     tr.appendChild(el("td", null, atlas.goods[row.good]));
     tr.appendChild(el("td", null, row.have === 0 ? "·" : String(row.have)));
     tr.appendChild(el("td", null, row.buy < 0 ? "—" : String(row.buy)));
-    tr.appendChild(el("td", row.glut ? "bad" : null, row.sell < 0 ? "—" : String(row.sell)));
+    // A depressed price with no clock on it reads as a poor port rather than a
+    // route you personally wore out, so the months are printed beside it.
+    const pays = row.sell < 0 ? "—"
+      : row.cool > 0 ? `${row.sell} · ${row.cool} mo` : String(row.sell);
+    tr.appendChild(el("td", row.glut || row.cool > 0 ? "bad" : null, pays));
 
     const actions = el("td");
     if (row.buy >= 0) {
@@ -451,6 +491,7 @@ function bind() {
   }
   $("order-on").addEventListener("click", () => order(() => wasm.sail_on()));
   $("order-wait").addEventListener("click", () => order(() => wasm.wait_here()));
+  $("order-attack").addEventListener("click", () => order(() => wasm.attack()));
   $("order-new").addEventListener("click", () => {
     looking = null;
     order(() => wasm.init(Math.floor(Math.random() * 0xffffffff)));
@@ -472,6 +513,9 @@ function bind() {
     } else if (event.key === ".") {
       event.preventDefault();
       order(() => wasm.wait_here());
+    } else if (key === "f") {
+      event.preventDefault();
+      order(() => wasm.attack());
     }
   });
 }

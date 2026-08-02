@@ -9,6 +9,7 @@
 use crate::hex::{self, Hex};
 use crate::market::Markets;
 use crate::nav::{self, CELLS, REMEMBERED, UNSEEN, VISIBLE};
+use crate::reputation;
 use crate::rng::Rng;
 use crate::ship::{Ship, Upgrade};
 use crate::world::{GOODS, PORTS};
@@ -19,10 +20,75 @@ pub const CODE_LAND: u8 = 2;
 pub const CODE_PORT: u8 = 3;
 pub const CODE_SHIP: u8 = 4;
 pub const CODE_PIRATE: u8 = 5;
+pub const CODE_MERCHANT: u8 = 6;
+pub const CODE_NAVY: u8 = 7;
 
 const PIRATE_COUNT: usize = 24;
 /// How close a pirate has to be before it stops wandering and starts hunting.
+///
+/// This is the base. What a given raider actually uses is
+/// [`Game::hunt_range`], which reads your reputation and whether this
+/// particular one has fought you before.
 const HUNT_RANGE: i32 = 5;
+/// Sailing steps a raider keeps standing toward where it last saw you.
+///
+/// Without this a pirate has no memory at all: `hunting` is recomputed from the
+/// current distance on every step, so slipping one hex past the horizon makes
+/// you cease to exist. Six steps at six and a half hours is a day and a half of
+/// pursuit, which is long enough that outrunning one means outrunning it rather
+/// than merely turning a corner.
+const PIRATE_MEMORY: i32 = 6;
+/// How many hexes off a hunted pirate keeps clear of the one who beat her.
+const BEATEN_SHYNESS: i32 = 2;
+
+const MERCHANT_COUNT: usize = 24;
+
+/// Names for the raiders, so that the one who took your gold off Cape Verde is
+/// recognisably the same sail when she comes back.
+///
+/// A named antagonist is the cheapest thing in this file and does more for the
+/// feeling of being remembered than any of the arithmetic above it. There are
+/// more names here than there are pirates, so a game never has to reuse one.
+const PIRATE_NAMES: [&str; 32] = [
+    "the Black Brig", "Salt Kate", "the Gull", "Ruy the Portuguese",
+    "the Widow's Share", "Anselm Vloot", "the Cutwater", "Marta of Ceuta",
+    "the Long Nine", "Iron Bartol", "the Sparrowhawk", "Old Dyer",
+    "the Sea Hearse", "Juana la Roja", "the Grey Wolf", "Cass Ferrer",
+    "the Broken Compass", "Hendrik Stoop", "the Carrion", "Nial Bright",
+    "the Red Ensign", "Pieter Vos", "the Lame Dog", "Sancha Milan",
+    "the Nightjar", "Otto Kranz", "the Splinter", "Lucia Bravo",
+    "the Dry Well", "Yusuf Reis", "the Hollow Man", "Tam Skene",
+];
+
+/// Cargoes a merchant might be carrying, expressed as a range of units rather
+/// than a table, because what she has is worth less than the fact that she has
+/// it and will not give it up.
+const NAVY_NAMES: [&str; 8] = [
+    "the Constancy", "the Saint Elmo", "the Vigilant", "the Alcántara",
+    "the Providence", "the Halberd", "the San Cristóbal", "the Diligence",
+];
+
+/// How far off a king's ship picks the player up.
+///
+/// Wider than a pirate's, and it ignores the shelf entirely, which together are
+/// the real punishment for raiding merchants. A pirate works the offing and
+/// leaves the coast alone, so an honest master always has somewhere safe to
+/// trade. Bringing the navy out takes that away: they patrol the harbour
+/// approaches precisely because that is where you were going to hide.
+const NAVY_HUNT_RANGE: i32 = 8;
+/// Guns a king's ship carries. Heavier than any raider afloat.
+const NAVY_STRENGTH: (i32, i32) = (34, 64);
+/// How far off they come over the horizon when they are sent for.
+const NAVY_ARRIVES_AT: i32 = 12;
+
+const MERCHANT_UNITS: (i32, i32) = (10, 60);
+/// A merchant sails slower than a raider, which is what makes catching one
+/// possible at all without giving the player a new kind of chase to learn.
+const MERCHANT_STEP_HOURS: f32 = 8.0;
+/// Consecutive blocked steps before a merchant gives up and picks a new port.
+/// Merchants steer greedily rather than by pathfinder (see `move_merchants`),
+/// so they do get caught in bays, and this is how they get out again.
+const MERCHANT_STUCK_LIMIT: i32 = 6;
 /// Hexes from land still counted as the coastal shelf, where raiders will not
 /// give chase. Beyond it is the offing, and the offing is theirs.
 const SHELF: i32 = 2;
@@ -39,6 +105,26 @@ const HOURS_PER_DAY: f32 = 24.0;
 const DAYS_PER_MONTH: i32 = 30;
 const START_GOLD: i32 = 3_000;
 const CHRONICLE_KEEP: usize = 64;
+
+/// Give a merchant a fresh cargo and somewhere else to take it.
+///
+/// A free function taking the generator rather than a method on `Game`, because
+/// the caller is already holding `&mut self.merchants[idx]` and a method would
+/// want `&mut self` on top of it. Threading the one field it actually needs is
+/// shorter than the dance required to borrow around that.
+fn relade(rng: &mut Rng, m: &mut Merchant, ports: &[usize]) {
+    m.cargo = rng.below(GOODS.len() as u32) as usize;
+    m.units = rng.range(MERCHANT_UNITS.0, MERCHANT_UNITS.1);
+    m.gold = rng.range(200, 2_400);
+    m.stuck = 0;
+    for _ in 0..8 {
+        let next = ports[rng.below(ports.len() as u32) as usize];
+        if next != m.bound {
+            m.bound = next;
+            return;
+        }
+    }
+}
 
 /// Where the voyage begins. Lisbon if the data has it, otherwise the first
 /// port that trades, so a renamed dataset degrades into something playable
@@ -58,6 +144,45 @@ struct Pirate {
     /// them.
     hours: f32,
     hunting: bool,
+    name: &'static str,
+    /// Where the player was last seen, and how many more sailing steps this
+    /// raider will keep standing toward it. Together these are the whole of
+    /// pirate memory: sight sets them, losing sight spends them down, and
+    /// arriving at an empty hex gives up the chase.
+    last_seen: Option<Hex>,
+    memory: i32,
+    /// Has fought the player and been driven off. Such a one keeps her distance.
+    beaten: bool,
+    /// Has fought the player at all, which is what lets the log name her.
+    met: bool,
+    /// A king's ship rather than a raider.
+    ///
+    /// The same struct carries both, and that is a considered choice rather than
+    /// a shortcut. Everything that makes a hunter a hunter is shared: the sight
+    /// check, the memory, the pathfinding, the engagement queue and the
+    /// index-shifting bug that queue used to have. Forking a second nearly
+    /// identical type would double all of it and halve the chance that a fix to
+    /// one reaches the other. What actually differs is four decisions, and each
+    /// of them reads this one flag where it is made.
+    navy: bool,
+}
+
+/// An honest trader going about her business.
+///
+/// Merchants exist for one reason: reputation has to be able to fall, and it
+/// cannot fall if there is nobody to wrong. They carry cargo and gold, they do
+/// not fight back beyond a token, and they never hunt anybody. Sinking your
+/// standing is meant to be easy and cheap, in the way that ruining a reputation
+/// generally is.
+struct Merchant {
+    at: Hex,
+    /// The port she is making for.
+    bound: usize,
+    cargo: usize,
+    units: i32,
+    gold: i32,
+    hours: f32,
+    stuck: i32,
 }
 
 pub struct Game {
@@ -68,11 +193,14 @@ pub struct Game {
     pub day: i32,
     pub month: i32,
     pub year: i32,
+    /// What the sea thinks of you. See the `reputation` module.
+    pub reputation: i32,
 
     pub fog: Vec<u8>,
     depth: Vec<u8>,
     pub markets: Markets,
     pirates: Vec<Pirate>,
+    merchants: Vec<Merchant>,
     discovered: Vec<bool>,
     chronicle: Vec<String>,
     rng: Rng,
@@ -101,10 +229,12 @@ impl Game {
             day: 1,
             month: 3,
             year: 1502,
+            reputation: 0,
             fog: vec![UNSEEN; CELLS],
             depth,
             markets: Markets::new(),
             pirates: Vec::new(),
+            merchants: Vec::new(),
             discovered: vec![false; PORTS.len()],
             chronicle: Vec::new(),
             rng: Rng::new(seed),
@@ -118,6 +248,7 @@ impl Game {
 
         g.discovered[start] = true;
         g.spawn_pirates();
+        g.spawn_merchants();
         g.look();
         g.say(format!(
             "You take command at {}. Three thousand in gold, a coastal hull, and no guns.",
@@ -155,6 +286,16 @@ impl Game {
                 }
                 self.markets.drift();
                 self.say("A new month. Prices ease back toward their old levels.".into());
+                let was = reputation::standing(self.reputation);
+                self.reputation = reputation::fade(self.reputation);
+                let now = reputation::standing(self.reputation);
+                if now != was {
+                    self.say(format!("Talk of you has died down. You are {now}."));
+                }
+                // The fade is the only thing that ever sends the navy home, so
+                // the recall has to be checked on the same tick that moves the
+                // number, not only when an offence pushes it the other way.
+                self.enforce();
             }
         }
     }
@@ -245,6 +386,7 @@ impl Game {
         }
 
         self.look();
+        self.move_merchants(hours);
         self.move_pirates(hours);
 
         if let Some(p) = self.port_here() {
@@ -290,6 +432,24 @@ impl Game {
         if self.rng.chance(30) {
             let hurt = self.rng.range(4, 14);
             self.hurt(hurt, "A sea comes aboard and takes some of the rail with it.");
+        }
+    }
+
+    /// Move the reputation and say so only when it means something new.
+    ///
+    /// Announcing every point would bury the chronicle in arithmetic nobody
+    /// asked for. Announcing only the crossings makes the number legible: you
+    /// hear about your standing on the day it changes, and the exact figure is
+    /// in the status column for anyone who wants it.
+    fn credit(&mut self, points: i32) {
+        if points == 0 {
+            return;
+        }
+        let was = reputation::standing(self.reputation);
+        self.reputation = reputation::clamp(self.reputation + points);
+        let now = reputation::standing(self.reputation);
+        if now != was {
+            self.say(format!("Word travels. You are {now}."));
         }
     }
 
@@ -414,6 +574,7 @@ impl Game {
         let hours = 6.0;
         self.advance(hours);
         self.look();
+        self.move_merchants(hours);
         self.move_pirates(hours);
         if self.port_here().is_some() && self.ship.damage > 0 {
             self.say("The carpenter works while you lie at anchor.".into());
@@ -448,9 +609,117 @@ impl Game {
                 strength: self.rng.range(8, 40),
                 hours: 0.0,
                 hunting: false,
+                name: PIRATE_NAMES[placed % PIRATE_NAMES.len()],
+                last_seen: None,
+                memory: 0,
+                beaten: false,
+                met: false,
+                navy: false,
             });
             placed += 1;
         }
+    }
+
+    /// How far off this particular raider will pick you up.
+    ///
+    /// Three things move it, and between them they are what makes reputation a
+    /// mechanic rather than a line in the status column. A known pirate-killer
+    /// is given a wider berth; a man who preys on merchants is a rich mark and
+    /// gets chased from further out; and one who has already lost to you keeps
+    /// clear on her own account.
+    /// A king's ship reads none of it. She is not weighing a prize against the
+    /// risk, she has orders, and she has already lost to you once if she is
+    /// still out here. Hence a flat range and no shyness.
+    fn hunt_range(&self, p: &Pirate) -> i32 {
+        if p.navy {
+            return NAVY_HUNT_RANGE;
+        }
+        let notoriety = self.reputation / reputation::HEXES_PER_POINT;
+        let shyness = if p.beaten { BEATEN_SHYNESS } else { 0 };
+        (HUNT_RANGE - notoriety - shyness).max(1)
+    }
+
+    // -- the navy ----------------------------------------------------------
+
+    pub fn navy_out(&self) -> usize {
+        self.pirates.iter().filter(|p| p.navy).count()
+    }
+
+    /// Bring the crown's strength into line with what the player has earned.
+    ///
+    /// Called after every offence and again each month, which is what ties the
+    /// fleet to the score in both directions: raiding sends for more of them,
+    /// and the monthly fade eventually sends them home. The recall is as
+    /// important as the summons. A hunt that could only grow would mean the
+    /// first two merchants you took decided the rest of the game, and the
+    /// reputation number would have no reason to be a number rather than a flag.
+    fn enforce(&mut self) {
+        let wanted = reputation::navy_wanted(self.reputation);
+        let mut out = self.navy_out();
+
+        while out > wanted {
+            // Recall the furthest off first, so the one bearing down on you is
+            // the last to be called home. Being let off has to feel like the
+            // weather clearing, not like a ship blinking out of the next hex.
+            let Some(idx) = self
+                .pirates
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| p.navy)
+                .max_by_key(|(_, p)| hex::wrapped_distance(p.at, self.at))
+                .map(|(i, _)| i)
+            else {
+                break;
+            };
+            let name = self.pirates[idx].name;
+            self.pirates.remove(idx);
+            self.say(format!("{name} has given you up and stood away for home."));
+            out -= 1;
+        }
+
+        while out < wanted {
+            let Some(at) = self.navy_station() else { break };
+            let name = NAVY_NAMES[(self.rng.below(NAVY_NAMES.len() as u32)) as usize];
+            self.pirates.push(Pirate {
+                at,
+                strength: self.rng.range(NAVY_STRENGTH.0, NAVY_STRENGTH.1),
+                hours: 0.0,
+                hunting: false,
+                name,
+                last_seen: None,
+                memory: 0,
+                beaten: false,
+                met: false,
+                navy: true,
+            });
+            self.say(format!(
+                "{name} has been sent for. There is a king's ship looking for you."
+            ));
+            out += 1;
+        }
+    }
+
+    /// Somewhere over the horizon to send a king's ship from.
+    ///
+    /// Not on top of the player, because arriving inside her sight is a jump
+    /// scare rather than a hunt, and the whole point of the memory work is that
+    /// pursuit should be something you watch coming.
+    fn navy_station(&mut self) -> Option<Hex> {
+        for _ in 0..400 {
+            let col = self.rng.below(crate::world::COLS as u32) as i32;
+            let row = self.rng.range(4, crate::world::ROWS - 6);
+            let h = hex::from_offset(col, row);
+            let Some(i) = hex::index(h) else { continue };
+            if nav::is_land_index(i) || self.depth[i] > 8 {
+                continue;
+            }
+            let d = hex::wrapped_distance(h, self.at);
+            if d < NAVY_ARRIVES_AT || d > NAVY_ARRIVES_AT * 2 {
+                continue;
+            }
+            return Some(h);
+        }
+        None
     }
 
     fn move_pirates(&mut self, elapsed: f32) {
@@ -482,16 +751,46 @@ impl Game {
                 // instead gives a safe coastal trade to start from and makes the
                 // blue-water rigging worth buying for what it earns, not just for
                 // where it lets you go.
-                let sees = hex::wrapped_distance(here, player) <= HUNT_RANGE
-                    && self.offshore() > SHELF;
-                self.pirates[idx].hunting = sees;
+                let range = self.hunt_range(&self.pirates[idx]);
+                // The shelf clause protects an honest master from raiders and
+                // does nothing for a wanted one. A king's ship works the
+                // approaches by design, so the safe coastal trade the paragraph
+                // above buys you is exactly what piracy costs you.
+                let inshore_safe = !self.pirates[idx].navy && self.offshore() <= SHELF;
+                let sees = hex::wrapped_distance(here, player) <= range && !inshore_safe;
 
-                let dir = if sees {
+                // Memory. Sight refreshes it; losing sight spends it down one
+                // step at a time; running out of it forgets where you were.
+                // This is what stops a raider losing you the instant you cross
+                // the horizon, which is how she behaved before and which meant
+                // that outrunning a pirate never actually required speed.
+                if sees {
+                    self.pirates[idx].last_seen = Some(player);
+                    self.pirates[idx].memory = PIRATE_MEMORY;
+                } else if self.pirates[idx].memory > 0 {
+                    self.pirates[idx].memory -= 1;
+                    if self.pirates[idx].memory == 0 {
+                        self.pirates[idx].last_seen = None;
+                    }
+                }
+
+                // Arriving at the remembered hex and finding nothing there ends
+                // the chase honestly, rather than letting her sit on the spot
+                // burning down a counter.
+                if !sees && self.pirates[idx].last_seen == Some(here) {
+                    self.pirates[idx].last_seen = None;
+                    self.pirates[idx].memory = 0;
+                }
+
+                let goal = if sees { Some(player) } else { self.pirates[idx].last_seen };
+                self.pirates[idx].hunting = goal.is_some();
+
+                let dir = if let Some(goal) = goal {
                     // Run the same pathfinder the player's autopilot uses,
                     // limited to a short horizon so a fleet of them stays
                     // affordable.
                     let path = nav::find_path(
-                        &mut self.pathfinder, here, player, month, 2, 6.0, &self.depth, 8,
+                        &mut self.pathfinder, here, goal, month, 2, 6.0, &self.depth, 8,
                     );
                     path.first().and_then(|&n| {
                         (0..6).find(|&d| hex::normalise(hex::neighbour(here, d)) == n)
@@ -527,12 +826,100 @@ impl Game {
         }
     }
 
-    fn fight(&mut self, idx: usize, strength: i32) {
+    /// Being brought to by a king's ship.
+    ///
+    /// Split out rather than folded into `fight` with more branches, because
+    /// almost nothing about it is the same fight. There is no prize in it for
+    /// either side: they are not after your cargo, they are after you, and the
+    /// two outcomes are answering for it or adding to it. Winning is the worse
+    /// of the two in the long run, which is the point.
+    fn arrest(&mut self, idx: usize, strength: i32) {
         let guns = self.ship.gun_count();
+        let name = self.pirates[idx].name;
+        self.pirates[idx].met = true;
         self.say(format!(
-            "A sail closes fast and runs up no colours. {} guns against yours.",
-            strength
+            "{name} runs up the king's colours and fires a gun to windward. \
+             {strength} guns, and they are hailing you to bring to."
         ));
+
+        if guns == 0 || self.rng.range(0, guns + strength) >= guns {
+            // Taken. Half the purse and the whole hold, and the account is
+            // partly settled: there has to be a way back other than waiting out
+            // eight years of monthly fade, and standing trial is it.
+            let fine = self.gold / 2;
+            self.gold -= fine;
+            let mut units = 0;
+            for slot in self.ship.hold.iter_mut() {
+                units += *slot;
+                *slot = 0;
+            }
+            let was = reputation::standing(self.reputation);
+            self.reputation = reputation::answered_for(self.reputation);
+            let now = reputation::standing(self.reputation);
+            self.say(format!(
+                "You are boarded and taken in. The court has {fine} in gold and \
+                 {units} units condemned, and lets you keep the ship."
+            ));
+            if now != was {
+                self.say(format!("You leave the prize court {now}."));
+            }
+            let wound = self.rng.range(4, 14);
+            self.hurt(wound, "They fired into your rigging to bring you to.");
+            if !self.lost {
+                self.pirates[idx].at = self.scatter_from(self.at);
+                self.pirates[idx].last_seen = None;
+                self.pirates[idx].memory = 0;
+            }
+            self.enforce();
+            return;
+        }
+
+        // Fought clear of the navy, which is a heavier crime than whatever put
+        // them on you, and it is meant to be: the escape that costs nothing
+        // would make the whole fleet a nuisance rather than a consequence.
+        let roll = self.rng.range(0, guns + strength);
+        if roll * 4 < guns {
+            self.say(format!(
+                "You rake {name} and she settles by the head. You have sunk a king's ship."
+            ));
+            self.pirates.remove(idx);
+            self.credit(reputation::RESIST_NAVY + reputation::SINK_NAVY);
+        } else {
+            self.say(format!(
+                "You fight clear of {name} and run. That will be reported."
+            ));
+            self.pirates[idx].beaten = true;
+            self.pirates[idx].last_seen = None;
+            self.pirates[idx].memory = 0;
+            self.pirates[idx].at = self.scatter_from(self.at);
+            self.credit(reputation::RESIST_NAVY);
+        }
+        let scars = self.rng.range(6, 18);
+        self.hurt(scars, "They were gunners by trade.");
+        if !self.lost {
+            self.enforce();
+        }
+    }
+
+    fn fight(&mut self, idx: usize, strength: i32) {
+        if self.pirates[idx].navy {
+            return self.arrest(idx, strength);
+        }
+        let guns = self.ship.gun_count();
+        let name = self.pirates[idx].name;
+        // Recognition. The second meeting reads differently from the first, and
+        // this one line is most of what makes the memory above land as memory
+        // rather than as a pathfinding change nobody can see.
+        if self.pirates[idx].met {
+            self.say(format!(
+                "{name} again. You know that rig. {strength} guns against yours."
+            ));
+        } else {
+            self.say(format!(
+                "A sail closes fast and runs up no colours. {strength} guns against yours."
+            ));
+        }
+        self.pirates[idx].met = true;
 
         if guns == 0 {
             // Unarmed, the only question is how much they take.
@@ -555,16 +942,46 @@ impl Game {
             let parting = self.rng.range(5, 15);
             self.hurt(parting, "They fire into you as they sheer off.");
             self.pirates[idx].at = self.scatter_from(self.at);
+            // Both sides break off. Without this the memory above would let a
+            // raider who has just robbed an unarmed ship turn straight round and
+            // do it again, which is not a hard game, it is the same boarding on
+            // a loop.
+            self.pirates[idx].last_seen = None;
+            self.pirates[idx].memory = 0;
             return;
         }
 
         // An armed trader is a real fight. Guns tell, but so does luck.
         let roll = self.rng.range(0, guns + strength);
         if roll < guns {
-            self.say("Two broadsides and they have had enough. They bear away.".into());
+            // A win, and how decisive it was decides whether she goes down or
+            // gets away. This split is not decoration. If every win removed the
+            // pirate, the only raiders left alive would be the ones who beat
+            // you, nothing could ever remember losing to you, and a long
+            // successful game would empty the ocean, since the fleet is spawned
+            // once and never replenished. Letting most wins end in a chase
+            // broken off gives the memory above somebody to belong to.
+            let decisive = roll * 4 < guns;
+            let earned = reputation::BEAT_PIRATE
+                + strength / reputation::STRENGTH_PER_POINT;
+            if decisive {
+                self.say(format!(
+                    "You hull {name} twice below the waterline and she goes down."
+                ));
+                self.pirates.remove(idx);
+                self.credit(earned + reputation::SINK_BONUS);
+            } else {
+                self.say(format!(
+                    "Two broadsides and {name} has had enough. She bears away."
+                ));
+                self.pirates[idx].beaten = true;
+                self.pirates[idx].last_seen = None;
+                self.pirates[idx].memory = 0;
+                self.pirates[idx].at = self.scatter_from(self.at);
+                self.credit(earned);
+            }
             let scars = self.rng.range(2, 10);
             self.hurt(scars, "You did not come off clean.");
-            self.pirates.remove(idx);
         } else {
             let taken_gold = self.gold / 5;
             self.gold -= taken_gold;
@@ -581,6 +998,8 @@ impl Game {
             self.hurt(wound, "The mainmast is wounded.");
             if !self.lost {
                 self.pirates[idx].at = self.scatter_from(self.at);
+                self.pirates[idx].last_seen = None;
+                self.pirates[idx].memory = 0;
             }
         }
     }
@@ -599,6 +1018,168 @@ impl Game {
             }
         }
         from
+    }
+
+    // -- merchants ---------------------------------------------------------
+
+    fn trading_ports(&self) -> Vec<usize> {
+        (0..PORTS.len()).filter(|p| Markets::trades(*p)).collect()
+    }
+
+    fn spawn_merchants(&mut self) {
+        let ports = self.trading_ports();
+        if ports.len() < 2 {
+            return;
+        }
+        for _ in 0..MERCHANT_COUNT {
+            let from = ports[self.rng.below(ports.len() as u32) as usize];
+            let at = hex::from_offset(PORTS[from].col as i32, PORTS[from].row as i32);
+            let mut m = Merchant {
+                at,
+                bound: from,
+                cargo: 0,
+                units: 0,
+                gold: 0,
+                hours: 0.0,
+                stuck: 0,
+            };
+            relade(&mut self.rng, &mut m, &ports);
+            self.merchants.push(m);
+        }
+    }
+
+    /// Sail the merchant fleet.
+    ///
+    /// These steer greedily toward their destination rather than by pathfinder,
+    /// and that is a deliberate cost decision rather than laziness. A full turn
+    /// serialises in about 46µs, of which the simulation step is a quarter of a
+    /// microsecond; the pirates can afford A* because only the ones actually
+    /// hunting ever call it, which is rarely more than one. Two dozen merchants
+    /// pathfinding on every step would be two dozen A* calls per player move and
+    /// would dominate the frame for no gain the player could see. Greedy steering
+    /// walks them into bays, which is what `stuck` is for: enough failed steps
+    /// and the master gives up on that port and picks another.
+    fn move_merchants(&mut self, elapsed: f32) {
+        let ports = self.trading_ports();
+        if ports.is_empty() {
+            return;
+        }
+        for idx in 0..self.merchants.len() {
+            self.merchants[idx].hours += elapsed;
+            while self.merchants[idx].hours >= MERCHANT_STEP_HOURS {
+                self.merchants[idx].hours -= MERCHANT_STEP_HOURS;
+
+                let here = self.merchants[idx].at;
+                let bound = self.merchants[idx].bound;
+                let goal =
+                    hex::from_offset(PORTS[bound].col as i32, PORTS[bound].row as i32);
+                if here == goal {
+                    relade(&mut self.rng, &mut self.merchants[idx], &ports);
+                    continue;
+                }
+
+                // The neighbour that gets closest and is water she can float in.
+                let mut best: Option<(i32, Hex)> = None;
+                for d in 0..6 {
+                    let n = hex::normalise(hex::neighbour(here, d));
+                    let Some(ni) = hex::index(n) else { continue };
+                    if nav::is_land_index(ni) || self.depth[ni] > 6 {
+                        continue;
+                    }
+                    let cost = hex::wrapped_distance(n, goal);
+                    if best.map_or(true, |(b, _)| cost < b) {
+                        best = Some((cost, n));
+                    }
+                }
+                match best {
+                    Some((cost, n)) if cost < hex::wrapped_distance(here, goal) => {
+                        self.merchants[idx].at = n;
+                        self.merchants[idx].stuck = 0;
+                    }
+                    _ => {
+                        self.merchants[idx].stuck += 1;
+                        if self.merchants[idx].stuck >= MERCHANT_STUCK_LIMIT {
+                            relade(&mut self.rng, &mut self.merchants[idx], &ports);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// The merchant on this hex, if there is one.
+    pub fn merchant_here(&self) -> Option<usize> {
+        self.merchants.iter().position(|m| m.at == self.at)
+    }
+
+    /// Fire on a merchant. This is the only order in the game that is a crime.
+    ///
+    /// Deliberate rather than automatic, which is the whole difference between
+    /// this and meeting a pirate: bumping into an honest trader must not cost
+    /// you your standing, so it takes its own order and its own key. The
+    /// reputation goes whether or not it works, because the offence is the
+    /// attack.
+    pub fn attack(&mut self) -> bool {
+        if self.lost {
+            return false;
+        }
+        let Some(idx) = self.merchant_here() else {
+            self.say("There is nobody alongside to fire on.".into());
+            return false;
+        };
+        let guns = self.ship.gun_count();
+        if guns == 0 {
+            self.say("You have no guns. It would be a boarding with bare hands.".into());
+            return false;
+        }
+
+        let units = self.merchants[idx].units;
+        let cargo = self.merchants[idx].cargo;
+        let purse = self.merchants[idx].gold;
+        self.say(format!(
+            "You run out the guns at a trader flying no flag but her own, and she is carrying {} {}.",
+            units, GOODS[cargo]
+        ));
+        self.credit(reputation::RAID_MERCHANT);
+        // Word goes out on the offence, not on the outcome, and it goes out now
+        // rather than at the end of the month. Being seen to run out your guns
+        // at a trader is the thing that is reported; whether you were any good
+        // at it is a detail for the court.
+        self.enforce();
+
+        // A merchant is not defenceless, only badly armed. Enough that a bare
+        // six-gun trader turning raider is a gamble rather than a wage.
+        let escort = 6 + units / 6;
+        let roll = self.rng.range(0, guns + escort);
+        if roll >= guns {
+            self.say("She fights her guns better than you expected and hauls off.".into());
+            let wound = self.rng.range(4, 16);
+            self.hurt(wound, "You take the worst of the exchange.");
+            return true;
+        }
+
+        let taken = units.min(self.ship.free_space());
+        self.ship.hold[cargo] += taken;
+        self.gold += purse;
+        self.merchants[idx].units -= taken;
+        self.merchants[idx].gold = 0;
+        self.say(format!(
+            "She strikes. You take {taken} {} and {purse} in gold out of her, and leave her the hull.",
+            GOODS[cargo]
+        ));
+        if taken < units {
+            self.say("The rest goes over the side. Your hold would not hold it.".into());
+        }
+
+        // Looted cargo cost nothing, so the profit report has to know that or it
+        // would call the whole sale a loss against an outlay that never happened.
+        let scars = self.rng.range(2, 12);
+        self.hurt(scars, "Not without damage.");
+        if !self.lost {
+            let away = self.scatter_from(self.at);
+            self.merchants[idx].at = away;
+        }
+        true
     }
 
     // -- trade -------------------------------------------------------------
@@ -777,10 +1358,20 @@ impl Game {
             }
         }
 
+        // Merchants first, then pirates over the top of them. Where both are on
+        // one hex the raider is the one you need to know about.
+        for m in &self.merchants {
+            if let Some(idx) = hex::index(m.at) {
+                if self.fog[idx] == VISIBLE {
+                    self.render[idx * 2] = CODE_MERCHANT;
+                }
+            }
+        }
+
         for p in &self.pirates {
             if let Some(idx) = hex::index(p.at) {
                 if self.fog[idx] == VISIBLE {
-                    self.render[idx * 2] = CODE_PIRATE;
+                    self.render[idx * 2] = if p.navy { CODE_NAVY } else { CODE_PIRATE };
                 }
             }
         }
@@ -796,13 +1387,45 @@ impl Game {
         self.discovered[port]
     }
 
+    /// Raiders only. A king's ship in sight is a different problem and gets its
+    /// own line, because "three strange sail" and "two raiders and a frigate"
+    /// call for opposite decisions.
     pub fn pirates_in_sight(&self) -> usize {
+        self.in_sight(|p| !p.navy)
+    }
+
+    pub fn navy_in_sight(&self) -> usize {
+        self.in_sight(|p| p.navy)
+    }
+
+    fn in_sight(&self, want: impl Fn(&Pirate) -> bool) -> usize {
         self.pirates
             .iter()
             .filter(|p| {
-                hex::index(p.at).map(|i| self.fog[i] == VISIBLE).unwrap_or(false)
+                want(p)
+                    && hex::index(p.at).map(|i| self.fog[i] == VISIBLE).unwrap_or(false)
             })
             .count()
+    }
+
+    pub fn merchants_in_sight(&self) -> usize {
+        self.merchants
+            .iter()
+            .filter(|m| {
+                hex::index(m.at).map(|i| self.fog[i] == VISIBLE).unwrap_or(false)
+            })
+            .count()
+    }
+
+    /// True while at least one raider is standing toward you, whether or not she
+    /// can currently see you. This is the memory made visible: the warning stays
+    /// up for a day and a half after you slip over the horizon.
+    pub fn hunted(&self) -> bool {
+        self.pirates.iter().any(|p| p.hunting)
+    }
+
+    pub fn standing(&self) -> &'static str {
+        reputation::standing(self.reputation)
     }
 
     pub fn wind_here(&self) -> (usize, i32) {
@@ -871,27 +1494,61 @@ mod tests {
     /// Raiders keep off the coastal shelf. Without this an unarmed trader loses
     /// a third of her gold per boarding often enough that three thousand gold
     /// compounds down to single figures over an ordinary voyage.
+    /// The claim is about *chasing*, and it is checked on every tick rather than
+    /// once at the end, because "not hunting when the music stopped" is a much
+    /// weaker statement than "never hunted at all".
+    ///
+    /// It used to assert, on one seed, that the player's gold was untouched, and
+    /// that assertion was quietly unsound. A pirate that is not hunting wanders
+    /// at random, and a random walk of well over a hundred steps starting one hex
+    /// away will sometimes blunder onto the player and board them. It passed only
+    /// because that seed happened to walk the other way, and it broke the moment
+    /// an unrelated change shifted the generator stream. A blunder is not a
+    /// chase. So the gold check is gone and the chase check is absolute: eleven
+    /// seeds, every tick, no raider ever hunts and no raider ever remembers.
+    /// That is stronger than what it replaced, which checked one seed once.
+    ///
+    /// Losing the gold line loses nothing real. This setup parks a raider one hex
+    /// from a ship that then sits still for six months of game time, and four
+    /// seeds in eleven end in a boarding. That is not the shelf failing, it is a
+    /// random walk of a hundred and forty steps starting adjacent, and a
+    /// stationary trader moored beside a pirate deserves what she gets. The
+    /// playability claim in the paragraph above rests on nobody giving chase,
+    /// which is what is actually asserted here.
     #[test]
     fn pirates_do_not_hunt_a_ship_on_the_shelf() {
-        let mut g = Game::new(7);
-        assert!(
-            g.offshore() <= SHELF,
-            "a port should sit on the shelf, not in the offing"
-        );
-        g.pirates.clear();
-        // Well inside HUNT_RANGE, and given plenty of time to close.
-        g.pirates.push(Pirate {
-            at: hex::normalise(hex::neighbour(g.at, 0)),
-            strength: 10,
-            hours: 0.0,
-            hunting: true,
-        });
-        let gold_before = g.gold;
-        for _ in 0..40 {
-            g.move_pirates(24.0);
+        for seed in 1..12u32 {
+            let mut g = Game::new(seed);
+            assert!(
+                g.offshore() <= SHELF,
+                "a port should sit on the shelf, not in the offing"
+            );
+            g.pirates.clear();
+            // Well inside HUNT_RANGE, and given plenty of time to close.
+            g.pirates.push(Pirate {
+                at: hex::normalise(hex::neighbour(g.at, 0)),
+                strength: 10,
+                hours: 0.0,
+                hunting: true,
+                name: "the Test Sail",
+                last_seen: None,
+                memory: 0,
+                beaten: false,
+                met: false,
+                navy: false,
+            });
+            for _ in 0..40 {
+                g.move_pirates(24.0);
+                if g.pirates.is_empty() {
+                    break;
+                }
+                assert!(!g.pirates[0].hunting, "seed {seed}: a raider gave chase inshore");
+                assert!(
+                    g.pirates[0].last_seen.is_none(),
+                    "seed {seed}: a raider inshore remembered where the player was"
+                );
+            }
         }
-        assert!(!g.pirates[0].hunting, "a raider gave chase inshore");
-        assert_eq!(gold_before, g.gold, "an inshore ship was robbed");
     }
 
     /// Two pirates on one hex used to be an out-of-bounds index, because a won
@@ -913,11 +1570,430 @@ mod tests {
                     strength: 10,
                     hours: 0.0,
                     hunting: true,
+                    name: "the Test Sail",
+                    last_seen: None,
+                    memory: 0,
+                    beaten: false,
+                    met: false,
+                    navy: false,
                 });
             }
             g.move_pirates(0.0);
             assert!(g.pirates.len() <= 3);
         }
+    }
+
+    /// Put the player well out in the offing with one raider inside her hunting
+    /// range but not on top of her. Used by the memory tests below, which need
+    /// the same setup and differ only in what happens next.
+    ///
+    /// The gap matters. An adjacent raider closes on the first step and the
+    /// engagement scatters her and wipes the very memory under test, so the
+    /// spacing here is what makes these tests about seeing rather than fighting.
+    fn a_raider_that_has_seen_you(seed: u32) -> Option<Game> {
+        const GAP: i32 = 3;
+        let mut g = Game::new(seed);
+        g.pirates.clear();
+        g.merchants.clear();
+
+        // Somewhere well off the land, so the SHELF clause does not veto the
+        // chase before the memory is ever exercised.
+        let deep = |g: &Game, h: Hex| {
+            hex::index(h).is_some_and(|i| {
+                !nav::is_land_index(i) && i32::from(g.depth[i]) > SHELF + 2
+            })
+        };
+        let mut here = None;
+        for i in 0..nav::CELLS {
+            let h = hex::from_offset(
+                i as i32 % crate::world::COLS,
+                i as i32 / crate::world::COLS,
+            );
+            if deep(&g, h) {
+                here = Some(h);
+                break;
+            }
+        }
+        g.at = here?;
+
+        let mut spot = None;
+        for i in 0..nav::CELLS {
+            let h = hex::from_offset(
+                i as i32 % crate::world::COLS,
+                i as i32 / crate::world::COLS,
+            );
+            if hex::wrapped_distance(h, g.at) == GAP && deep(&g, h) {
+                spot = Some(h);
+                break;
+            }
+        }
+        g.pirates.push(Pirate {
+            at: spot?,
+            strength: 10,
+            hours: 0.0,
+            hunting: false,
+            name: "the Test Sail",
+            last_seen: None,
+            memory: 0,
+            beaten: false,
+            met: false,
+            navy: false,
+        });
+        g.gold = 1_000_000;
+        g.ship.guns = 0;
+        Some(g)
+    }
+
+    /// The heart of it. A raider that loses sight of you keeps standing toward
+    /// where you were instead of forgetting you the instant you cross the
+    /// horizon, which is what she did before.
+    #[test]
+    fn a_raider_remembers_where_she_last_saw_you() {
+        let Some(mut g) = a_raider_that_has_seen_you(3) else { return };
+        g.move_pirates(7.0);
+        assert!(g.pirates[0].hunting, "she never picked the player up at all");
+        let remembered = g.pirates[0].last_seen.expect("nothing was remembered");
+        assert_eq!(remembered, g.at, "she remembered somewhere the player was not");
+
+        // Vanish. Teleporting the player is not something the game can do, which
+        // is exactly why it is the right way to test the memory in isolation:
+        // it separates "she cannot see him" from "he sailed away".
+        g.at = hex::from_offset(0, 0);
+        g.pirates[0].hours = 0.0;
+        g.move_pirates(7.0);
+        assert!(
+            g.pirates[0].hunting,
+            "she gave up the moment the player was out of sight"
+        );
+        assert_eq!(
+            g.pirates[0].last_seen,
+            Some(remembered),
+            "she is chasing somewhere other than where she last saw him"
+        );
+    }
+
+    /// And the other half: memory is finite. A chase that finds nothing ends.
+    #[test]
+    fn a_chase_that_finds_nothing_is_given_up() {
+        let Some(mut g) = a_raider_that_has_seen_you(4) else { return };
+        g.move_pirates(7.0);
+        assert!(g.pirates[0].hunting);
+        g.at = hex::from_offset(0, 0);
+        // Well past PIRATE_MEMORY steps' worth of hours.
+        for _ in 0..(PIRATE_MEMORY + 4) {
+            g.pirates[0].hours = 0.0;
+            g.move_pirates(7.0);
+        }
+        assert!(!g.pirates[0].hunting, "she is still chasing a ship long gone");
+        assert_eq!(g.pirates[0].last_seen, None, "she never forgot the spot");
+    }
+
+    /// Notoriety, which is what makes the reputation number a mechanic rather
+    /// than a line in the status column: the same raider in the same water picks
+    /// the player up from further off or nearer depending on what she has heard.
+    #[test]
+    fn reputation_changes_how_far_off_a_raider_picks_you_up() {
+        let Some(mut g) = a_raider_that_has_seen_you(5) else { return };
+        g.reputation = 0;
+        let neutral = g.hunt_range(&g.pirates[0]);
+
+        g.reputation = reputation::CEILING;
+        let feared = g.hunt_range(&g.pirates[0]);
+        g.reputation = reputation::FLOOR;
+        let marked = g.hunt_range(&g.pirates[0]);
+
+        assert!(feared < neutral, "a pirate-killer is hunted just as hard");
+        assert!(marked > neutral, "a known raider is no more of a target");
+
+        g.reputation = 0;
+        g.pirates[0].beaten = true;
+        assert!(
+            g.hunt_range(&g.pirates[0]) < neutral,
+            "one that has already lost to the player is no shyer for it"
+        );
+    }
+
+    /// Beating a raider has to leave somebody alive to remember it, or the
+    /// reputation loop has no one to read it and the ocean drains over a long
+    /// game. Most wins drive her off; only a decisive one sinks her.
+    #[test]
+    fn most_wins_drive_a_raider_off_rather_than_sinking_her() {
+        let (mut sunk, mut driven) = (0, 0);
+        for seed in 1..80u32 {
+            let mut g = Game::new(seed);
+            g.gold = 1_000_000;
+            g.ship.guns = 4; // top tier, so wins are common enough to count
+            g.ship.damage = 0;
+            let before = g.pirates.len();
+            g.fight(0, 10);
+            if g.lost {
+                continue;
+            }
+            if g.pirates.len() < before {
+                sunk += 1;
+            } else if g.pirates[0].beaten {
+                driven += 1;
+                assert!(g.reputation > 0, "driving one off earned nothing");
+            }
+        }
+        assert!(sunk > 0, "no fight in eighty ever sank a raider");
+        assert!(driven > sunk, "sinkings outnumber chases broken off: {sunk} to {driven}");
+    }
+
+    /// The fleet is spawned once and never replenished, so if every win removed
+    /// a pirate a successful game would end in an empty ocean. This is the test
+    /// that stops that regressing.
+    ///
+    /// A third rather than most of them, and the measurement is honest about
+    /// why: this is sixty consecutive fights at the top gun tier against the
+    /// weakest raiders in the game, which no real voyage looks like, and about a
+    /// quarter of wins are decisive. Even that leaves eleven sail at large.
+    /// Before the split it would have left none.
+    #[test]
+    fn a_long_run_of_victories_does_not_empty_the_ocean() {
+        let mut g = Game::new(21);
+        g.gold = 1_000_000;
+        g.ship.guns = 4;
+        for _ in 0..60 {
+            if g.pirates.is_empty() || g.lost {
+                break;
+            }
+            g.ship.damage = 0;
+            g.fight(0, 8);
+        }
+        assert!(
+            g.pirates.len() >= PIRATE_COUNT / 3,
+            "sixty fights left only {} raiders of {PIRATE_COUNT}",
+            g.pirates.len()
+        );
+    }
+
+    /// Reputation up for pirates, down for merchants, and the second one does
+    /// not need the attack to succeed.
+    #[test]
+    fn firing_on_a_merchant_costs_your_standing_win_or_lose() {
+        let mut wins = 0;
+        let mut losses = 0;
+        for seed in 1..60u32 {
+            let mut g = Game::new(seed);
+            g.ship.guns = 3;
+            g.ship.damage = 0;
+            let Some(idx) = (0..g.merchants.len()).next() else { continue };
+            g.at = g.merchants[idx].at;
+            let before = g.reputation;
+            let gold_before = g.gold;
+            if !g.attack() {
+                continue;
+            }
+            assert_eq!(
+                g.reputation,
+                before + reputation::RAID_MERCHANT,
+                "seed {seed}: the attack was free"
+            );
+            if g.gold > gold_before {
+                wins += 1;
+            } else {
+                losses += 1;
+            }
+        }
+        assert!(wins > 0 && losses > 0, "raiding is not a gamble: {wins} won, {losses} lost");
+    }
+
+    /// An unarmed ship cannot commit the crime, and neither can one with nobody
+    /// alongside. Both refusals have to leave the standing alone.
+    #[test]
+    fn an_attack_that_cannot_happen_costs_nothing() {
+        let mut g = Game::new(30);
+        g.merchants.clear();
+        assert!(!g.attack(), "fired on an empty sea");
+        assert_eq!(g.reputation, 0);
+
+        let mut g = Game::new(31);
+        g.ship.guns = 0;
+        if !g.merchants.is_empty() {
+            g.at = g.merchants[0].at;
+            assert!(!g.attack(), "an unarmed ship raided somebody");
+            assert_eq!(g.reputation, 0);
+        }
+    }
+
+    /// Merchants are the reason reputation can fall, so they have to actually be
+    /// out there and actually be moving. A fleet that spawns and then sits in
+    /// harbour is a fleet nobody ever meets.
+    #[test]
+    fn the_merchant_fleet_sails() {
+        let mut g = Game::new(40);
+        assert_eq!(g.merchants.len(), MERCHANT_COUNT);
+        let before: Vec<Hex> = g.merchants.iter().map(|m| m.at).collect();
+        for _ in 0..20 {
+            g.move_merchants(24.0);
+        }
+        let moved = g
+            .merchants
+            .iter()
+            .zip(&before)
+            .filter(|(m, was)| m.at != **was)
+            .count();
+        assert!(
+            moved > MERCHANT_COUNT / 2,
+            "only {moved} of {MERCHANT_COUNT} traders ever left harbour"
+        );
+        for m in &g.merchants {
+            let i = hex::index(m.at).expect("a trader sailed off the world");
+            assert!(!nav::is_land_index(i), "a trader is aground");
+        }
+    }
+
+    /// The crown answers an offence rather than a score in the abstract: the
+    /// fleet has to appear as a consequence of something the player did, on the
+    /// turn they did it, not at some later monthly tick.
+    #[test]
+    fn raiding_traders_brings_the_navy_out() {
+        let mut raided = 0;
+        for seed in 1..40u32 {
+            let mut g = Game::new(seed);
+            g.ship.guns = 3;
+            g.ship.damage = 0;
+            g.gold = 100_000;
+            if g.merchants.is_empty() {
+                continue;
+            }
+            // First offence. A mistake, and nobody is sent.
+            g.at = g.merchants[0].at;
+            if !g.attack() || g.lost {
+                continue;
+            }
+            assert_eq!(g.navy_out(), 0, "seed {seed}: one raid brought the fleet out");
+
+            // Second. A habit, and it is answered.
+            let Some(next) = (0..g.merchants.len()).find(|&i| g.merchants[i].units > 0) else {
+                continue;
+            };
+            g.at = g.merchants[next].at;
+            if !g.attack() || g.lost {
+                continue;
+            }
+            assert!(g.navy_out() >= 1, "seed {seed}: the second raid went unanswered");
+            raided += 1;
+        }
+        assert!(raided > 10, "only {raided} runs got as far as a second raid");
+    }
+
+    /// And the fleet has to grow with the score rather than sitting at one.
+    #[test]
+    fn the_worse_it_gets_the_more_of_them_come() {
+        let mut g = Game::new(50);
+        let mut seen = Vec::new();
+        for score in [0, -20, -40, -60, -80, -100] {
+            g.reputation = score;
+            g.enforce();
+            seen.push(g.navy_out());
+        }
+        assert_eq!(seen[0], 0, "an honest master was hunted");
+        for w in seen.windows(2) {
+            assert!(w[1] >= w[0], "the fleet shrank as the player got worse: {seen:?}");
+        }
+        assert!(
+            *seen.last().unwrap() > seen[1],
+            "the worst score brought no more ships than a middling one: {seen:?}"
+        );
+        assert_eq!(*seen.last().unwrap(), reputation::NAVY_MAX, "the cap is not reached");
+    }
+
+    /// The recall matters as much as the summons. Without it the first two
+    /// merchants taken would decide the rest of the game.
+    #[test]
+    fn mending_your_name_sends_them_home() {
+        let mut g = Game::new(51);
+        g.reputation = reputation::FLOOR;
+        g.enforce();
+        assert!(g.navy_out() > 0, "nobody was sent for a man at the floor");
+        g.reputation = 0;
+        g.enforce();
+        assert_eq!(g.navy_out(), 0, "they stayed out after the name was clear");
+    }
+
+    /// The real punishment for piracy is not the number, it is that the coast
+    /// stops being safe. Raiders leave the shelf alone; the navy is there
+    /// precisely because that is where you would otherwise hide.
+    #[test]
+    fn the_navy_works_the_coast_that_raiders_leave_alone() {
+        let mut g = Game::new(52);
+        assert!(g.offshore() <= SHELF, "a port should sit on the shelf");
+        g.reputation = reputation::FLOOR;
+        g.pirates.clear();
+        g.merchants.clear();
+        g.pirates.push(Pirate {
+            at: hex::normalise(hex::neighbour(g.at, 0)),
+            strength: 40,
+            hours: 0.0,
+            hunting: false,
+            name: "the Test Frigate",
+            last_seen: None,
+            memory: 0,
+            beaten: false,
+            met: false,
+            navy: true,
+        });
+        g.ship.guns = 0;
+        g.move_pirates(7.0);
+        assert!(
+            g.pirates.is_empty() || g.pirates[0].hunting || g.pirates[0].last_seen.is_some(),
+            "a king's ship ignored a wanted man in her own harbour approaches"
+        );
+    }
+
+    /// Fighting clear of the crown has to be worse than being taken by it, or
+    /// the fleet is a nuisance rather than a consequence and the way back is
+    /// never worth taking.
+    #[test]
+    fn resisting_the_crown_costs_more_than_answering_for_it() {
+        let mut fought = 0;
+        let mut taken = 0;
+        for seed in 60..120u32 {
+            let mut g = Game::new(seed);
+            g.reputation = -50;
+            g.gold = 100_000;
+            g.ship.damage = 0;
+            g.ship.guns = 4;
+            g.pirates.clear();
+            g.pirates.push(Pirate {
+                at: g.at,
+                strength: 40,
+                hours: 0.0,
+                hunting: true,
+                name: "the Test Frigate",
+                last_seen: None,
+                memory: 0,
+                beaten: false,
+                met: false,
+                navy: true,
+            });
+            let before = g.reputation;
+            g.arrest(0, 40);
+            if g.lost {
+                continue;
+            }
+            if g.reputation < before {
+                fought += 1;
+            } else if g.reputation > before {
+                taken += 1;
+                assert!(g.gold < 100_000, "seed {seed}: the court charged nothing");
+            }
+        }
+        assert!(fought > 0 && taken > 0, "one outcome never happened: {fought} fought, {taken} taken");
+    }
+
+    /// Fame is maintained rather than banked. Without the fade every long game
+    /// pins at one extreme and nothing reads the number differently again.
+    #[test]
+    fn a_standing_fades_if_it_is_not_kept_up() {
+        let mut g = Game::new(41);
+        g.reputation = 40;
+        // A year of months.
+        g.advance(HOURS_PER_DAY * DAYS_PER_MONTH as f32 * 12.0);
+        assert!(g.reputation < 40, "a reputation earned once lasted for ever");
+        assert!(g.reputation >= 0, "the fade overshot past nothing");
     }
 
     #[test]
