@@ -21,6 +21,8 @@ pub const CODE_SHIP: u8 = 4;
 pub const CODE_PIRATE: u8 = 5;
 
 const PIRATE_COUNT: usize = 24;
+/// How close a pirate has to be before it stops wandering and starts hunting.
+const HUNT_RANGE: i32 = 5;
 const HOURS_PER_DAY: f32 = 24.0;
 const DAYS_PER_MONTH: i32 = 30;
 const START_GOLD: i32 = 3_000;
@@ -66,6 +68,7 @@ pub struct Game {
     render: Vec<u8>,
     scratch: Vec<Hex>,
     ray: Vec<Hex>,
+    pathfinder: nav::Scratch,
 
     /// Autopilot: hexes still to sail, in reverse order so the next is last.
     course: Vec<Hex>,
@@ -96,6 +99,7 @@ impl Game {
             render: vec![0; CELLS * 2],
             scratch: Vec::new(),
             ray: Vec::new(),
+            pathfinder: nav::Scratch::new(),
             course: Vec::new(),
             lost: false,
         };
@@ -292,14 +296,23 @@ impl Game {
             return false;
         }
         let goal = hex::from_offset(PORTS[port].col as i32, PORTS[port].row as i32);
-        let path = nav::find_path(
-            self.at,
-            goal,
-            self.month,
+        // Hoisted, because the pathfinder's scratch is borrowed mutably for the
+        // length of the call and `self.ship.base_hours()` is a borrow of self.
+        let (from, month) = (self.at, self.month);
+        let (rig, hours, rating) = (
             self.ship.rigging,
             self.ship.base_hours(),
-            &self.depth,
             self.ship.bluewater_rating(),
+        );
+        let path = nav::find_path(
+            &mut self.pathfinder,
+            from,
+            goal,
+            month,
+            rig,
+            hours,
+            &self.depth,
+            rating,
         );
         if path.is_empty() {
             self.say(format!(
@@ -399,21 +412,17 @@ impl Game {
         let mut engagements = Vec::new();
 
         for idx in 0..self.pirates.len() {
-            let (at, strength) = {
-                let p = &self.pirates[idx];
-                (p.at, p.strength)
-            };
+            let strength = self.pirates[idx].strength;
             self.pirates[idx].hours += elapsed;
 
             // A pirate sails a little slower than a well-found trader, which is
             // what makes rigging worth buying for reasons other than speed.
             let step_hours = 6.5;
-            let mut moved = false;
             while self.pirates[idx].hours >= step_hours {
                 self.pirates[idx].hours -= step_hours;
 
                 let here = self.pirates[idx].at;
-                let sees = hex::wrapped_distance(here, player) <= 5;
+                let sees = hex::wrapped_distance(here, player) <= HUNT_RANGE;
                 self.pirates[idx].hunting = sees;
 
                 let dir = if sees {
@@ -421,7 +430,7 @@ impl Game {
                     // limited to a short horizon so a fleet of them stays
                     // affordable.
                     let path = nav::find_path(
-                        here, player, month, 2, 6.0, &self.depth, 8,
+                        &mut self.pathfinder, here, player, month, 2, 6.0, &self.depth, 8,
                     );
                     path.first().and_then(|&n| {
                         (0..6).find(|&d| hex::normalise(hex::neighbour(here, d)) == n)
@@ -435,20 +444,21 @@ impl Game {
                     if let Some(ni) = hex::index(n) {
                         if !nav::is_land_index(ni) && self.depth[ni] <= 8 {
                             self.pirates[idx].at = n;
-                            moved = true;
                         }
                     }
                 }
             }
-            let _ = moved;
 
             if self.pirates[idx].at == player {
                 engagements.push((idx, strength));
             }
-            let _ = at;
         }
 
-        for (idx, strength) in engagements {
+        // Descending, because a won fight removes the pirate from the vector
+        // and every index above it shifts down. Two of them can reach the same
+        // hex on the same tick, and with `panic = "abort"` an out-of-bounds
+        // index here is not a bug report, it is a blank page.
+        for (idx, strength) in engagements.into_iter().rev() {
             self.fight(idx, strength);
             if self.lost {
                 return;
@@ -763,6 +773,32 @@ mod tests {
         assert!(lit > 1, "the ship is blind in harbour");
         let dark = g.fog.iter().filter(|v| **v == UNSEEN).count();
         assert!(dark > CELLS / 2, "the chart starts too full");
+    }
+
+    /// Two pirates on one hex used to be an out-of-bounds index, because a won
+    /// fight removes an element and the queued indices above it went stale.
+    /// Under `panic = "abort"` that is a blank page and a console trap, so it
+    /// gets a test of its own rather than a comment.
+    #[test]
+    fn two_pirates_on_the_same_hex_do_not_break_the_engagement() {
+        for seed in 1..40u32 {
+            let mut g = Game::new(seed);
+            // Armed, so `fight` can take the branch that removes a pirate, and
+            // rich enough that losing does not end the run early.
+            g.ship.guns = 3;
+            g.gold = 100_000;
+            g.pirates.clear();
+            for _ in 0..3 {
+                g.pirates.push(Pirate {
+                    at: g.at,
+                    strength: 10,
+                    hours: 0.0,
+                    hunting: true,
+                });
+            }
+            g.move_pirates(0.0);
+            assert!(g.pirates.len() <= 3);
+        }
     }
 
     #[test]

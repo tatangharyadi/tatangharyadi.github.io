@@ -229,6 +229,64 @@ pub fn refresh_fov(eye: Hex, radius: i32, fog: &mut [u8], scratch: &mut Vec<Hex>
 // Pathfinding
 // ---------------------------------------------------------------------------
 
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
+
+#[derive(PartialEq)]
+struct Node {
+    f: f32,
+    i: usize,
+}
+impl Eq for Node {}
+impl Ord for Node {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Reversed, because BinaryHeap is a max-heap and this is a search
+        // for the cheapest.
+        other.f.partial_cmp(&self.f).unwrap_or(Ordering::Equal)
+    }
+}
+impl PartialOrd for Node {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// The four map-sized buffers A* needs, kept so they can be reused.
+///
+/// This is not premature. A hunting pirate pathfinds once per move and there
+/// are two dozen of them, so allocating these per call means something like a
+/// megabyte of churn every time the player presses a key. That is not slow
+/// enough to notice, but it is enough to make the allocator ask for more linear
+/// memory, and `memory.grow` detaches every `ArrayBuffer` view JavaScript is
+/// holding. The page would go blank several moves in, for a reason that looks
+/// nothing like its cause.
+pub struct Scratch {
+    g: Vec<f32>,
+    came: Vec<i32>,
+    coord: Vec<Hex>,
+    done: Vec<bool>,
+    open: BinaryHeap<Node>,
+}
+
+impl Scratch {
+    pub fn new() -> Self {
+        Scratch {
+            g: vec![f32::INFINITY; CELLS],
+            came: vec![-1; CELLS],
+            coord: vec![Hex::new(0, 0); CELLS],
+            done: vec![false; CELLS],
+            open: BinaryHeap::new(),
+        }
+    }
+
+    fn reset(&mut self) {
+        self.g.iter_mut().for_each(|v| *v = f32::INFINITY);
+        self.came.iter_mut().for_each(|v| *v = -1);
+        self.done.iter_mut().for_each(|v| *v = false);
+        self.open.clear();
+    }
+}
+
 /// A* from `start` to `goal` over water, minimising hours under sail.
 ///
 /// Returns the hexes after `start`, ending at `goal`, or an empty path if the
@@ -236,6 +294,7 @@ pub fn refresh_fov(eye: Hex, radius: i32, fog: &mut [u8], scratch: &mut Vec<Hex>
 /// than the ship dares go, which is how a coastal hull is kept out of the
 /// Atlantic without a special case anywhere else.
 pub fn find_path(
+    scratch: &mut Scratch,
     start: Hex,
     goal: Hex,
     month: i32,
@@ -244,28 +303,6 @@ pub fn find_path(
     depth: &[u8],
     max_depth_from_land: i32,
 ) -> Vec<Hex> {
-    use std::cmp::Ordering;
-    use std::collections::BinaryHeap;
-
-    #[derive(PartialEq)]
-    struct Node {
-        f: f32,
-        i: usize,
-    }
-    impl Eq for Node {}
-    impl Ord for Node {
-        fn cmp(&self, other: &Self) -> Ordering {
-            // Reversed, because BinaryHeap is a max-heap and this is a search
-            // for the cheapest.
-            other.f.partial_cmp(&self.f).unwrap_or(Ordering::Equal)
-        }
-    }
-    impl PartialOrd for Node {
-        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-            Some(self.cmp(other))
-        }
-    }
-
     let Some(goal_i) = hex::index(goal) else {
         return Vec::new();
     };
@@ -282,15 +319,12 @@ pub fn find_path(
     // itself.
     let cheapest = base_hours * 0.35;
 
-    let mut g = vec![f32::INFINITY; CELLS];
-    let mut came: Vec<i32> = vec![-1; CELLS];
-    let mut coord = vec![Hex::new(0, 0); CELLS];
-    let mut done = vec![false; CELLS];
+    scratch.reset();
+    let Scratch { g, came, coord, done, open } = scratch;
 
     g[start_i] = 0.0;
     coord[start_i] = start;
 
-    let mut open = BinaryHeap::new();
     open.push(Node {
         f: hex::wrapped_distance(start, goal) as f32 * cheapest,
         i: start_i,
@@ -417,7 +451,7 @@ mod tests {
         let depth = distance_to_land();
         let a = port_hex(0);
         let b = port_hex(1);
-        let path = find_path(a, b, 6, 4, 6.0, &depth, 99);
+        let path = find_path(&mut Scratch::new(), a, b, 6, 4, 6.0, &depth, 99);
         assert!(!path.is_empty(), "no route between the first two ports");
         assert_eq!(*path.last().unwrap(), b);
         let mut prev = a;
@@ -445,10 +479,10 @@ mod tests {
             }
         }
         let (i, j, _) = best;
-        let open = find_path(port_hex(i), port_hex(j), 6, 4, 6.0, &depth, 99);
+        let open = find_path(&mut Scratch::new(), port_hex(i), port_hex(j), 6, 4, 6.0, &depth, 99);
         assert!(!open.is_empty(), "the two furthest ports are not connected");
 
-        let hugging = find_path(port_hex(i), port_hex(j), 6, 0, 6.0, &depth, 1);
+        let hugging = find_path(&mut Scratch::new(), port_hex(i), port_hex(j), 6, 0, 6.0, &depth, 1);
         assert!(
             hugging.len() != open.len() || hugging.is_empty(),
             "a coast-hugging route was identical to the open-water one"
