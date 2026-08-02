@@ -1213,6 +1213,17 @@ impl Game {
             self.say(format!("Nobody in {} deals in {}.", PORTS[port].name, GOODS[good]));
             return false;
         };
+        // Priced but shut. The distinction matters enough to spend a different
+        // sentence on it: the first refusal above is the world telling you the
+        // good is not here, this one is the harbour telling you it is not here
+        // *for you yet*, and those ask for opposite responses from the player.
+        if !self.markets.is_open(port, good) {
+            self.say(format!(
+                "{} is traded in {} behind closed doors. Buy your way in first.",
+                GOODS[good], PORTS[port].name
+            ));
+            return false;
+        }
         let affordable = self.gold / unit;
         let fits = self.ship.free_space();
         let take = qty.min(affordable).min(fits);
@@ -1283,6 +1294,45 @@ impl Game {
                 "Sold {take} {} at {unit}: {verdict}.",
                 GOODS[good]
             ));
+        }
+        true
+    }
+
+    /// Put money into the harbour and have one more of its goods opened to you.
+    ///
+    /// Deliberately not a choice of *which* good. The port decides what it lets
+    /// a new partner see next, which is both the truthful reading and the one
+    /// that keeps two ports of an economy distinct: if the player picked, every
+    /// port would converge on the same book in the same order.
+    pub fn invest(&mut self) -> bool {
+        let Some(port) = self.port_here() else {
+            self.say("You are at sea. There is nobody to invest with.".into());
+            return false;
+        };
+        let Some(cost) = self.markets.investment_cost(port) else {
+            self.say(format!(
+                "{} has no more to show you. Their whole book is open.",
+                PORTS[port].name
+            ));
+            return false;
+        };
+        if self.gold < cost {
+            self.say(format!("A share in {} costs {cost}.", PORTS[port].name));
+            return false;
+        }
+        let before: Vec<usize> = (0..GOODS.len())
+            .filter(|&g| self.markets.is_open(port, g))
+            .collect();
+        self.gold -= cost;
+        self.markets.invest(port, cost);
+        let opened = (0..GOODS.len())
+            .find(|g| self.markets.is_open(port, *g) && !before.contains(g));
+        match opened {
+            Some(g) => self.say(format!(
+                "Invested {cost} in {}. They open the {} trade to you.",
+                PORTS[port].name, GOODS[g]
+            )),
+            None => self.say(format!("Invested {cost} in {}.", PORTS[port].name)),
         }
         true
     }
@@ -2097,12 +2147,48 @@ mod tests {
         let mut g = Game::new(4);
         let port = g.port_here().unwrap();
         let good = (0..GOODS.len())
-            .find(|&x| g.markets.buy_price(port, x).is_some())
+            .find(|&x| g.markets.buy_price(port, x).is_some() && g.markets.is_open(port, x))
             .expect("the starting port sells nothing at all");
         let gold_before = g.gold;
         assert!(g.buy(good, 5));
         assert_eq!(g.ship.hold[good], 5);
         assert!(g.gold < gold_before);
+    }
+
+    /// The opening move, checked as a whole rather than as its parts. Gating
+    /// the market is the one change that could make the first five minutes
+    /// worse, and a port that opens three goods a player cannot afford is the
+    /// same dead start as a port that opens none.
+    #[test]
+    fn the_first_port_is_playable_on_the_opening_purse() {
+        let g = Game::new(4);
+        let port = g.port_here().expect("the voyage does not start in a port");
+        let open: Vec<usize> = (0..GOODS.len())
+            .filter(|&x| g.markets.is_open(port, x))
+            .collect();
+        assert!(open.len() >= 2, "the first port opens almost nothing");
+        assert!(
+            open.iter()
+                .any(|&x| g.markets.buy_price(port, x).unwrap() <= g.gold),
+            "nothing the first port opens is affordable on the opening purse"
+        );
+    }
+
+    #[test]
+    fn buying_a_shut_good_is_refused_and_investing_opens_one() {
+        let mut g = Game::new(4);
+        let port = g.port_here().unwrap();
+        let shut = (0..GOODS.len())
+            .find(|&x| g.markets.buy_price(port, x).is_some() && !g.markets.is_open(port, x))
+            .expect("the first port holds nothing back");
+        g.gold = 1_000_000;
+        assert!(!g.buy(shut, 1), "a shut good was sold anyway");
+        assert_eq!(g.ship.hold[shut], 0);
+
+        let before = g.markets.open_count(port);
+        assert!(g.invest());
+        assert_eq!(g.markets.open_count(port), before + 1);
+        assert!(g.markets.favour_of(port) > 0, "investing earned no standing");
     }
 
     #[test]
@@ -2125,7 +2211,7 @@ mod tests {
         g.gold = 10_000_000;
         let port = g.port_here().unwrap();
         let good = (0..GOODS.len())
-            .find(|&x| g.markets.buy_price(port, x).is_some())
+            .find(|&x| g.markets.buy_price(port, x).is_some() && g.markets.is_open(port, x))
             .unwrap();
         g.buy(good, 100_000);
         assert!(g.ship.cargo() <= g.ship.capacity());

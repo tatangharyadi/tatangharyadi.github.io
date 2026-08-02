@@ -161,6 +161,12 @@ pub extern "C" fn repair() -> i32 {
     game().repair() as i32
 }
 
+/// Buy a share in the port under the keel, opening one more of its goods.
+#[no_mangle]
+pub extern "C" fn invest() -> i32 {
+    game().invest() as i32
+}
+
 /// Fire on the merchant sharing this hex.
 ///
 /// It returns whether the order was *accepted*, not whether it succeeded, which
@@ -292,6 +298,27 @@ pub extern "C" fn write_status() {
         None => s.push_str("-1"),
     }
 
+    // Standing at this quayside, and what it is worth. The discount is small on
+    // purpose, so it has to be printed as a figure: a twelve percent cut nobody
+    // states is a rounding error the player will read as noise in the index.
+    let (favour, discount, invested, invest_cost, open, stocked) = match port {
+        Some(p) => (
+            g.markets.favour_of(p),
+            g.markets.favour_discount(p),
+            g.markets.invested_of(p),
+            g.markets.investment_cost(p).unwrap_or(-1),
+            g.markets.open_count(p),
+            Markets::stocked_count(p),
+        ),
+        None => (0, 0, 0, -1, 0, 0),
+    };
+    kv_i(&mut s, "favour", favour, false);
+    kv_i(&mut s, "favourDiscount", discount, false);
+    kv_i(&mut s, "invested", invested, false);
+    kv_i(&mut s, "investCost", invest_cost, false);
+    kv_i(&mut s, "openGoods", open, false);
+    kv_i(&mut s, "stockedGoods", stocked, false);
+
     // What the yard would charge, so the page never has to know the tables.
     s.push_str(",\"upgrades\":[");
     for i in 0..3 {
@@ -317,14 +344,18 @@ pub extern "C" fn write_status() {
     let mut first = true;
     for good in 0..GOODS.len() {
         let have = g.ship.hold[good];
-        let (buy, sell, glut, cool) = match port {
+        let (buy, sell, glut, cool, shut) = match port {
             Some(p) => (
                 g.markets.buy_price(p, good).unwrap_or(-1),
                 g.markets.sell_price(p, good).unwrap_or(-1),
                 Markets::is_glutted(p, good),
                 g.markets.cooldown_of(p, good),
+                // Priced and shut, which is a different row from unpriced. The
+                // page needs both facts because they read as the same blank
+                // otherwise, and one of them is an invitation to invest.
+                g.markets.buy_price(p, good).is_some() && !g.markets.is_open(p, good),
             ),
-            None => (-1, -1, false, 0),
+            None => (-1, -1, false, 0, false),
         };
         if have == 0 && buy < 0 && sell < 0 {
             continue;
@@ -348,6 +379,8 @@ pub extern "C" fn write_status() {
         // route, which is the opposite of what the cooldown is for.
         s.push_str(",\"cool\":");
         s.push_str(&cool.to_string());
+        s.push_str(",\"shut\":");
+        s.push_str(if shut { "true" } else { "false" });
         s.push('}');
     }
     s.push(']');
@@ -607,6 +640,12 @@ mod tests {
             "\"navy\"",
             "\"navyOut\"",
             "\"cool\"",
+            "\"shut\"",
+            "\"favour\"",
+            "\"favourDiscount\"",
+            "\"investCost\"",
+            "\"openGoods\"",
+            "\"stockedGoods\"",
         ] {
             assert!(s.contains(key), "the status no longer carries {key}");
         }
