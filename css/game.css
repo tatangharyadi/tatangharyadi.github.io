@@ -25,7 +25,11 @@
 
   /* Chart hues. Mocha, named for what they draw rather than for the colour. */
   --sea-shallow: #89b4fa;
-  --sea-deep: #6c7086;
+  /* overlay2, not overlay0. Deep water has to stay duller than the shallows,
+   * but it is also the darkest thing on the chart, so it sets the floor for how
+   * faint a remembered hex may be drawn. overlay0 measured 3.36:1 lit and 1.62:1
+   * remembered, which is to say invisible: explored ocean looked unexplored. */
+  --sea-deep: #9399b2;
   --shore: #a6e3a1;
   --harbour: #f9e2af;
   --ship: #f5e0dc;
@@ -483,9 +487,17 @@ input[type="number"] {
 
 /* The chart itself.
  *
- * Three states of knowledge, drawn by opacity rather than by hue, so the
- * distinction survives every kind of colour blindness: lit, remembered, and
- * never seen. Never-seen hexes draw nothing at all. */
+ * Three states of knowledge, told apart by opacity first so the distinction
+ * survives every kind of colour blindness: lit, remembered, and
+ * never seen. Never-seen hexes draw nothing at all, so the blank is the fog:
+ * it means unexplored and nothing else.
+ *
+ * That only reads if remembered is unmistakably *drawn*. The dim state is a
+ * chart you have surveyed and sailed away from, not a hint of one, so it has a
+ * contrast floor rather than a pleasing opacity: every hue must clear 3:1
+ * against the panel at seen-1. The binding case is --sea-deep, the darkest
+ * glyph on the chart; at 0.42 it measured 1.62:1 and open water you had already
+ * crossed was indistinguishable from open water you had never seen. */
 .cell {
   font-family: var(--font-mono);
   font-size: 15px;
@@ -499,7 +511,16 @@ input[type="number"] {
 }
 
 .cell.seen-1 {
-  opacity: 0.42;
+  opacity: 0.65;
+  /* Colour drains out of a chart drawn from memory. This is the second cue, and
+   * it exists because opacity alone cannot carry both jobs: once the dim state
+   * is lifted clear of the background it is necessarily closer to the lit one,
+   * and the two would be told apart by brightness alone. Saturation is free
+   * here -- the filter matrix is built on the same luminance coefficients WCAG
+   * measures with, so draining the hue moves every contrast figure above by
+   * less than 0.1 -- and it is redundant rather than load-bearing, so a visitor
+   * who cannot see the hue shift still has the opacity step. */
+  filter: saturate(0.3);
 }
 
 .cell.seen-2 {
