@@ -386,6 +386,93 @@ function mendButton(s) {
 }
 
 /** Buy and sell rows, plus the yard, or an explanation of why there is neither. */
+/**
+ * The factor's errand: the one accepted, the one on offer, or neither.
+ *
+ * Drawn at sea as well as in harbour, and that is the point of it being its
+ * own function. A commission is a reason to be somewhere, so the moment it
+ * stops being visible from the deck it stops steering anything: the player
+ * reads it once at the quay, sails, and forgets which harbour wanted what.
+ *
+ * Nothing is drawn at all when there is neither, rather than an empty heading.
+ * A "the factor" with nothing under it reads as a section that failed to load.
+ */
+function commissionSection(s, body) {
+  const c = s.commission;
+  const offer = s.offer;
+  if (!c && !offer) return;
+
+  body.appendChild(el("h3", "panel--sub", "the factor"));
+
+  if (c) {
+    // A deliver errand is paid where it lands, so naming the port twice reads
+    // as a mistake rather than as precision. A collect errand is paid at the
+    // other end from the one it names, and there the second port is the whole
+    // point of the sentence.
+    const bound = c.kind === "deliver"
+      ? `${c.qty} ${c.goodName} to ${c.otherName}, paid on landing there`
+      : `${c.qty} ${c.goodName} out of ${c.otherName}, paid at ${c.paidAtName}`;
+    body.appendChild(el("p", null,
+      `Under commission: ${bound}. ` +
+      `${c.gold.toLocaleString("en")} gold and ${c.favour} favour.`));
+    // What is aboard against what was asked. The parcel is ordinary cargo the
+    // player buys and may sell, so this number moves for reasons that have
+    // nothing to do with the errand, and it is the only way to see that.
+    // Plain body text when the parcel is short and dim when it is made up. Not
+    // `bad`: red is what this page uses for a glutted market and a hull taking
+    // water, and a parcel you have simply not bought yet is neither. It is the
+    // next thing to do, which is the ordinary colour.
+    body.appendChild(el("p", c.enough ? "dim" : null,
+      c.enough
+        ? `${c.have} ${c.goodName} in the hold. The parcel is made up.`
+        : `${c.have} of ${c.qty} ${c.goodName} in the hold, ` +
+          `${c.qty - c.have} short. The parcel is to be had in ${c.boughtAtName}.`));
+
+    const orders = el("div", "helm--orders");
+    const settle = el("button", null,
+      c.atPayingPort
+        ? `hand over the ${c.goodName}`
+        : `wanted at ${c.paidAtName}`);
+    // The same id the accept button carries, and deliberately so. This is the
+    // one control on the site that really does replace itself: press "take the
+    // commission" and the button under the cursor is gone, because there is no
+    // longer an offer to take. `order` puts focus back by looking the id up
+    // again, so an id that vanishes strands a keyboard user on <body> -- the
+    // exact failure the stable-id rule in AGENTS.md exists to prevent. Naming
+    // the slot rather than the verb keeps the lookup working across the
+    // transition, and the slot is honestly one thing: what the factor is
+    // waiting for you to do.
+    settle.id = "commission-order";
+    // Never `disabled`: the control the player just pressed must stay in the
+    // tab order, and a press that cannot be honoured is a chronicle line
+    // saying which of the two conditions is missing.
+    if (!c.atPayingPort || !c.enough) settle.setAttribute("aria-disabled", "true");
+    settle.addEventListener("click", () => order(() => wasm.settle_commission()));
+    orders.appendChild(settle);
+
+    const drop = el("button", null, "give up the commission");
+    drop.id = "commission-abandon";
+    drop.addEventListener("click", () => order(() => wasm.abandon_commission()));
+    orders.appendChild(drop);
+    body.appendChild(orders);
+    return;
+  }
+
+  body.appendChild(el("p", null, offer.text));
+  // The gold is already in the sentence above, so this line carries what that
+  // one leaves out: the standing, and the fact that the parcel is not handed
+  // to you. A player who reads the fee and not the outlay has been misled.
+  body.appendChild(el("p", "dim",
+    `${offer.favour} favour with the gold. ` +
+    `The parcel is bought in ${offer.boughtAtName} at your own cost.`));
+  const orders = el("div", "helm--orders");
+  const take = el("button", null, "take the commission");
+  take.id = "commission-order"; // See the settle button: one slot, one id.
+  take.addEventListener("click", () => order(() => wasm.accept_commission()));
+  orders.appendChild(take);
+  body.appendChild(orders);
+}
+
 function drawHere(s) {
   const body = $("here--body");
   body.replaceChildren();
@@ -413,6 +500,7 @@ function drawHere(s) {
     const carpenter = el("div", "helm--orders");
     carpenter.appendChild(mendButton(s));
     body.appendChild(carpenter);
+    commissionSection(s, body);
     if (s.underWay) {
       body.appendChild(el("p", "dim", "A course is laid. Sail on to make the next leg."));
     }
@@ -443,6 +531,11 @@ function drawHere(s) {
     ? " Their whole book is open to you."
     : ` ${shut} of their ${s.stockedGoods} goods are still closed to you.`;
   body.appendChild(el("p", "dim", standing + book));
+
+  // Above the market table, because it is the thing that decides what to buy
+  // out of it. Below it the errand would be read after the decision it exists
+  // to inform.
+  commissionSection(s, body);
 
   const wrap = el("div", "market--scroll");
   const table = el("table", "market");
@@ -724,12 +817,28 @@ function order(run) {
   // same way: look the element back up by the id it kept. Buying stores is the
   // order that made this matter, because it is the first one a player presses
   // several times in a row.
-  const had = document.activeElement && document.activeElement.id;
+  const active = document.activeElement;
+  const had = active && active.id;
+  // The panel the control was in, for the case the id lookup cannot cover: an
+  // order whose own control is gone afterwards because the thing it acted on
+  // no longer exists. Discharging a commission is the first of those -- the
+  // factor's section disappears with the errand -- and without somewhere to
+  // put focus a keyboard user is dropped on <body> at the exact moment they
+  // succeeded at something. The panel is not as good as the button, but it is
+  // inside the component rather than outside it.
+  const panel = active && active.closest && active.closest(".panel");
   run();
   refresh();
-  if (had) {
-    const again = $(had);
-    if (again) again.focus();
+  if (!had) return;
+  const again = $(had);
+  if (again) {
+    again.focus();
+  } else if (panel) {
+    // Programmatic only. A section is not a tab stop and must not become one,
+    // so the index is negative: this makes it a place focus can be *put*, not
+    // a place tabbing can land.
+    panel.tabIndex = -1;
+    panel.focus();
   }
 }
 

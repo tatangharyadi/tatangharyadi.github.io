@@ -17,6 +17,7 @@
 //! call that writes it. The page reads it immediately and does not keep the
 //! pointer, which is the one rule a caller has to follow.
 
+pub mod commission;
 pub mod hex;
 pub mod market;
 pub mod nav;
@@ -26,6 +27,7 @@ pub mod ship;
 pub mod sim;
 pub mod world;
 
+use commission::{Commission, Kind};
 use market::Markets;
 use ship::{Ship, Upgrade};
 use sim::Game;
@@ -204,6 +206,28 @@ pub extern "C" fn mend() -> i32 {
 #[no_mangle]
 pub extern "C" fn invest() -> i32 {
     game().invest() as i32
+}
+
+/// Take the errand the factor at this quayside has put to you.
+///
+/// Nothing is paid and nothing is loaded. See `commission` for why the parcel
+/// is bought by the player like any other cargo.
+#[no_mangle]
+pub extern "C" fn accept_commission() -> i32 {
+    game().accept_commission() as i32
+}
+
+/// Hand over the parcel and be paid. Nought if you are at the wrong port or
+/// short of the goods; the chronicle says which.
+#[no_mangle]
+pub extern "C" fn settle_commission() -> i32 {
+    game().settle_commission() as i32
+}
+
+/// Give up the errand. No penalty, so this always succeeds if there was one.
+#[no_mangle]
+pub extern "C" fn abandon_commission() -> i32 {
+    game().abandon_commission() as i32
 }
 
 /// Fire on the merchant sharing this hex.
@@ -553,6 +577,15 @@ pub extern "C" fn write_status() {
     }
     s.push(']');
 
+    // The errand on the table here, and the one already accepted. Both are
+    // `null` far more often than not, which is why they are objects rather than
+    // a spread of flat keys: an absent commission has no fields to give
+    // sensible values to, and `-1` for a port index reads as a bug.
+    s.push_str(",\"offer\":");
+    write_commission(&mut s, g, g.offer(), port);
+    s.push_str(",\"commission\":");
+    write_commission(&mut s, g, g.commission(), port);
+
     s.push_str(",\"chronicle\":[");
     for (i, line) in g.chronicle().iter().enumerate() {
         if i > 0 {
@@ -623,6 +656,52 @@ fn kv_b(s: &mut String, key: &str, value: bool) {
     s.push_str(key);
     s.push_str("\":");
     s.push_str(if value { "true" } else { "false" });
+}
+
+/// One commission, or `null`. Written from the page's point of view rather than
+/// the simulation's: the panel needs to know whether it can draw a button, not
+/// which end of the errand this port happens to be.
+fn write_commission(s: &mut String, g: &Game, c: Option<&Commission>, here: Option<usize>) {
+    let Some(c) = c else {
+        s.push_str("null");
+        return;
+    };
+    let have = g.ship.hold[c.good];
+    s.push_str("{\"kind\":");
+    push_str_json(s, if c.kind == Kind::Deliver { "deliver" } else { "collect" });
+    s.push_str(",\"text\":");
+    push_str_json(s, &c.wording());
+    s.push_str(",\"good\":");
+    s.push_str(&c.good.to_string());
+    s.push_str(",\"goodName\":");
+    push_str_json(s, GOODS[c.good]);
+    s.push_str(",\"qty\":");
+    s.push_str(&c.qty.to_string());
+    s.push_str(",\"have\":");
+    s.push_str(&have.to_string());
+    s.push_str(",\"gold\":");
+    s.push_str(&c.gold.to_string());
+    s.push_str(",\"favour\":");
+    s.push_str(&c.favour.to_string());
+    // The far end, always, because that is the harbour the errand is pointing
+    // the player at and the panel names it whichever way the parcel travels.
+    s.push_str(",\"other\":");
+    s.push_str(&c.other.to_string());
+    s.push_str(",\"otherName\":");
+    push_str_json(s, PORTS[c.other].name);
+    s.push_str(",\"paidAt\":");
+    s.push_str(&c.paid_at().to_string());
+    s.push_str(",\"paidAtName\":");
+    push_str_json(s, PORTS[c.paid_at()].name);
+    s.push_str(",\"boughtAtName\":");
+    push_str_json(s, PORTS[c.bought_at()].name);
+    // Both halves of "can it be discharged", separately, so the page can say
+    // which one is missing instead of greying a button with no reason.
+    s.push_str(",\"atPayingPort\":");
+    s.push_str(if here == Some(c.paid_at()) { "true" } else { "false" });
+    s.push_str(",\"enough\":");
+    s.push_str(if have >= c.qty { "true" } else { "false" });
+    s.push('}');
 }
 
 fn push_str_json(s: &mut String, v: &str) {
@@ -831,6 +910,8 @@ mod tests {
             "\"storePrices\"",
             "\"storePricesAfloat\"",
             "\"barred\"",
+            "\"offer\"",
+            "\"commission\"",
         ] {
             assert!(s.contains(key), "the status no longer carries {key}");
         }

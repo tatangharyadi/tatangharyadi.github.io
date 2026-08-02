@@ -346,6 +346,24 @@ impl Markets {
         self.earn_favour(port, gold);
     }
 
+    /// Put a port in your debt directly, in points rather than in gold.
+    ///
+    /// Every other way of earning standing runs through `earn_favour`, which is
+    /// denominated in gold traded, because every other way of earning it *is* a
+    /// trade. Discharging a commission is not: no goods change hands at a price
+    /// and there is no sum for `earn_favour` to divide. The alternative was to
+    /// invent a notional gold figure and hand it over, which would tie the size
+    /// of the thank-you to the going rate for the parcel rather than to the
+    /// favour the errand was worth.
+    ///
+    /// Clamped at the same ceiling, so this is not a way round `FAVOUR_MAX`.
+    pub fn oblige(&mut self, port: usize, points: i32) {
+        if port >= self.favour.len() || points <= 0 {
+            return;
+        }
+        self.favour[port] = (self.favour[port] + points).min(FAVOUR_MAX);
+    }
+
     /// Called on the first of the month. Every index creeps back toward
     /// neutral, so a route you wrecked will recover if you leave it alone, and
     /// the map keeps offering you somewhere to come back to.
