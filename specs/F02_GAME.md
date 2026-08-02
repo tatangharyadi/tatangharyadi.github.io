@@ -2,21 +2,6 @@
 
 **Status:** done
 
-**What this document is for.** It is written to be sufficient to rebuild the
-feature from nothing. "From scratch" here means re-implementable in the same
-shape: the same exported ABI, the same byte encodings, the same JSON payloads,
-the same data files. Those are specified exhaustively below, because they are the
-seams a rebuild has to hit exactly or the two halves do not meet.
-
-**Where the line is drawn.** Full fidelity on **interfaces**: the export
-signatures, the render buffer, the text protocol, the TSV schemas, the class and
-store tables. Behavioural fidelity on **rules**: the shape of each formula and
-the constants that tune it, not every branch. The simulation is over four
-thousand lines in `game/src/sim.rs` and an exhaustive transcription of it would
-be a worse copy of the source. Where this document gives a constant and a
-direction, that is the contract; where you need the exact arithmetic, the source
-is named.
-
 ## Overview
 
 Helm is a turn-based trading game on a hexagonal world map. The player commands a
@@ -24,11 +9,7 @@ ship, buys and sells across regional markets, hires and feeds a crew, refits and
 repairs, takes commissions to unfamiliar ports, fights or avoids pirates, and
 earns or loses standing with the crown.
 
-It is reached as an easter egg from the masthead text rather than from the nav,
-and it is on the site for one reason: it is the hardest thing here to fake. A
-static page can claim depth. A simulation with a rule set, a generated world that
-is asserted to be playable, and a test suite that runs on a real machine either
-holds up or does not.
+It is reached as an easter egg from the masthead text rather than from the nav.
 
 The whole simulation is Rust. `js/game.js` knows no rules at all: it instantiates
 the module, calls exported functions, reads strings back out of linear memory and

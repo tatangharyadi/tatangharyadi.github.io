@@ -2,15 +2,6 @@
 
 **Status:** done
 
-**What this document is for.** It is written to be sufficient to rebuild the
-feature from nothing. Where it states a constant, an id, a schema or a
-configuration value, that value is part of the contract and a rebuild that
-changes it is a different feature. "From scratch" here means re-implementable in
-the same shape: the same file layout, the same corpus format, the same DOM ids.
-It deliberately repeats things that also appear in
-[ARCHITECTURE.md](../ARCHITECTURE.md); a specification you have to read another
-document to act on is not one.
-
 ## Overview
 
 Ask is a search box on the home page. A visitor types a question in their own
@@ -349,12 +340,9 @@ The model and runtime are large enough that the feature does not load on page
 view. `#ask--gate` states the cost before spending it and waits for a press.
 
 The measured table, the compression figures and the `curl` that re-measures them
-live in [ARCHITECTURE.md](../ARCHITECTURE.md#the-search) and are deliberately not
-copied here. That is the one exception to this document being self-sufficient,
-and it is the exception because the number is measured and will drift: a rebuild
-needs to know that the gate exists, states its cost, and quotes the transferred
-figure rather than the on-disk one. It does not need the byte count to be correct
-in two places.
+live in [ARCHITECTURE.md](../ARCHITECTURE.md#the-search) and are not copied here,
+because the number is measured and will drift. The gate must exist, state its
+cost, and quote the transferred figure rather than the on-disk one.
 
 ---
 
