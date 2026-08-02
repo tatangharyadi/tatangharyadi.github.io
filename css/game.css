@@ -118,6 +118,9 @@ a {
 
 .helm--notice {
   max-width: 70ch;
+  /* Explicit, because this is a <p> and the shorthand it replaced was zeroing
+     the browser's own top margin as a side effect. */
+  margin-top: 0;
   margin-bottom: 1rem;
   padding: 0.75rem;
   border: 1px solid var(--border);
