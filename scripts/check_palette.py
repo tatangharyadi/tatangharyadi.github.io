@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that the four hand-kept copies of the palette agree.
+"""Check that the five hand-kept copies of the palette agree.
 
 The Catppuccin values are duplicated on purpose, for reasons documented in
 ARCHITECTURE.md and AGENTS.md:
@@ -12,10 +12,12 @@ ARCHITECTURE.md and AGENTS.md:
                        semantic names, with the dark half prefixed `mocha-`.
   4. theme-color     - a <meta> pair per page, one per colour scheme, whose
                        values are --bg-chrome in each flavour.
+  5. css/game.css    - literal hexes, because game.html is Mocha in both colour
+                       schemes and so has no var() indirection to inherit.
 
 Nothing enforces that at runtime, so a change to one copy and not the others is
 silent. This script is that enforcement. It reads css/style.css as the source of
-truth and holds the other three against it.
+truth and holds the other four against it.
 
 Stdlib only, by design - the repo has no package manager. See
 ARCHITECTURE.md#continuous-integration.
@@ -43,7 +45,28 @@ SEMANTIC = {
 # that page uses no accent decoration, no alternate surfaces and no borders.
 SUBSET_404 = ["--bg", "--text", "--text-muted", "--accent-text"]
 
+# css/game.css writes hexes rather than var(), because that page is Mocha under
+# both colour schemes and there is nothing to switch. That makes it a fifth copy
+# of the palette, and an unusual one: it also needs Catppuccin colours the rest
+# of the site never uses, because a map has to distinguish a pirate from a port
+# from a landfall and the site's seven tokens cannot carry that.
+#
+# So the check is in two halves. Any colour that css/style.css also defines must
+# equal the Mocha value there, which is the drift this script exists to catch.
+# Anything else must be named here, spelled the way upstream Catppuccin spells
+# it, which turns "I picked a nice blue" into a decision someone has to write
+# down. Values are from the Catppuccin Mocha palette.
+MOCHA_EXTRA = {
+    "#6c7086": "overlay0",
+    "#89b4fa": "blue",
+    "#a6e3a1": "green",
+    "#f38ba8": "red",
+    "#f5e0dc": "rosewater",
+    "#f9e2af": "yellow",
+}
+
 HEX = re.compile(r"(--[a-z-]+)\s*:\s*(#[0-9a-fA-F]{3,8})\s*;")
+ANY_HEX = re.compile(r"#[0-9a-fA-F]{6}\b")
 
 failures = []
 
@@ -148,12 +171,52 @@ def theme_colours(text, relpath):
     return found
 
 
+def check_game_css(text, light, dark):
+    """Hold css/game.css to the Mocha half, and make its extras deliberate.
+
+    Three failures are worth catching here. A hex that matches no Mocha value
+    and is not on the allowlist is someone eyeballing a colour. A hex that
+    matches a *Latte* value is worse, because it is a light-theme colour on a
+    page that is dark under both schemes, and it will look almost right. And an
+    allowlist entry nothing uses any more is a stale exemption, which is how an
+    allowlist stops meaning anything.
+    """
+    mocha = set(dark.values())
+    latte_only = set(light.values()) - mocha
+    used_extra = set()
+
+    for hexval in sorted({m.group(0).lower() for m in ANY_HEX.finditer(text)}):
+        if hexval in mocha:
+            continue
+        if hexval in MOCHA_EXTRA:
+            used_extra.add(hexval)
+            continue
+        if hexval in latte_only:
+            fail(
+                f"css/game.css: {hexval} is a Latte value, but game.html is "
+                "Mocha under both colour schemes"
+            )
+            continue
+        fail(
+            f"css/game.css: {hexval} is in neither css/style.css's Mocha block "
+            "nor MOCHA_EXTRA -- name it there if it is a real Catppuccin colour"
+        )
+
+    for hexval, name in sorted(MOCHA_EXTRA.items()):
+        if hexval not in used_extra:
+            fail(
+                f"MOCHA_EXTRA lists {hexval} ({name}) but css/game.css no "
+                "longer uses it -- drop the entry"
+            )
+
+
 def main():
     style = read("css/style.css")
     notfound = read("404.html")
     design = read("DESIGN.md")
     index = read("index.html")
-    if style is None or notfound is None or design is None or index is None:
+    game = read("css/game.css")
+    if None in (style, notfound, design, index, game):
         return report()
 
     # 1. The source of truth.
@@ -211,6 +274,9 @@ def main():
                     f"--bg-chrome is {want}"
                 )
 
+    # 5. css/game.css, which is Mocha-only and writes its hexes out.
+    check_game_css(game, light, dark)
+
     return report()
 
 
@@ -224,8 +290,8 @@ def report():
             "truth; bring the others into line with it."
         )
         return 1
-    print("Palette is in step across css/style.css, 404.html, DESIGN.md and the "
-          "theme-color metas.")
+    print("Palette is in step across css/style.css, 404.html, DESIGN.md, "
+          "css/game.css and the theme-color metas.")
     return 0
 
 

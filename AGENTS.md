@@ -293,9 +293,11 @@ Three further rules for any change:
 - **`404.html` styles are inline on purpose.** It must render even if the
   stylesheet is what failed. Its palette is therefore a hand-kept copy of the one
   in `css/style.css` — change one and change the other.
-- **The palette is written out in four places.** `css/style.css` is the source of
-  truth; `404.html`, `DESIGN.md`'s front matter and the `theme-color` metas are
-  copies. `scripts/check_palette.py` is what holds them together — run it after any
+- **The palette is written out in five places.** `css/style.css` is the source of
+  truth; `404.html`, `DESIGN.md`'s front matter, the `theme-color` metas and
+  `css/game.css` are copies. The last of those is Mocha-only and writes literal
+  hexes, so the check holds its shared colours to the dark block and makes it name
+  any extra Catppuccin colour it uses. `scripts/check_palette.py` is what holds them together — run it after any
   colour change, and do not work around it by editing only the copy you are looking
   at. Each duplication is justified in its own bullet below.
 - **`DESIGN.md`'s front matter is the third copy of the palette.** It follows the

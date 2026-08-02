@@ -10,8 +10,8 @@ Plain HTML and CSS plus one runtime library, served directly by GitHub Pages fro
 
 **One exception, and it is quarantined.** `game/` is Rust and needs cargo to
 produce `assets/game.wasm`. The binary is committed, so the toolchain is on
-nobody's critical path: visitors, contributors editing prose, and five of the
-eight CI checks all run without Rust installed. It is a separate page, a separate
+nobody's critical path: visitors, contributors editing prose, and eight of the
+nine CI checks all run without Rust installed. It is a separate page, a separate
 stylesheet, a separate script and a separate language, and it is argued for in
 [The simulation](#the-simulation) and in
 [AGENTS.md](AGENTS.md#the-shape-of-the-repo). Everything below still describes
@@ -344,8 +344,9 @@ compiled to `wasm32-unknown-unknown`, drawn by `js/game.js` as inline SVG.
 46 microseconds: 0.23 for the simulation step and the rest for serialising the
 425-cell viewport and the status block to text the page can read. That is a third
 of a percent of a frame at 60Hz, and any of it would run fine in JavaScript. The
-reason is the other one: the simulation is about 2,000 lines with a world model,
-a market, navigation and fog of war, and it has 46 tests. Rust gives that a type
+reason is the other one: the simulation is about 2,950 hand-written lines with a
+world model, a market, navigation and fog of war, and it has 46 tests. (That
+count excludes `game/src/world.rs`, which is generated and would flatter it.) Rust gives that a type
 system, exhaustive matching and `cargo test`. Claiming a performance need would
 be the easier argument and it would not be true.
 
@@ -454,21 +455,35 @@ than loud.
 | `scripts/check_htmx.py` | A renamed fragment 404s in silence; a fragment that drifted from the prose looks fine; a control without an `id` strands focus on `<body>`; a trigger moved inside its own target strands it too, and only on a keyboard |
 | `scripts/propagate_work.py --check` | Proves the fragments are still what the generator emits, so a drift is fixed by regenerating rather than by hand-patching one copy |
 | `scripts/check_corpus.py` | A stale embedding does not raise, it just retrieves worse; a dead anchor sends a result nowhere; a corpus built for another model is the right shape in the wrong space |
-| `scripts/check_palette.py` | The palette exists in four copies (below) |
-| `scripts/check_repo.py` | Deleting `.nojekyll` breaks paths with no build error; `sitemap.xml` drifts silently; the nav exists in four copies and editing three of them looks fine on the page you are reading |
+| `scripts/check_palette.py` | The palette exists in five copies (below) |
+| `scripts/check_repo.py` | Deleting `.nojekyll` breaks paths with no build error; `sitemap.xml` drifts silently; the nav exists in three copies and editing two of them looks fine on the page you are reading |
 | `scripts/gen_game_data.py --check` | Proves `game/src/world.rs` is still what the TSVs produce, and re-runs the three map assertions: a coastline edit that walls a port in, strands one in open ocean or drops two into one hex fails here instead of being found by sailing into it |
 | `scripts/build_game.sh --check` | Verifies `assets/game.wasm` against the hash committed beside it. Needs no Rust |
-| `cargo test --manifest-path game/Cargo.toml` | The 46 simulation tests. Runs in its own job so the one above stays toolchain-free |
 | `npx @google/design.md lint DESIGN.md` | Holds the file at 0 errors and 0 warnings |
+| `cargo test --manifest-path game/Cargo.toml` | The simulation tests. The only check that needs a toolchain, so it runs alone in a second job and a red mark there means one thing |
 
 **The palette check is the one that earns its keep.** The Catppuccin values are
-written out in four places — the `:root` and dark blocks in `css/style.css`,
-`404.html`'s inline subset, `DESIGN.md`'s front matter under semantic names, and
-the `theme-color` meta pair in each page. Every one of those duplications is
-justified, and none of them is enforced by anything at runtime. Changing one and
-not the others produces no error, no visual break in the scheme you happen to be
-testing, and no reviewable signal. `scripts/check_palette.py` reads
-`css/style.css` as the source of truth and holds the other three against it.
+written out in five places — the `:root` and dark blocks in `css/style.css`,
+`404.html`'s inline subset, `DESIGN.md`'s front matter under semantic names, the
+`theme-color` meta pair in each page, and the literal hexes in `css/game.css`.
+Every one of those duplications is justified, and none of them is enforced by
+anything at runtime. Changing one and not the others produces no error, no visual
+break in the scheme you happen to be testing, and no reviewable signal.
+`scripts/check_palette.py` reads `css/style.css` as the source of truth and holds
+the other four against it.
+
+`css/game.css` is the awkward one and was almost left out, which would have been
+the wrong call: an unchecked copy is exactly the drift the script exists to
+prevent, and "it is a special case" is how a five-copy palette becomes a
+four-copy check. It is special in a real way, though. That page is Mocha under
+both colour schemes, so it writes hexes rather than `var()`, and it needs
+Catppuccin colours the site's seven tokens do not carry, because a map has to
+tell a pirate from a port. So the check has two halves: any colour the site also
+defines must equal the Mocha value there, and anything else has to be named in
+`MOCHA_EXTRA` with its upstream Catppuccin name. That makes "I picked a nice
+blue" into something a reviewer can see. A Latte value appearing there is called
+out separately, because a light-theme colour on a permanently dark page looks
+almost right, and an allowlist entry nothing uses any more fails too.
 
 Two things this deliberately does **not** do. It does not check the parts that
 matter most — keyboard operability, focus order, both colour schemes, Lighthouse

@@ -57,7 +57,7 @@ jobs:
       - name: Search index still matches portfolio.html
         run: python3 scripts/check_corpus.py
 
-      - name: Palette is in step across all four copies
+      - name: Palette is in step across every copy
         run: python3 scripts/check_palette.py
 
       - name: .nojekyll present and sitemap in step
@@ -81,19 +81,6 @@ jobs:
       - name: Committed wasm matches its hash
         run: scripts/build_game.sh --check
 
-  # A separate job so the one above stays toolchain-free. Nothing is installed
-  # here either: GitHub's runners ship a stable Rust, and the tests are a
-  # host-native cargo test with no dependencies and no wasm target, so this is
-  # a checkout and a compile.
-  game:
-    name: Simulation tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: cargo test
-        run: cargo test --manifest-path game/Cargo.toml
-
       # Pinned rather than floating: an unpinned alpha changing under us turns CI
       # red with no change to this repo, which is exactly the maintenance burden
       # the no-toolchain stance exists to avoid.
@@ -116,3 +103,20 @@ jobs:
               sys.exit(1)
           print("\nDESIGN.md lint: clean.")
           PY
+
+  # A separate job so the one above stays toolchain-free. Nothing is installed
+  # here either: GitHub's runners ship a stable Rust, and the tests are a
+  # host-native cargo test with no dependencies and no wasm target, so this is
+  # a checkout and a compile.
+  #
+  # This job holds exactly one step on purpose. Everything that does not need
+  # Rust belongs in `check` above, so that a red mark here says "the simulation
+  # is wrong" and nothing else.
+  game:
+    name: Simulation tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: cargo test
+        run: cargo test --manifest-path game/Cargo.toml
