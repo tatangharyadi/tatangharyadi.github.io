@@ -4,7 +4,7 @@
 pub const COLS: i32 = 72;
 pub const ROWS: i32 = 36;
 
-/// Odd-r offset grid, row-major. '#' is land, '~' is open water.
+/// Odd-r offset grid, row-major. '#' is land, '.' is open water.
 /// 1773 of 2592 cells are sea reachable from every port.
 pub const LAND: &[u8] = b"\
 ........................................................................\

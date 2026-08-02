@@ -16,6 +16,12 @@ fails CI when the assertion drifts. That arrangement is the product.
 For how the site is built and why, read [ARCHITECTURE.md](../ARCHITECTURE.md).
 For the rules that bind a change, read [AGENTS.md](../AGENTS.md).
 
+**What the two feature specs are for.** They are reconstruction documents. Each
+is written so that someone holding it and no repository could rebuild the feature
+in the same shape, and the constants, ids, schemas and encodings in them are
+contract rather than illustration. This document is the layer above: what the
+site is, who it is for, and how the pieces fit. It does not repeat their detail.
+
 ## Positioning
 
 | | |
