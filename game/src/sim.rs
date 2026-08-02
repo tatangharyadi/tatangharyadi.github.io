@@ -809,7 +809,12 @@ impl Game {
             self.say("You are already there.".into());
             return false;
         }
-        self.lay_course(goal, "the open sea")
+        // Named if the hex happens to be a harbour, because a course laid by
+        // clicking the chart can land on one and every refusal below prints this
+        // string. "The open sea is too shallow for her draught" is a sentence no
+        // reader can act on.
+        let what = self.port_at(goal).map_or("the open sea", |p| PORTS[p].name);
+        self.lay_course(goal, what)
     }
 
     fn lay_course(&mut self, goal: hex::Hex, what: &str) -> bool {
@@ -2684,6 +2689,32 @@ mod tests {
             "she was refused without being told why: {:?}",
             g.chronicle().last()
         );
+    }
+
+    /// A course clicked on the chart names the harbour it is refused by.
+    ///
+    /// `set_course_hex` knows only a hex, so it used to hand the refusal the
+    /// words "the open sea" whatever it was pointed at. A port is a water cell,
+    /// so clicking a shallow harbour produced "the open sea is too shallow for
+    /// her draught": true of nothing, and no help at all to someone deciding
+    /// which hull to buy.
+    #[test]
+    fn a_course_clicked_on_a_shallow_harbour_names_it() {
+        let mut g = Game::new(1);
+        let port = (0..PORTS.len())
+            .find(|&i| {
+                let h = hex::from_offset(PORTS[i].col as i32, PORTS[i].row as i32);
+                hex::index(h).is_some_and(|idx| g.shallow_harbour[idx]) && h != g.at
+            })
+            .expect("no shallow harbour");
+        let h = hex::from_offset(PORTS[port].col as i32, PORTS[port].row as i32);
+        g.fog[hex::index(h).unwrap()] = nav::REMEMBERED;
+        g.ship = Ship::of_class(Class::Galleon, GOODS.len());
+
+        assert!(!g.set_course_hex(PORTS[port].col as i32, PORTS[port].row as i32));
+        let said = g.chronicle().last().unwrap().clone();
+        assert!(said.contains(PORTS[port].name), "she was refused by an unnamed place: {said:?}");
+        assert!(!said.contains("open sea"), "still the old wording: {said:?}");
     }
 
     /// The boat you start in is the one exception, and it is the point of her.
