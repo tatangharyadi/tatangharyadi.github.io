@@ -233,6 +233,26 @@ const BASELINE_DRIFT_ALPHA = 0.003;
 // number a real camera has confirmed is right.
 const HEAD_YAW_SLERP = 0.25;
 
+// How far each swing-mapped bone moves toward this frame's target each call,
+// via slerp, instead of retarget() copying the target straight onto the bone
+// the way it did before. A real camera showed a stationary subject's Head
+// visibly rotating frame to frame with yaw pinned at exactly 0 — proof the
+// motion was not applyHeadYaw()'s twist, which is already damped by
+// HEAD_YAW_SLERP above, but retarget()'s swing write, which had no damping at
+// all: every frame it solved boneQuat fresh from that frame's raw landmark
+// positions and copied it straight onto the bone, so BlazePose's ordinary
+// per-frame landmark noise reproduced itself directly as visible rotation.
+// Head has no landmark pair of its own (see the note above levelHead()) and
+// tracks Neck's world orientation exactly, so Neck's swing noise is what was
+// actually visible. Started at the same value as HEAD_YAW_SLERP rather than a
+// fresh guess: it is already tuned against this camera and this page, and the
+// two dampers solve the same underlying problem — a per-frame landmark
+// estimate that wobbles even when the tracked joint is still. Untested
+// against a real camera; see specs/F03_MOCAP.md and the neckDeltaDeg
+// diagnostic below, which exists so that claim can be checked with a number
+// instead of eyeballing a screenshot.
+const SWING_SLERP = 0.25;
+
 export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
   const head = boneMap.get('Head');
   if (!head) return undefined;
@@ -457,7 +477,18 @@ export function retarget(landmarks, boneMap, restDirections, THREE, scratch) {
   scratch.targetLocal ??= new THREE.Vector3();
   scratch.parentWorldQuat ??= new THREE.Quaternion();
   scratch.boneQuat ??= new THREE.Quaternion();
-  const { targetWorld, targetLocal, parentWorldQuat, boneQuat } = scratch;
+  scratch.neckPrevQuat ??= new THREE.Quaternion();
+  const { targetWorld, targetLocal, parentWorldQuat, boneQuat, neckPrevQuat } = scratch;
+
+  // Temporary measurement instrument, same lifetime as the debug overlay in
+  // js/mocap.js: nothing upstream of retarget() had a number for how much
+  // Neck's swing actually moved frame to frame, only the yaw twist's own
+  // diagnostics, so a jitter complaint had nothing to check but a screenshot.
+  // Only Neck is measured — it is the shortest landmark pair in
+  // BONE_DIRECTIONS (shoulder midpoint to ear midpoint) and the one Head
+  // tracks exactly via levelHead(), so it is where swing noise is most
+  // visible, not because the other eight bones don't move.
+  const diagnostics = {};
 
   for (const { bone: name, from, to, flattenDepth } of BONE_DIRECTIONS) {
     const bone = boneMap.get(name);
@@ -491,7 +522,13 @@ export function retarget(landmarks, boneMap, restDirections, THREE, scratch) {
     targetLocal.copy(targetWorld).applyQuaternion(parentWorldQuat.clone().invert());
 
     boneQuat.setFromUnitVectors(restDir, targetLocal);
-    bone.quaternion.copy(boneQuat);
+    if (name === 'Neck') neckPrevQuat.copy(bone.quaternion);
+    bone.quaternion.slerp(boneQuat, SWING_SLERP);
     bone.updateWorldMatrix(false, true);
+    if (name === 'Neck') {
+      diagnostics.neckDeltaDeg = (bone.quaternion.angleTo(neckPrevQuat) * 180) / Math.PI;
+    }
   }
+
+  return diagnostics;
 }

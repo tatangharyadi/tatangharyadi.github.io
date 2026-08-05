@@ -249,8 +249,9 @@ let debugEl = null;
 let debugFrame = 0;
 
 function renderFrame(landmarks) {
-  retarget(landmarks, boneMap, restDirections, THREE, retargetScratch);
-  const diagnostics = applyHeadYaw(landmarks, boneMap, THREE, retargetScratch);
+  const swingDiagnostics = retarget(landmarks, boneMap, restDirections, THREE, retargetScratch);
+  const yawDiagnostics = applyHeadYaw(landmarks, boneMap, THREE, retargetScratch);
+  const diagnostics = yawDiagnostics ? { ...swingDiagnostics, ...yawDiagnostics } : undefined;
   renderer.render(scene, camera);
 
   debugFrame++;
@@ -262,7 +263,8 @@ function renderFrame(landmarks) {
       `baseline: ${fmt(diagnostics.baseline)}\n` +
       `adjustedDiff: ${fmt(diagnostics.adjustedDiff)}\n` +
       `filteredDiff: ${fmt(diagnostics.filteredDiff)}\n` +
-      `yaw (deg): ${fmt(diagnostics.yaw !== undefined ? (diagnostics.yaw * 180) / Math.PI : undefined)}`;
+      `yaw (deg): ${fmt(diagnostics.yaw !== undefined ? (diagnostics.yaw * 180) / Math.PI : undefined)}\n` +
+      `neck delta (deg): ${fmt(diagnostics.neckDeltaDeg)}`;
     // Logged every 15 frames (~0.5s at 30fps) rather than every frame, so the
     // console stays readable enough to copy a run of readings back out.
     if (debugFrame % 15 === 0) {
