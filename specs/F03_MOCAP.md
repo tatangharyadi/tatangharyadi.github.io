@@ -109,7 +109,7 @@ Nothing here is reachable by a visitor until that wiring lands.
 | `mocap.html` | The page: camera gate, video preview, Three.js stage, status region |
 | `css/mocap.css` | Stage layout, gate styling. No colour of its own beyond the shared palette. |
 | `js/mocap.js` | Camera acquisition, LiteRT load, inference loop, Three.js scene and render loop |
-| `js/mocap-retarget.js` | Maps 33 BlazePose landmarks to `godette_rigged.glb` bone rotations |
+| `js/mocap-retarget.js` | Maps 33 BlazePose landmarks to `RobotExpressive.glb` bone rotations |
 | `vendor/litert/litert-core.mjs` | Vendored `@litertjs/core`, `CompiledModel`/`Tensor`/`loadLiteRt` |
 | `vendor/litert/wasm-utils.mjs` | Vendored `@litertjs/wasm-utils`, `createWasmLib` |
 | `vendor/litert/litert_wasm_compat_internal.{js,wasm}` | Non-threaded, no relaxed-SIMD WASM build. The safe default. |
@@ -117,7 +117,7 @@ Nothing here is reachable by a visitor until that wiring lands.
 | `vendor/three/three.module.min.js` | Vendored Three.js r169 |
 | `vendor/three/examples/jsm/loaders/GLTFLoader.js` | Vendored GLTF loader, imports bare `"three"` |
 | `assets/models/pose-landmark-full/pose_landmark_full.tflite` | MediaPipe BlazePose full, from `storage.googleapis.com/mediapipe-assets/` |
-| `assets/character/godette_rigged.glb` | CC-BY-4.0 rigged character, "Godette (Rigged)" by zahlenmaler, from Sketchfab |
+| `assets/character/RobotExpressive.glb` | CC0 rigged character, from `mrdoob/three.js` examples |
 
 ---
 
@@ -186,24 +186,18 @@ builds a direction vector, and computes the quaternion that rotates the rig's
 rest-pose bone direction onto it.
 
 Real bone names, read directly out of the loaded scene's own `THREE.Bone`
-nodes rather than assumed: `Head_129`, `Neck_1_132`, `Arm_Upper_1L_157`/
-`Arm_Upper_1R_187`, `Arm_Lower_1L_155`/`Arm_Lower_1R_185`,
-`Leg_UpperL_205`/`Leg_UpperR_211`, `Leg_LowerL_202`/`Leg_LowerR_208` — no dot
-separator, despite the GLB's own exported node names carrying one as an L/R
-side marker (`Arm_Upper_1.L_157`). `THREE.GLTFLoader` runs every node name
-through `PropertyBinding`'s track-path sanitizer on load, which strips that
-character before the bone ever reaches `buildBoneMap`. An earlier version of
-this file and of `js/mocap-retarget.js` used the dotted, pre-sanitization
-form; every one of those names silently missed the real bone,
-`buildRestDirections()` built an empty map for them, and the character never
-moved with no error ever thrown — see F03-AC09. This is the same failure
-mode the site's earlier character (`RobotExpressive.glb`) hit for a
-different reason: that rig's names had no dot at all, and an even earlier
-version of this mapping assumed one (`UpperArm.L`) anyway. Two different
-rigs, two different wrong guesses at the same seam — read `boneMap.keys()`
-from the loaded scene, do not assume the naming convention from either the
-GLB's JSON or a prior rig. Finger and pole-target bones exist on the rig and
-are out of scope — see below.
+nodes rather than assumed: `Hips`, `Neck`, `Head`, `ShoulderL`/`ShoulderR`,
+`UpperArmL`/`UpperArmR`, `LowerArmL`/`LowerArmR`, `UpperLegL`/`UpperLegR`,
+`LowerLegL`/`LowerLegR` — no dot separator, despite a Blender-export naming
+convention suggesting one. An earlier version of this file and of
+`js/mocap-retarget.js` assumed the dotted form (`UpperArm.L`); every one of
+those names silently missed the real bone, `buildRestDirections()` built an
+empty map, and the character never moved with no error ever thrown — see
+F03-AC09. The rig carries two nodes both named `Torso`;
+`js/mocap-retarget.js` documents which one it targets and why, inline, the
+first time this ambiguity matters, rather than leaving a future reader to
+rediscover it from the GLB by hand. Finger and pole-target bones exist on the
+rig and are out of scope — see below.
 
 Head/neck orientation is in scope: BlazePose has no landmark at the base of
 the neck, so `js/mocap-retarget.js` drives the rig's `Neck` bone from the
@@ -226,30 +220,19 @@ this z term entirely rather than computing it from landmark depth, which
 removes that noise at a real cost: see the comment above
 `BONE_DIRECTIONS` in `js/mocap-retarget.js` and the scope cut below.
 
-**The specific degree figures above were measured against
-`RobotExpressive.glb`, the character this rig replaced, and have not been
-re-measured against `godette_rigged.glb`.** The reasoning (a monocular depth
-estimate has no business contributing to a rotation this visible) is not
-character-specific and still holds; the magnitudes are not re-verified. See
-the same caveat above `BONE_DIRECTIONS` in `js/mocap-retarget.js`.
-
 Separately, `Head` itself is never a bone `retarget()` writes to — there is
-no landmark for it, only for `Neck`. `RobotExpressive.glb` gave `Head` a
+no landmark for it, only for `Neck`. `RobotExpressive.glb` gives `Head` a
 small but non-identity rest rotation of its own (measured directly:
 `{x: -0.035, y: -0.082, z: -0.0019, w: 0.996}`), and because nothing ever
-corrects it, that offset composed on top of whatever `Neck` was doing on
+corrects it, that offset composes on top of whatever `Neck` is doing on
 every single frame. A neutral pose that left `Neck`'s own world rotation
 level still left `Head`'s world rotation off by roughly 4° of pitch and 9°
 of yaw, confirmed with the real `THREE.Bone` state in a loaded scene and
-again by a rendered screenshot. **Those figures are `RobotExpressive.glb`'s
-own; `godette_rigged.glb`'s `Head_129` rest rotation has not been
-re-measured**, though the mechanism `levelHead()` corrects for — a rig's
-authored rest rotation on the head bone composing on top of `Neck`'s target
-every frame — is generic to any rig, not specific to the old one.
-`levelHead(boneMap)`, exported from `js/mocap-retarget.js` and called once
-from `js/mocap.js`'s `setupScene()` alongside `buildRestDirections`, resets
-`Head`'s local quaternion to identity at load so its world rotation tracks
-`Neck`'s exactly instead of carrying that baked-in tilt forever after.
+again by a rendered screenshot. `levelHead(boneMap)`, exported from
+`js/mocap-retarget.js` and called once from `js/mocap.js`'s `setupScene()`
+alongside `buildRestDirections`, resets `Head`'s local quaternion to
+identity at load so its world rotation tracks `Neck`'s exactly instead of
+carrying that baked-in tilt forever after.
 
 Turning the head left or right is a twist around its own vertical axis, not a
 swing between two directions, and `setFromUnitVectors` — the only rotation
@@ -316,7 +299,7 @@ fix negates `z` the same way `y` is already negated.
 
 ## Scope cuts
 
-- **One character.** `godette_rigged.glb` only. A second rig needs its own
+- **One character.** `RobotExpressive.glb` only. A second rig needs its own
   bone-name mapping in `js/mocap-retarget.js`, documented in
   `assets/character/README.md`.
 - **No recording, no export, no photo/video capture of any kind.** The stage
@@ -385,7 +368,7 @@ plus a re-entry guard flag, exactly like `js/ask.js`.
 | F03-AC06 | `mocap.html` has no `nav-links--container`, so `check_repo.py`'s nav check does not need updating for it, matching `ask.html`'s precedent. | Structural, `scripts/check_repo.py` |
 | F03-AC07 | `mocap.html` is listed in `sitemap.xml`. | `scripts/check_repo.py`, CI |
 | F03-AC08 | Contrast holds at 4.5:1 for text in both flavours, checked against Latte. | Human, per colour scheme |
-| F03-AC09 | Bone names referenced in `js/mocap-retarget.js` match the names actually present in a loaded scene's `boneMap`. | Human: logged `[...boneMap.keys()]` in a browser (`GLTFLoader` loading `godette_rigged.glb`) and diffed against `BONE_DIRECTIONS`. The GLB's own exported node names carry a `.` (`Arm_Upper_1.L_157`); `THREE.GLTFLoader` strips it via `PropertyBinding`'s sanitizer before the bone reaches `buildBoneMap`, so the confirmed, matching form is `Arm_Upper_1L_157` — an earlier version of this mapping used the unsanitized, dotted form and every `boneMap.get()` call for it returned `undefined` |
+| F03-AC09 | Bone names referenced in `js/mocap-retarget.js` match the names actually present in `RobotExpressive.glb`. | Human: logged `[...boneMap.keys()]` at runtime and diffed against `BONE_DIRECTIONS`; the dotted names an earlier version used (`UpperArm.L`) never matched and were corrected to the rig's real, dotless names (`UpperArmL`) |
 
 ---
 
