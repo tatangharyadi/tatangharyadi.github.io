@@ -174,8 +174,6 @@ function setupScene(characterRoot) {
   scene = new THREE.Scene();
 
   camera = new THREE.PerspectiveCamera(35, els.stage.clientWidth / els.stage.clientHeight, 0.1, 100);
-  camera.position.set(0, 1.4, 3.2);
-  camera.lookAt(0, 1, 0);
 
   scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
   const key = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -186,6 +184,23 @@ function setupScene(characterRoot) {
   scene.add(character);
   boneMap = buildBoneMap(character);
   restDirections = buildRestDirections(boneMap);
+
+  // Framed from the character's own measured size, not a hardcoded distance:
+  // an assumed ~1.7-unit-tall figure put the camera inside RobotExpressive's
+  // actual rest-pose bounds (roughly 4.8 units top to bottom), producing an
+  // extreme close-up of its hip rather than a body shot. Fitting to the
+  // real box means a future character swap frames correctly with no matching
+  // hand-edit here, the same reasoning tensorDataToLandmarks above uses for
+  // reading shapes off the model rather than assuming them.
+  const box = new THREE.Box3().setFromObject(character);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const verticalFov = THREE.MathUtils.degToRad(camera.fov);
+  const distanceForHeight = size.y / 2 / Math.tan(verticalFov / 2);
+  const distanceForWidth = size.x / 2 / Math.tan(verticalFov / 2) / camera.aspect;
+  const distance = Math.max(distanceForHeight, distanceForWidth) * 1.3;
+  camera.position.set(center.x, center.y, center.z + distance);
+  camera.lookAt(center);
 
   renderer = new THREE.WebGLRenderer({ canvas: els.stage, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
