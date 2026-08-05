@@ -148,23 +148,29 @@ in the masthead role.
   browser tab (mirrored L/R mapping, excess Neck pitch from depth noise, a
   static offset baked into the Head bone, and unsupported head yaw, fixed as
   a twist applied to Head separately from Neck's swing math). A real camera
-  then took four more passes to make that yaw fix usable, all four rooted in
-  noise in the same ear-depth-difference signal: it froze on losing the far
-  ear's tracking mid-turn and snapped between left/right with no damping
-  (fixed with fallback-to-front on lost tracking and a per-frame slerp); then
-  defaulted to a left turn facing the camera dead on, because the raw signal
-  never read zero at rest (fixed by calibrating an early reading as "forward"
-  and measuring later frames as a delta from it); then overcorrected the
-  other way, because that calibration locked onto a single frame no less
-  exposed to noise than the signal it corrected (fixed by averaging ten
-  tracked frames before locking the baseline in); then oscillated left/right
-  without settling, because the signal's sign was flipping frame to frame
-  near zero and no output-side damping can converge on a target that itself
-  keeps reversing (fixed by low-pass filtering the signal itself,
-  `DEPTH_DIFF_FILTER_ALPHA`, before the deadzone and sign check see it). All
-  four fixes are re-verified synthetically against sequences built to
-  reproduce each reported symptom, but none is yet reconfirmed on a real
-  camera. The rest of the human
+  then took five more passes to make that yaw fix usable, all five rooted in
+  noise or drift in the same ear-depth-difference signal: it froze on losing
+  the far ear's tracking mid-turn and snapped between left/right with no
+  damping (fixed with fallback-to-front on lost tracking and a per-frame
+  slerp); then defaulted to a left turn facing the camera dead on, because
+  the raw signal never read zero at rest (fixed by calibrating an early
+  reading as "forward" and measuring later frames as a delta from it); then
+  overcorrected the other way, because that calibration locked onto a single
+  frame no less exposed to noise than the signal it corrected (fixed by
+  averaging 30 tracked frames before locking the baseline in); then
+  oscillated left/right without settling, because the signal's sign was
+  flipping frame to frame near zero and no output-side damping can converge
+  on a target that itself keeps reversing (fixed by low-pass filtering the
+  signal itself, `DEPTH_DIFF_FILTER_ALPHA`, before the deadzone and sign
+  check see it); then read as one turn direction saturating the clamp while
+  a comparably deliberate turn the other way barely cleared the deadzone,
+  because the locked baseline had drifted away from where the signal
+  actually rested partway into the session rather than any real per-ear bias
+  (fixed by letting the baseline keep drifting slowly toward the tracked
+  signal, `BASELINE_DRIFT_ALPHA`, instead of locking it once for the whole
+  session). All five fixes are re-verified synthetically against sequences
+  built to reproduce each reported symptom, and the fifth is also reconfirmed
+  on a real camera. The rest of the human
   verification steps in AGENTS.md (keyboard traversal, both colour schemes,
   breakpoints, reduced motion, Lighthouse, and that real-camera pass) have
   not yet been run.

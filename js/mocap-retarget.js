@@ -196,6 +196,28 @@ const CALIBRATION_FRAMES = 30;
 // number a real camera has tuned; see the comment where this is applied.
 const DEPTH_DIFF_FILTER_ALPHA = 0.15;
 
+// How much each tracked frame's raw depthDiff moves the locked baseline
+// itself, after CALIBRATION_FRAMES has already set it once. A real camera
+// showed the same turn held for the same duration reaching a filteredDiff of
+// roughly -42 one way and only +16 the other — not a per-ear asymmetry:
+// re-centering both readings on the depthDiff actually observed at rest
+// during that session (not the value CALIBRATION_FRAMES had locked in
+// earlier) made the two turns agree to within a few percent. The baseline
+// had drifted — auto-exposure, the subject shifting in frame, BlazePose's own
+// temporal smoothing settling further — and the one-shot lock from startup
+// had no way to follow it. This alpha lets the baseline keep tracking
+// wherever depthDiff actually rests, an order of magnitude slower than
+// DEPTH_DIFF_FILTER_ALPHA so a held turn (which also sits away from zero) is
+// not mistaken for a new rest point for many seconds — long enough for any
+// deliberate pose, short enough that the baseline does not need a second
+// explicit calibration if the session runs long. The known cost: hold a turn
+// for tens of seconds and the character eases back toward front under you,
+// because the baseline has drifted onto your held position. Acceptable for an
+// easter egg; not something a deadzone gate could avoid, since the whole
+// point is correcting drift that has already carried the rest point outside
+// the deadzone.
+const BASELINE_DRIFT_ALPHA = 0.003;
+
 // How far Head's current quaternion moves toward this frame's target each
 // call, via slerp — not a value derived from any measurement, since there is
 // no clean way to synthesize per-frame *noise* the way the deadzone/clamp
@@ -291,6 +313,8 @@ export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
       if (scratch.headYawCalibrationCount >= CALIBRATION_FRAMES) {
         scratch.headYawBaseline = scratch.headYawCalibrationSum / scratch.headYawCalibrationCount;
       }
+    } else {
+      scratch.headYawBaseline += BASELINE_DRIFT_ALPHA * (depthDiff - scratch.headYawBaseline);
     }
 
     diagnostics.baseline = scratch.headYawBaseline;
