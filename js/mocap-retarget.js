@@ -36,15 +36,15 @@ export const LANDMARK = Object.freeze({
 
 // Each entry maps a bone, by the name it has in the GLB, to the pair of
 // landmarks whose direction (parent joint -> child joint) that bone should
-// point along. "left"/"right" here are MediaPipe's, and MediaPipe labels them
-// anatomically as depicted in the raw camera frame — the same convention a
-// photograph uses, not the one a mirror uses: a subject's own right hand,
-// raised in front of a front-facing camera, is still LEFT_WRIST's mirror
-// counterpart in screen space, not RIGHT_WRIST's. A character viewed face-on
-// is stood the way a person facing the visitor is stood, so it must move the
-// way a reflection does: the visitor's right arm drives the character's own
-// left arm bone. Each pair below is therefore crossed on purpose — this is
-// not a naming mistake to "simplify".
+// point along. "left"/"right" here are MediaPipe's own labels, and each pair
+// below maps a bone directly onto the same-side landmark — UpperArmL to
+// LEFT_SHOULDER/LEFT_ELBOW, UpperArmR to RIGHT_SHOULDER/RIGHT_ELBOW, and so
+// on. A crossed mapping was tried on the theory that a character facing the
+// visitor should move like a reflection, the way a mirror does; verified
+// against a real camera, that theory was wrong — it drove the wrong arm bone
+// for a given real arm, and the direct, same-side mapping is what actually
+// tracks correctly. Do not re-cross these without a real-camera check, not
+// just the sandboxed fake-camera one this repo's tooling can run.
 //
 // Neck is the one entry whose "from" is not a single landmark: BlazePose has
 // no landmark at the base of the neck, so the shoulder midpoint stands in for
@@ -53,17 +53,20 @@ export const LANDMARK = Object.freeze({
 // needing its own separate pass. Its "to" is the ear midpoint, not the nose:
 // the nose sits well forward of the head's actual vertical axis even when a
 // subject looks straight ahead, so using it baked a permanent forward slump
-// into every frame. The ears sit close to that axis at roughly head height,
-// so their midpoint tracks real nodding/tilting without that built-in bias.
+// into every frame that is not present with the ear midpoint. A forward
+// slump has still been observed against a real camera with this fix in
+// place, so the ear midpoint removes the nose's bias but is not a confirmed
+// fix for the slump itself — the actual cause (landmark noise, visibility
+// gating, or something else) is still under investigation.
 export const BONE_DIRECTIONS = Object.freeze([
-  { bone: 'UpperArmL', from: LANDMARK.RIGHT_SHOULDER, to: LANDMARK.RIGHT_ELBOW },
-  { bone: 'LowerArmL', from: LANDMARK.RIGHT_ELBOW, to: LANDMARK.RIGHT_WRIST },
-  { bone: 'UpperArmR', from: LANDMARK.LEFT_SHOULDER, to: LANDMARK.LEFT_ELBOW },
-  { bone: 'LowerArmR', from: LANDMARK.LEFT_ELBOW, to: LANDMARK.LEFT_WRIST },
-  { bone: 'UpperLegL', from: LANDMARK.RIGHT_HIP, to: LANDMARK.RIGHT_KNEE },
-  { bone: 'LowerLegL', from: LANDMARK.RIGHT_KNEE, to: LANDMARK.RIGHT_ANKLE },
-  { bone: 'UpperLegR', from: LANDMARK.LEFT_HIP, to: LANDMARK.LEFT_KNEE },
-  { bone: 'LowerLegR', from: LANDMARK.LEFT_KNEE, to: LANDMARK.LEFT_ANKLE },
+  { bone: 'UpperArmL', from: LANDMARK.LEFT_SHOULDER, to: LANDMARK.LEFT_ELBOW },
+  { bone: 'LowerArmL', from: LANDMARK.LEFT_ELBOW, to: LANDMARK.LEFT_WRIST },
+  { bone: 'UpperArmR', from: LANDMARK.RIGHT_SHOULDER, to: LANDMARK.RIGHT_ELBOW },
+  { bone: 'LowerArmR', from: LANDMARK.RIGHT_ELBOW, to: LANDMARK.RIGHT_WRIST },
+  { bone: 'UpperLegL', from: LANDMARK.LEFT_HIP, to: LANDMARK.LEFT_KNEE },
+  { bone: 'LowerLegL', from: LANDMARK.LEFT_KNEE, to: LANDMARK.LEFT_ANKLE },
+  { bone: 'UpperLegR', from: LANDMARK.RIGHT_HIP, to: LANDMARK.RIGHT_KNEE },
+  { bone: 'LowerLegR', from: LANDMARK.RIGHT_KNEE, to: LANDMARK.RIGHT_ANKLE },
   { bone: 'Neck', from: [LANDMARK.LEFT_SHOULDER, LANDMARK.RIGHT_SHOULDER], to: [LANDMARK.LEFT_EAR, LANDMARK.RIGHT_EAR] },
 ]);
 
