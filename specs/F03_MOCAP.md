@@ -2,52 +2,47 @@
 
 **Status:** wired end to end and verified in a browser — camera access, pose
 inference, retargeting and rendering all confirmed working, including a
-stop/restart cycle. Seven real gaps found and addressed since, each verified
-against the live code path with synthetic landmarks unless noted: a mirrored
-L/R mapping (reverted to direct, same-side landmarks), excess Neck pitch from
-monocular depth noise (fixed via `flattenDepth`, see below), a static
-~4°/~9° pitch/yaw offset baked into the `Head` bone's own rest rotation in
-the GLB (fixed via `levelHead()`), head yaw being entirely unsupported
-because it is a twist and `retarget()`'s swing-only math cannot produce one
-(added via `applyHeadYaw()`), and two found on an actual camera, not
-synthetically, in that first `applyHeadYaw()`. The first was snapping
-between left/right with nothing in between and never returning to front:
-losing confident tracking on the far ear (routine mid-turn) froze the last
-computed rotation instead of falling back toward front, and every frame
-snapped straight to its target with no damping against the noisy depth
-signal driving it. Both are fixed (fallback-to-front on lost tracking, a
-per-frame `slerp` toward the target) and re-verified with a synthetic frame
-sequence that holds a turn, drops the far ear's visibility mid-turn, and
-confirms the yaw eases back to zero rather than freezing. The second, found
-on a later real-camera pass, was defaulting to a left turn while the subject
-faced the camera dead on: the raw ear-depth difference sat on one side of
-zero on every frame rather than jittering across it, so no deadzone could
-catch it — "facing forward" and "the raw signal reads zero" were never the
-same value for this camera and face. Fixed by calibrating, treating an
-early reading as "forward" and measuring every later frame as a delta from
-it (`scratch.headYawBaseline`); re-verified with a synthetic constant-biased
-"forward" reading settling at 0° yaw after calibration, and genuine turns in
-both directions from that same biased baseline still reaching the expected
-clamp. That first version of the calibration locked the baseline from a
-single frame, and a real camera turned up the opposite failure this time: an
-exaggerated turn the *other* way, because the one frame the calibration
-happened to land on was itself a noisy outlier — no less exposed to per-frame
-noise than the raw signal it was meant to correct, and the very first tracked
-frame is exactly the one most likely to catch the camera still adjusting
-exposure or the model's own smoothing not yet warmed up. Fixed by averaging
-`CALIBRATION_FRAMES` (10) tracked frames before locking the baseline in,
-holding yaw at 0 for that short window rather than computing against an
-incomplete average; re-verified with a synthetic sequence where the first
-frame is a 0.15 outlier against nine otherwise-stable near-zero readings,
-confirming the locked baseline lands near the stable value rather than the
-outlier, and that a genuine held turn from that baseline still reaches the
-expected clamp. None of these three fixes has been re-confirmed on a real
-camera, only against the synthetic sequences built to reproduce each
-reported symptom. `applyHeadYaw()` as a whole still needs a real-camera pass
-before its deadzone, clamp, damping constant and now calibration can all be
-trusted rather than just exercised. The remaining AGENTS.md human checks
-(keyboard-only traversal, both colour schemes, breakpoints, reduced motion,
-Lighthouse) have not yet been run either.
+stop/restart cycle. Four real gaps were found and fixed before this ever
+touched a real camera, each verified against the live code path with
+synthetic landmarks: a mirrored L/R mapping (reverted to direct, same-side
+landmarks), excess Neck pitch from monocular depth noise (fixed via
+`flattenDepth`, see below), a static ~4°/~9° pitch/yaw offset baked into the
+`Head` bone's own rest rotation in the GLB (fixed via `levelHead()`), and
+head yaw being entirely unsupported because it is a twist and `retarget()`'s
+swing-only math cannot produce one (added via `applyHeadYaw()`).
+
+A real camera then took four more passes to get that last one usable, each
+exposing the next problem underneath the previous fix rather than a fresh
+one, because all four live in the same signal: the difference between the
+two ears' monocular depth estimates is small, and every stage of turning it
+into a yaw angle had a different way of amplifying its noise instead of the
+turn it was supposed to represent. In order: it snapped between left and
+right with nothing in between and never returned to front (losing the far
+ear's tracking mid-turn froze the last rotation instead of easing back, and
+every frame copied its raw target with no damping — fixed with
+fallback-to-front on lost tracking and a per-frame `slerp`); it then
+defaulted to a left turn while facing the camera dead on (the raw signal
+never actually read zero at rest for this camera/face — fixed by calibrating
+an early reading as "forward" and measuring later frames as a delta from it,
+`scratch.headYawBaseline`); it then overcorrected the *other* way (that
+calibration had locked onto a single frame exactly as exposed to noise as
+the signal it was meant to correct — fixed by averaging
+`CALIBRATION_FRAMES`, 10, tracked frames before locking the baseline in);
+and it then oscillated left/right without ever settling (the raw signal's
+sign was flipping frame to frame near zero, so the *target* handed to the
+slerp flipped too, and a slerp chasing a reversing target cannot converge no
+matter how slow it moves — fixed with an exponential filter,
+`DEPTH_DIFF_FILTER_ALPHA`, smoothing the signal itself before the deadzone
+and sign check ever see it). Each fix is re-verified with a synthetic
+sequence built to reproduce its specific reported symptom — see the inline
+comments in `js/mocap-retarget.js` for the exact sequences — but none of the
+four has been reconfirmed on a real camera after the fix, only against the
+synthetic reproduction of the bug it targets. `applyHeadYaw()` as a whole
+still needs a real-camera pass before its deadzone, clamp, damping,
+calibration and filtering can all be trusted together rather than each
+having only cleared the specific failure that motivated it. The remaining
+AGENTS.md human checks (keyboard-only traversal, both colour schemes,
+breakpoints, reduced motion, Lighthouse) have not yet been run either.
 
 ## Overview
 

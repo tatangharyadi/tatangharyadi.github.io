@@ -170,6 +170,15 @@ const MAX_HEAD_YAW = Math.PI / 4; // 45 degrees
 // single-frame reading.
 const CALIBRATION_FRAMES = 10;
 
+// How much each frame's raw ear-depth-difference reading moves the running
+// filtered value used for the deadzone and sign check below, toward that
+// frame's own reading. 0.15 means roughly six or seven frames to fold in a
+// step change — deliberately similar in order of magnitude to
+// HEAD_YAW_SLERP's own settle time, since the two dampers are solving
+// adjacent halves of the same noise problem, not independent ones. Not a
+// number a real camera has tuned; see the comment where this is applied.
+const DEPTH_DIFF_FILTER_ALPHA = 0.15;
+
 // How far Head's current quaternion moves toward this frame's target each
 // call, via slerp — not a value derived from any measurement, since there is
 // no clean way to synthesize per-frame *noise* the way the deadzone/clamp
@@ -261,10 +270,37 @@ export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
 
     if (scratch.headYawBaseline !== undefined) {
       const adjustedDiff = depthDiff - scratch.headYawBaseline;
-      const magnitude = Math.min(Math.abs(adjustedDiff), EAR_DEPTH_AT_MAX_YAW);
+
+      // Every fix above still fed the deadzone a raw, single-frame
+      // adjustedDiff, and a real camera showed exactly the failure that
+      // implies: the head oscillating left/right without ever settling.
+      // That is not the deadzone being wrong or the baseline being wrong —
+      // it is that the raw signal's own *sign* flips from one frame to the
+      // next when its true value sits near zero, so the target this
+      // function hands to the slerp below flips too, and a slerp chasing a
+      // target that reverses every frame never converges no matter how slow
+      // it is told to move. The deadzone and the output slerp both assumed
+      // the noise they had to survive was small compared to a real turn;
+      // this is the fix for when it isn't. Filtering the signal itself,
+      // before it ever reaches the deadzone, means the value the deadzone
+      // and sign check see has already had most of that frame-to-frame
+      // noise averaged out, so it can no longer flip sign on noise alone.
+      // DEPTH_DIFF_FILTER_ALPHA is deliberately close to the noise-vs-signal
+      // problem HEAD_YAW_SLERP already exists to solve, and the two stack:
+      // this smooths the target before it is computed, that smooths the
+      // bone's approach to whatever target results. Untested against a real
+      // camera; verified only that a synthetic signal alternating in sign
+      // every frame, well past the deadzone in each direction, no longer
+      // makes the computed yaw target flip sign every frame the way an
+      // unfiltered reading did.
+      scratch.headYawFilteredDiff ??= adjustedDiff;
+      scratch.headYawFilteredDiff += DEPTH_DIFF_FILTER_ALPHA * (adjustedDiff - scratch.headYawFilteredDiff);
+      const filteredDiff = scratch.headYawFilteredDiff;
+
+      const magnitude = Math.min(Math.abs(filteredDiff), EAR_DEPTH_AT_MAX_YAW);
       if (magnitude >= EAR_DEPTH_DEADZONE) {
         const t = (magnitude - EAR_DEPTH_DEADZONE) / (EAR_DEPTH_AT_MAX_YAW - EAR_DEPTH_DEADZONE);
-        yaw = Math.sign(adjustedDiff) * t * MAX_HEAD_YAW;
+        yaw = Math.sign(filteredDiff) * t * MAX_HEAD_YAW;
       }
     }
   }
