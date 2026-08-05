@@ -211,10 +211,35 @@ export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
     // the same convention note retarget() already relies on, not
     // independently verified here.
     const depthDiff = left.z - right.z;
-    const magnitude = Math.min(Math.abs(depthDiff), EAR_DEPTH_AT_MAX_YAW);
+
+    // A real camera showed this defaulting to a left turn while the subject
+    // faced the camera dead on. That is not jitter around zero — jitter
+    // would average out and only occasionally cross the deadzone in either
+    // direction — it is a `depthDiff` that sits on one side of zero every
+    // frame, which means "camera facing forward" and "depthDiff == 0" are
+    // not the same thing for this camera/face. Likely causes are a webcam
+    // that is not dead-level with the face or an ear whose monocular depth
+    // BlazePose consistently misjudges relative to the other, and neither is
+    // something a fixed deadzone can correct, because a bias that never
+    // crosses zero never re-enters the deadzone to be caught by it.
+    // Calibrating out whatever `depthDiff` reads on the first tracked frame
+    // treats that frame as "forward" and measures every later frame as a
+    // delta from it, which is exactly the assumption this easter egg already
+    // makes implicitly — the visitor is expected to be facing the camera
+    // when the feature starts. Recalibrating only once, and only ever
+    // forward from module load (see the module-level `scratch` in
+    // js/mocap.js), means a deliberate held turn does not slowly get
+    // absorbed back into "center" the way a continuously-adapting baseline
+    // would.
+    if (scratch.headYawBaseline === undefined) {
+      scratch.headYawBaseline = depthDiff;
+    }
+    const adjustedDiff = depthDiff - scratch.headYawBaseline;
+
+    const magnitude = Math.min(Math.abs(adjustedDiff), EAR_DEPTH_AT_MAX_YAW);
     if (magnitude >= EAR_DEPTH_DEADZONE) {
       const t = (magnitude - EAR_DEPTH_DEADZONE) / (EAR_DEPTH_AT_MAX_YAW - EAR_DEPTH_DEADZONE);
-      yaw = Math.sign(depthDiff) * t * MAX_HEAD_YAW;
+      yaw = Math.sign(adjustedDiff) * t * MAX_HEAD_YAW;
     }
   }
 

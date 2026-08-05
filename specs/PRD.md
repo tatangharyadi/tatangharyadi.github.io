@@ -148,12 +148,16 @@ in the masthead role.
   browser tab (mirrored L/R mapping, excess Neck pitch from depth noise, a
   static offset baked into the Head bone, and unsupported head yaw, fixed as
   a twist applied to Head separately from Neck's swing math). A real camera
-  then surfaced two more in that yaw fix — it froze on losing the far ear's
-  tracking mid-turn instead of easing back to front, and snapped between
-  left/right with no damping against the noisy depth signal driving it —
-  both now fixed (fallback-to-front on lost tracking, a per-frame slerp) and
-  re-verified synthetically against the exact sequence that reproduced the
-  symptom, but not yet reconfirmed on a real camera. The rest of the human
+  then surfaced two more in that yaw fix, on two separate passes: it froze on
+  losing the far ear's tracking mid-turn instead of easing back to front and
+  snapped between left/right with no damping (fixed with fallback-to-front on
+  lost tracking and a per-frame slerp), then defaulted to a left turn even
+  facing the camera dead on, because the raw depth signal never actually read
+  zero when facing forward (fixed by calibrating that "forward" reading once,
+  on the first tracked frame, and measuring later frames as a delta from it).
+  Both fixes are re-verified synthetically against sequences built to
+  reproduce each reported symptom, but neither is yet reconfirmed on a real
+  camera. The rest of the human
   verification steps in AGENTS.md (keyboard traversal, both colour schemes,
   breakpoints, reduced motion, Lighthouse, and that real-camera pass) have
   not yet been run.
