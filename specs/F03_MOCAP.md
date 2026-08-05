@@ -2,8 +2,17 @@
 
 **Status:** wired end to end and verified in a browser — camera access, pose
 inference, retargeting and rendering all confirmed working, including a
-stop/restart cycle. The remaining AGENTS.md human checks (keyboard-only
-traversal, both colour schemes, breakpoints, reduced motion, Lighthouse) have
+stop/restart cycle. Three real bugs found and fixed since, each verified
+against the live `retarget()`/`buildBoneMap`/`levelHead` code path with
+synthetic landmarks rather than by inspection: a mirrored L/R mapping
+(reverted to direct, same-side landmarks), excess Neck pitch from monocular
+depth noise (fixed via `flattenDepth`, see below), and a static ~4°/~9°
+pitch/yaw offset baked into the `Head` bone's own rest rotation in the GLB
+(fixed via `levelHead()`). None of these three fixes has been checked against
+a real webcam — only against synthetic landmarks fed through the real code in
+a loaded browser tab, which is strong evidence but not the same claim. The
+remaining AGENTS.md human checks (keyboard-only traversal, both colour
+schemes, breakpoints, reduced motion, Lighthouse, and a real-camera pass) have
 not yet been run.
 
 ## Overview
@@ -144,8 +153,29 @@ it independently. The target was originally the nose landmark rather than the
 ear midpoint; the nose sits well forward of the head's actual vertical axis
 even when a subject looks straight ahead, which baked a permanent forward
 slump into every frame regardless of real head pose. The ears sit close to
-that axis at roughly head height, so their midpoint tracks real nodding and
-tilting without that built-in bias.
+that axis at roughly head height, so their midpoint removes most of that
+bias, but not all of it: BlazePose's monocular `z` is noisy, and even a
+small, realistic forward-lean depth offset between the shoulder and ear
+midpoints (0.05 of the normalized range) measured out to roughly 11° of
+extra Neck pitch beyond the rig's own ~6° rest baseline, 26° at 0.10. The
+`Neck` entry in `BONE_DIRECTIONS` carries a `flattenDepth` flag that zeroes
+this z term entirely rather than computing it from landmark depth, which
+removes that noise at a real cost: see the comment above
+`BONE_DIRECTIONS` in `js/mocap-retarget.js` and the scope cut below.
+
+Separately, `Head` itself is never a bone `retarget()` writes to — there is
+no landmark for it, only for `Neck`. `RobotExpressive.glb` gives `Head` a
+small but non-identity rest rotation of its own (measured directly:
+`{x: -0.035, y: -0.082, z: -0.0019, w: 0.996}`), and because nothing ever
+corrects it, that offset composes on top of whatever `Neck` is doing on
+every single frame. A neutral pose that left `Neck`'s own world rotation
+level still left `Head`'s world rotation off by roughly 4° of pitch and 9°
+of yaw, confirmed with the real `THREE.Bone` state in a loaded scene and
+again by a rendered screenshot. `levelHead(boneMap)`, exported from
+`js/mocap-retarget.js` and called once from `js/mocap.js`'s `setupScene()`
+alongside `buildRestDirections`, resets `Head`'s local quaternion to
+identity at load so its world rotation tracks `Neck`'s exactly instead of
+carrying that baked-in tilt forever after.
 
 MediaPipe's left/right landmark labels are anatomical, the same convention a
 photograph uses: a subject's own raised right hand is still `LEFT_WRIST`'s
@@ -176,8 +206,21 @@ fix negates `z` the same way `y` is already negated.
   what keeps the privacy claim structural rather than promised.
 - **Body pose and head/neck orientation, not hands or face.** BlazePose's 33
   landmarks cover torso, limbs and the nose. Head orientation follows via the
-  `Neck` bone (shoulder midpoint to nose); finger bones and facial morph
-  targets exist on the rig and are not driven.
+  `Neck` bone (shoulder midpoint to ear midpoint); finger bones and facial
+  morph targets exist on the rig and are not driven.
+- **Neck does not convey a forward/backward nod or an in-place head tilt.**
+  `flattenDepth` (above) removes the z term that a nod would have shown up
+  in, and `resolveLandmark()`'s midpoint averaging removes the rest: one ear
+  higher than the other, with the midpoint unmoved, produced the identical
+  Neck rotation as a level pose in direct testing, and moving the ear
+  midpoint's y alone (holding x fixed) produced no rotation change at all,
+  because a normalized target vector doesn't change direction when only its
+  magnitude changes. The one motion that does still reach Neck is the ear
+  midpoint shifting sideways in x relative to the shoulder midpoint — leaning
+  the whole head to one side — which reads mostly as roll. This is a real
+  limit of a midpoint-to-midpoint mapping with no per-eye or per-ear signal,
+  not a bug still to be found; see the `BONE_DIRECTIONS` comment in
+  `js/mocap-retarget.js`.
 - **WebGPU is never required.** `loadLiteRt` is called with no `options`, so
   it runs on WASM alone; a `getWebGpuDevice()` path is not used, keeping the
   feature working on any browser Ask already assumes.
