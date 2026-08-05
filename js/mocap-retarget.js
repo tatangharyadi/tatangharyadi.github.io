@@ -175,8 +175,19 @@ export function levelHead(boneMap) {
 // from four data points on one camera and one face, not a general
 // calibration — re-measure with the same overlay before trusting these on a
 // different camera. See specs/F03_MOCAP.md.
-const EAR_DEPTH_DEADZONE = 12;
-const EAR_DEPTH_AT_MAX_YAW = 30;
+//
+// Re-measured on a second camera/face: the debug overlay showed filteredDiff
+// topping out around 5 during an active turn, never once reaching the old
+// deadzone of 12 — so on this camera yaw computed to exactly 0 on every
+// frame, turn or no turn, which is indistinguishable from "broken" without
+// the overlay. This camera's whole usable range sits roughly an order of
+// magnitude below the first camera's, not just below its old deadzone, so
+// both constants move down together rather than only widening the deadzone.
+// Still only two data points on one session, not a general calibration — the
+// same "re-measure before trusting these on a different camera" caveat above
+// applies to these new values too.
+const EAR_DEPTH_DEADZONE = 4;
+const EAR_DEPTH_AT_MAX_YAW = 18;
 const MAX_HEAD_YAW = Math.PI / 4; // 45 degrees
 
 // How many tracked frames applyHeadYaw() averages together before locking in
