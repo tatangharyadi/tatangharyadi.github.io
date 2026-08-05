@@ -144,6 +144,16 @@ function videoFrameToTensor(video, inputDetails) {
 const LANDMARK_COUNT = 39;
 const LANDMARK_STRIDE = 5;
 
+// The raw "Identity" tensor carries visibility as a pre-sigmoid logit, not a
+// [0, 1] probability — MediaPipe's own graph applies this same activation in
+// a separate TensorsToLandmarksCalculator step that is not baked into the
+// .tflite file. Confirmed empirically: logged raw values ranged well outside
+// [0, 1] (e.g. 8.01, -1.49, 0.13). mocap-retarget.js's MIN_VISIBILITY compares
+// against a probability, so the logit has to be squashed here first.
+function sigmoid(x) {
+  return 1 / (1 + Math.exp(-x));
+}
+
 function tensorDataToLandmarks(flat) {
   if (flat.length < LANDMARK_COUNT * LANDMARK_STRIDE) {
     throw new Error(
@@ -154,7 +164,7 @@ function tensorDataToLandmarks(flat) {
   const landmarks = new Array(LANDMARK_COUNT);
   for (let i = 0; i < LANDMARK_COUNT; i++) {
     const o = i * LANDMARK_STRIDE;
-    landmarks[i] = { x: flat[o], y: flat[o + 1], z: flat[o + 2], visibility: flat[o + 3] };
+    landmarks[i] = { x: flat[o], y: flat[o + 1], z: flat[o + 2], visibility: sigmoid(flat[o + 3]) };
   }
   return landmarks;
 }

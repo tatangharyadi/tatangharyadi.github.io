@@ -120,12 +120,17 @@ for each mapped bone, it takes the landmark pair spanning that bone segment,
 builds a direction vector, and computes the quaternion that rotates the rig's
 rest-pose bone direction onto it.
 
-Real bone names, read directly out of `RobotExpressive.glb`'s embedded glTF
-JSON rather than assumed: `Hips`, `Neck`, `Head`, `Shoulder.L`/`Shoulder.R`,
-`UpperArm.L`/`UpperArm.R`, `LowerArm.L`/`LowerArm.R`, `UpperLeg.L`/`UpperLeg.R`,
-`LowerLeg.L`/`LowerLeg.R`. The rig carries two nodes both named `Torso` (7 and
-10); `js/mocap-retarget.js` documents which one it targets and why, inline,
-the first time this ambiguity matters, rather than leaving a future reader to
+Real bone names, read directly out of the loaded scene's own `THREE.Bone`
+nodes rather than assumed: `Hips`, `Neck`, `Head`, `ShoulderL`/`ShoulderR`,
+`UpperArmL`/`UpperArmR`, `LowerArmL`/`LowerArmR`, `UpperLegL`/`UpperLegR`,
+`LowerLegL`/`LowerLegR` — no dot separator, despite a Blender-export naming
+convention suggesting one. An earlier version of this file and of
+`js/mocap-retarget.js` assumed the dotted form (`UpperArm.L`); every one of
+those names silently missed the real bone, `buildRestDirections()` built an
+empty map, and the character never moved with no error ever thrown — see
+F03-AC09. The rig carries two nodes both named `Torso`;
+`js/mocap-retarget.js` documents which one it targets and why, inline, the
+first time this ambiguity matters, rather than leaving a future reader to
 rediscover it from the GLB by hand. Finger and pole-target bones exist on the
 rig and are out of scope — see below.
 
@@ -187,7 +192,7 @@ plus a re-entry guard flag, exactly like `js/ask.js`.
 | F03-AC06 | `mocap.html` has no `nav-links--container`, so `check_repo.py`'s nav check does not need updating for it, matching `ask.html`'s precedent. | Structural, `scripts/check_repo.py` |
 | F03-AC07 | `mocap.html` is listed in `sitemap.xml`. | `scripts/check_repo.py`, CI |
 | F03-AC08 | Contrast holds at 4.5:1 for text in both flavours, checked against Latte. | Human, per colour scheme |
-| F03-AC09 | Bone names referenced in `js/mocap-retarget.js` match the names actually present in `RobotExpressive.glb`. | Human: re-parse the GLB's glTF JSON and diff against the mapping |
+| F03-AC09 | Bone names referenced in `js/mocap-retarget.js` match the names actually present in `RobotExpressive.glb`. | Human: logged `[...boneMap.keys()]` at runtime and diffed against `BONE_DIRECTIONS`; the dotted names an earlier version used (`UpperArm.L`) never matched and were corrected to the rig's real, dotless names (`UpperArmL`) |
 
 ---
 

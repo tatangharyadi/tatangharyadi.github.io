@@ -6,14 +6,16 @@
 // terms rather than folded into "instantiate, call, draw" the way js/game.js
 // gets to.
 //
-// Bone names below were read directly out of RobotExpressive.glb's embedded
-// glTF JSON (not assumed from a naming convention): node 8 Hips, node 9
-// Abdomen, node 10 Torso, node 11 Neck, node 13 Head, then Shoulder/UpperArm/
-// Arm/LowerArm and UpperLeg/Leg/LowerLeg, each .L and .R. Two nodes are named
-// "Torso" (indices 7 and 10) and Object3D.traverse() visits node 7 first, so
-// buildBoneMap() below silently keeps node 7 and drops node 10 under that
-// name. That is a real ambiguity in the asset, not a bug in this file — see
-// assets/character/README.md.
+// Bone names below were read directly out of the running scene's own
+// THREE.Bone nodes (root.traverse in buildBoneMap), not assumed from a naming
+// convention: RobotExpressive.glb's rig has no dot separator — it is
+// UpperArmL/UpperArmR, LowerArmL/LowerArmR, UpperLegL/UpperLegR,
+// LowerLegL/LowerLegR, not the dotted "UpperArm.L" a Blender-export naming
+// convention would suggest. Two nodes are named "Torso" (one directly under
+// Hips as "Torso_1", one elsewhere) and Object3D.traverse() visits its first
+// match, so buildBoneMap() below silently keeps whichever is visited first
+// under a given name. That is a real ambiguity in the asset, not a bug in
+// this file — see assets/character/README.md.
 
 export const LANDMARK = Object.freeze({
   LEFT_SHOULDER: 11,
@@ -38,14 +40,14 @@ export const LANDMARK = Object.freeze({
 // front-facing selfie camera needs no un-mirroring for this reason; a
 // rear-facing one would.
 export const BONE_DIRECTIONS = Object.freeze([
-  { bone: 'UpperArm.L', from: LANDMARK.LEFT_SHOULDER, to: LANDMARK.LEFT_ELBOW },
-  { bone: 'LowerArm.L', from: LANDMARK.LEFT_ELBOW, to: LANDMARK.LEFT_WRIST },
-  { bone: 'UpperArm.R', from: LANDMARK.RIGHT_SHOULDER, to: LANDMARK.RIGHT_ELBOW },
-  { bone: 'LowerArm.R', from: LANDMARK.RIGHT_ELBOW, to: LANDMARK.RIGHT_WRIST },
-  { bone: 'UpperLeg.L', from: LANDMARK.LEFT_HIP, to: LANDMARK.LEFT_KNEE },
-  { bone: 'LowerLeg.L', from: LANDMARK.LEFT_KNEE, to: LANDMARK.LEFT_ANKLE },
-  { bone: 'UpperLeg.R', from: LANDMARK.RIGHT_HIP, to: LANDMARK.RIGHT_KNEE },
-  { bone: 'LowerLeg.R', from: LANDMARK.RIGHT_KNEE, to: LANDMARK.RIGHT_ANKLE },
+  { bone: 'UpperArmL', from: LANDMARK.LEFT_SHOULDER, to: LANDMARK.LEFT_ELBOW },
+  { bone: 'LowerArmL', from: LANDMARK.LEFT_ELBOW, to: LANDMARK.LEFT_WRIST },
+  { bone: 'UpperArmR', from: LANDMARK.RIGHT_SHOULDER, to: LANDMARK.RIGHT_ELBOW },
+  { bone: 'LowerArmR', from: LANDMARK.RIGHT_ELBOW, to: LANDMARK.RIGHT_WRIST },
+  { bone: 'UpperLegL', from: LANDMARK.LEFT_HIP, to: LANDMARK.LEFT_KNEE },
+  { bone: 'LowerLegL', from: LANDMARK.LEFT_KNEE, to: LANDMARK.LEFT_ANKLE },
+  { bone: 'UpperLegR', from: LANDMARK.RIGHT_HIP, to: LANDMARK.RIGHT_KNEE },
+  { bone: 'LowerLegR', from: LANDMARK.RIGHT_KNEE, to: LANDMARK.RIGHT_ANKLE },
 ]);
 
 // Below this a landmark's own visibility score (BlazePose's fourth value per
