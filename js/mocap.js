@@ -26,7 +26,7 @@ import { buildBoneMap, buildRestDirections, levelHead, retarget, applyHeadYaw } 
 // asked to consider the threaded or JSPI builds.
 const LITERT_DIR = 'vendor/litert/';
 const POSE_MODEL_URL = 'assets/models/pose-landmark-full/pose_landmark_full.tflite';
-const CHARACTER_URL = 'assets/character/RobotExpressive.glb';
+const CHARACTER_URL = 'assets/character/godette_rigged.glb';
 
 const els = {
   gate: document.getElementById('echo--gate'),

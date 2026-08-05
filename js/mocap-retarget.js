@@ -8,14 +8,31 @@
 //
 // Bone names below were read directly out of the running scene's own
 // THREE.Bone nodes (root.traverse in buildBoneMap), not assumed from a naming
-// convention: RobotExpressive.glb's rig has no dot separator — it is
-// UpperArmL/UpperArmR, LowerArmL/LowerArmR, UpperLegL/UpperLegR,
-// LowerLegL/LowerLegR, not the dotted "UpperArm.L" a Blender-export naming
-// convention would suggest. Two nodes are named "Torso" (one directly under
-// Hips as "Torso_1", one elsewhere) and Object3D.traverse() visits its first
-// match, so buildBoneMap() below silently keeps whichever is visited first
-// under a given name. That is a real ambiguity in the asset, not a bug in
-// this file — see assets/character/README.md.
+// convention: godette_rigged.glb's exported node names carry the exporter's
+// own numeric suffix (`Head_129`, `Arm_Upper_1L_157`) rather than the clean
+// `UpperArmL` names an earlier character (RobotExpressive.glb) used, so every
+// name below is a literal copy-paste of what buildBoneMap() actually saw, not
+// a guess at what the rig "should" be called. It is also not a literal
+// copy-paste of the GLB's own JSON: the exported node names carry a `.` (an
+// L/R side marker, e.g. `Arm_Upper_1.L_157`), and THREE.GLTFLoader's node
+// names are run through `PropertyBinding`'s track-path sanitizer, which
+// strips that character before the bone ever reaches `buildBoneMap` —
+// `boneMap.keys()` in a loaded scene reads `Arm_Upper_1L_157`, not the form
+// the GLB's own JSON carries. Every name below is copied from the sanitized,
+// post-load form, confirmed against a loaded scene rather than derived from
+// the export. The rig also carries a parallel IK control skeleton
+// (`IK_Arm_UpperL`, `IK_Leg_UpperL`, …) alongside the FK bones mapped below;
+// those are left unmapped and untouched because nothing here drives them and
+// there is no baked animation for them to reproduce.
+//
+// The arm and leg chains each split what a single "upper arm"/"upper leg"
+// bone would be into two bones — `Arm_Upper_1L` then `Arm_Upper_2L`, same
+// for the lower segment and for the leg's `Leg_UpperL`/`Leg_Upper_2L` — a
+// twist-correction split for smoother deformation, not two independent
+// joints. Only the first bone of each pair (`Arm_Upper_1L`, `Arm_Lower_1L`,
+// `Leg_UpperL`, `Leg_LowerL`) is mapped below; the second, unmapped bone
+// keeps its authored rest-pose offset from its parent and is carried along
+// by it, the same way any other unmapped child bone would be.
 
 export const LANDMARK = Object.freeze({
   LEFT_EAR: 7,
@@ -56,21 +73,17 @@ export const LANDMARK = Object.freeze({
 // into every frame that is not present with the ear midpoint.
 //
 // Neck also carries `flattenDepth: true`, which the arm and leg entries do
-// not. Measured with synthetic landmarks against the real retarget() below:
-// an ear-to-shoulder depth offset of just 0.05 in BlazePose's normalized
-// coordinates — a forward lean well within how a visitor actually sits at a
-// webcam, not a landmark glitch — produced roughly 11 degrees of extra Neck
-// pitch on top of a ~6 degree baseline the rig's own rest pose already
-// carries; 0.10 produced roughly 26. That baseline itself comes from
-// Torso_1's own authored rest tilt (Torso_1 is not a mapped bone, so its
-// world rotation never changes) and retarget()'s parent-relative math
-// correctly compensating for it — that part is not a bug. The depth
-// sensitivity is: a monocular depth estimate has no business contributing
-// that much to a rotation this visible. Dropping the depth term for this one
-// entry (see `flattenDepth` in retarget() below) held Neck's pitch exactly
-// flat across every depth offset tested, with no change to the arm and leg
-// entries, which still use full depth because a limb reaching toward or away
-// from the camera needs it.
+// not, for the same reason regardless of which character is loaded: a
+// monocular depth estimate has no business contributing to a rotation as
+// visible as a forward nod. The specific magnitudes below (a ~6 degree rest
+// baseline, ~11 degrees of extra pitch from a 0.05 depth offset, ~26 from
+// 0.10) were measured against RobotExpressive.glb, the character this rig
+// replaced, and have not been re-measured against godette_rigged.glb's own
+// rest pose or its three-segment Neck_1/Neck_2/Neck_3 chain — this entry
+// only drives Neck_1, the base segment, so the rest baseline in particular
+// may differ. The reasoning (dropping the depth term removes a
+// disproportionate noise source) is not character-specific and still holds;
+// this rig's own magnitudes have not been measured.
 //
 // What flattenDepth costs, beyond what the arm and leg entries pay: Neck's
 // target is the vector from the shoulder midpoint to the ear midpoint, so it
@@ -89,16 +102,22 @@ export const LANDMARK = Object.freeze({
 // relative to the shoulder midpoint — leaning the whole head to one side —
 // which reads mostly as roll. Forward/backward nod and in-place lateral tilt
 // are both gone. That is a real scope cut, not a bug — see F03_MOCAP.md.
+// Bone names carry the sanitized form THREE.GLTFLoader's node names end up
+// with, not the raw names in the GLB's own JSON: GLTFLoader strips
+// characters unsafe for animation-track paths (`PropertyBinding`'s
+// sanitizer), which drops the `.` out of names like `Arm_Upper_1.L_157`.
+// A loaded `boneMap.keys()` reads `Arm_Upper_1L_157`, not the dotted form —
+// confirmed here, not assumed.
 export const BONE_DIRECTIONS = Object.freeze([
-  { bone: 'UpperArmL', from: LANDMARK.LEFT_SHOULDER, to: LANDMARK.LEFT_ELBOW },
-  { bone: 'LowerArmL', from: LANDMARK.LEFT_ELBOW, to: LANDMARK.LEFT_WRIST },
-  { bone: 'UpperArmR', from: LANDMARK.RIGHT_SHOULDER, to: LANDMARK.RIGHT_ELBOW },
-  { bone: 'LowerArmR', from: LANDMARK.RIGHT_ELBOW, to: LANDMARK.RIGHT_WRIST },
-  { bone: 'UpperLegL', from: LANDMARK.LEFT_HIP, to: LANDMARK.LEFT_KNEE },
-  { bone: 'LowerLegL', from: LANDMARK.LEFT_KNEE, to: LANDMARK.LEFT_ANKLE },
-  { bone: 'UpperLegR', from: LANDMARK.RIGHT_HIP, to: LANDMARK.RIGHT_KNEE },
-  { bone: 'LowerLegR', from: LANDMARK.RIGHT_KNEE, to: LANDMARK.RIGHT_ANKLE },
-  { bone: 'Neck', from: [LANDMARK.LEFT_SHOULDER, LANDMARK.RIGHT_SHOULDER], to: [LANDMARK.LEFT_EAR, LANDMARK.RIGHT_EAR], flattenDepth: true },
+  { bone: 'Arm_Upper_1L_157', from: LANDMARK.LEFT_SHOULDER, to: LANDMARK.LEFT_ELBOW },
+  { bone: 'Arm_Lower_1L_155', from: LANDMARK.LEFT_ELBOW, to: LANDMARK.LEFT_WRIST },
+  { bone: 'Arm_Upper_1R_187', from: LANDMARK.RIGHT_SHOULDER, to: LANDMARK.RIGHT_ELBOW },
+  { bone: 'Arm_Lower_1R_185', from: LANDMARK.RIGHT_ELBOW, to: LANDMARK.RIGHT_WRIST },
+  { bone: 'Leg_UpperL_205', from: LANDMARK.LEFT_HIP, to: LANDMARK.LEFT_KNEE },
+  { bone: 'Leg_LowerL_202', from: LANDMARK.LEFT_KNEE, to: LANDMARK.LEFT_ANKLE },
+  { bone: 'Leg_UpperR_211', from: LANDMARK.RIGHT_HIP, to: LANDMARK.RIGHT_KNEE },
+  { bone: 'Leg_LowerR_208', from: LANDMARK.RIGHT_KNEE, to: LANDMARK.RIGHT_ANKLE },
+  { bone: 'Neck_1_132', from: [LANDMARK.LEFT_SHOULDER, LANDMARK.RIGHT_SHOULDER], to: [LANDMARK.LEFT_EAR, LANDMARK.RIGHT_EAR], flattenDepth: true },
 ]);
 
 // Below this a landmark's own visibility score (BlazePose's fourth value per
@@ -123,7 +142,7 @@ const MIN_VISIBILITY = 0.5;
 // identity this sets is the rest state applyHeadYaw() below turns away from
 // and back to every frame, not a value nothing touches again.
 export function levelHead(boneMap) {
-  boneMap.get('Head')?.quaternion.identity();
+  boneMap.get('Head_129')?.quaternion.identity();
 }
 
 // Turning the head left/right is a twist around its own long axis, not a
@@ -234,7 +253,7 @@ const BASELINE_DRIFT_ALPHA = 0.003;
 const HEAD_YAW_SLERP = 0.25;
 
 export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
-  const head = boneMap.get('Head');
+  const head = boneMap.get('Head_129');
   if (!head) return undefined;
 
   scratch.headYawAxis ??= new THREE.Vector3();
@@ -373,10 +392,12 @@ export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
   return diagnostics;
 }
 
-// Walks the loaded glTF scene once and returns { name -> THREE.Bone }, using
-// each bone's *first* traversal match — see the Torso note above. Built once
-// after the character loads, not per frame: bone identity does not change
-// while the page runs.
+// Walks the loaded glTF scene once and returns { name -> THREE.Bone }. Uses
+// each bone's *first* traversal match in case of a duplicate name — the
+// rig this replaced (RobotExpressive.glb) carried two nodes both named
+// `Torso`; godette_rigged.glb has no duplicate bone names, so this is
+// defensive rather than load-bearing here. Built once after the character
+// loads, not per frame: bone identity does not change while the page runs.
 export function buildBoneMap(root) {
   const bones = new Map();
   root.traverse((node) => {
@@ -391,7 +412,7 @@ export function buildBoneMap(root) {
 // first child, expressed in the bone's *local* space, at the moment the
 // character loaded. A bone's THREE.Object3D children carry their rest-pose
 // offset in exactly that space already, so this needs no separate bind-pose
-// file or T-pose calibration step: RobotExpressive's authored rest pose *is*
+// file or T-pose calibration step: the character's authored rest pose *is*
 // the reference.
 export function buildRestDirections(boneMap) {
   const rest = new Map();
@@ -428,7 +449,7 @@ function resolveLandmark(landmarks, ref) {
 
 // Rotates each mapped bone so the direction from it to its child matches the
 // corresponding landmark pair, leaving everything else (spine, hands, facial
-// expression) exactly as RobotExpressive.glb authored it — see F03_MOCAP.md's
+// expression) exactly as godette_rigged.glb authored it — see F03_MOCAP.md's
 // scope cuts. Head orientation mostly follows via the Neck bone above; the
 // one exception is yaw, applied separately by applyHeadYaw() straight to
 // Head, for the reason argued in the comment above that function — this loop

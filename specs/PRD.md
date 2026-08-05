@@ -60,7 +60,7 @@ game.html ─── js/game.js ─── assets/game.wasm  ← cargo, wasm32-unk
 
 mocap.html ─── js/mocap.js ──┬── vendor/litert ── assets/models/pose-landmark-full/
               │            │        (BlazePose pose inference)     → F03_MOCAP
-              │            └── vendor/three ─── assets/character/RobotExpressive.glb
+              │            └── vendor/three ─── assets/character/godette_rigged.glb
               └── js/mocap-retarget.js  (landmarks → bone quaternions)
 ```
 
@@ -138,16 +138,21 @@ in the masthead role.
   `internal`) are usable, because GitHub Pages cannot set the COOP/COEP
   headers cross-origin isolation needs — the same constraint `js/ask.js`
   already lives under.
-- One character (`RobotExpressive.glb`, CC0), body pose and head/neck
-  orientation — lateral lean and yaw, not nodding or in-place tilt, a real
-  scope cut and not yet a fully solved feature. No recording or export. Scope
-  cuts are listed in full in F03_MOCAP.md.
-- Status: wired end to end and verified in a browser — camera access, pose
-  inference, retargeting, rendering and a stop/restart cycle all confirmed
-  working. Four gaps found and fixed via synthetic landmarks in a loaded
-  browser tab (mirrored L/R mapping, excess Neck pitch from depth noise, a
-  static offset baked into the Head bone, and unsupported head yaw, fixed as
-  a twist applied to Head separately from Neck's swing math). A real camera
+- One character (`godette_rigged.glb`, CC-BY-4.0, credited on `mocap.html`
+  itself), body pose and head/neck orientation — lateral lean and yaw, not
+  nodding or in-place tilt, a real scope cut and not yet a fully solved
+  feature. No recording or export. Scope cuts are listed in full in
+  F03_MOCAP.md.
+- Status: the account below (camera access, pose inference, retargeting,
+  rendering, stop/restart, the yaw fixes) was verified in a browser against
+  `RobotExpressive.glb`, the character this rig replaced. The bone-name
+  mapping in `js/mocap-retarget.js` has been updated for
+  `godette_rigged.glb`'s own node names, but the swap has not yet been
+  re-verified in a browser — see the caveats in F03_MOCAP.md. Four gaps found
+  and fixed via synthetic landmarks in a loaded browser tab (mirrored L/R
+  mapping, excess Neck pitch from depth noise, a static offset baked into
+  the Head bone, and unsupported head yaw, fixed as a twist applied to Head
+  separately from Neck's swing math). A real camera
   then took five more passes to make that yaw fix usable, all five rooted in
   noise or drift in the same ear-depth-difference signal: it froze on losing
   the far ear's tracking mid-turn and snapped between left/right with no

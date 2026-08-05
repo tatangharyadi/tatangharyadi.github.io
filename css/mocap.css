@@ -135,3 +135,16 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
 }
+
+/* CC-BY-4.0 requires this credit stay visible on the page, not just in
+   assets/character/README.md — see mocap.html. */
+.echo--credit {
+  max-width: var(--measure, 40rem);
+  margin: 1.5rem auto 0 auto;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.echo--credit a {
+  color: var(--accent-text);
+}
