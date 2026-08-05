@@ -34,25 +34,20 @@ export const LANDMARK = Object.freeze({
 
 // Each entry maps a bone, by the name it has in the GLB, to the pair of
 // landmarks whose direction (parent joint -> child joint) that bone should
-// point along. "left"/"right" here are MediaPipe's, and MediaPipe labels them
-// anatomically as depicted in the raw camera frame — the same convention a
-// photograph uses, not the one a mirror uses: a subject's own right hand,
-// raised in front of a front-facing camera, is still LEFT_WRIST's mirror
-// counterpart in screen space, not RIGHT_WRIST's. A character viewed face-on
-// is stood the way a person facing the visitor is stood, so it must move the
-// way a reflection does: the visitor's right arm drives the character's own
-// left arm bone. Each pair below is therefore crossed on purpose — this is
-// not a naming mistake to "simplify". Confirmed by the character puppeting
-// like a mirror rather than like someone being watched from behind.
+// point along. "left"/"right" here are MediaPipe's, which are the subject's
+// own left and right as seen from behind the lens looking out — i.e. already
+// mirrored the way a mirror mirrors you, not the way a photo of you does. A
+// front-facing selfie camera needs no un-mirroring for this reason; a
+// rear-facing one would.
 export const BONE_DIRECTIONS = Object.freeze([
-  { bone: 'UpperArmL', from: LANDMARK.RIGHT_SHOULDER, to: LANDMARK.RIGHT_ELBOW },
-  { bone: 'LowerArmL', from: LANDMARK.RIGHT_ELBOW, to: LANDMARK.RIGHT_WRIST },
-  { bone: 'UpperArmR', from: LANDMARK.LEFT_SHOULDER, to: LANDMARK.LEFT_ELBOW },
-  { bone: 'LowerArmR', from: LANDMARK.LEFT_ELBOW, to: LANDMARK.LEFT_WRIST },
-  { bone: 'UpperLegL', from: LANDMARK.RIGHT_HIP, to: LANDMARK.RIGHT_KNEE },
-  { bone: 'LowerLegL', from: LANDMARK.RIGHT_KNEE, to: LANDMARK.RIGHT_ANKLE },
-  { bone: 'UpperLegR', from: LANDMARK.LEFT_HIP, to: LANDMARK.LEFT_KNEE },
-  { bone: 'LowerLegR', from: LANDMARK.LEFT_KNEE, to: LANDMARK.LEFT_ANKLE },
+  { bone: 'UpperArmL', from: LANDMARK.LEFT_SHOULDER, to: LANDMARK.LEFT_ELBOW },
+  { bone: 'LowerArmL', from: LANDMARK.LEFT_ELBOW, to: LANDMARK.LEFT_WRIST },
+  { bone: 'UpperArmR', from: LANDMARK.RIGHT_SHOULDER, to: LANDMARK.RIGHT_ELBOW },
+  { bone: 'LowerArmR', from: LANDMARK.RIGHT_ELBOW, to: LANDMARK.RIGHT_WRIST },
+  { bone: 'UpperLegL', from: LANDMARK.LEFT_HIP, to: LANDMARK.LEFT_KNEE },
+  { bone: 'LowerLegL', from: LANDMARK.LEFT_KNEE, to: LANDMARK.LEFT_ANKLE },
+  { bone: 'UpperLegR', from: LANDMARK.RIGHT_HIP, to: LANDMARK.RIGHT_KNEE },
+  { bone: 'LowerLegR', from: LANDMARK.RIGHT_KNEE, to: LANDMARK.RIGHT_ANKLE },
 ]);
 
 // Below this a landmark's own visibility score (BlazePose's fourth value per
