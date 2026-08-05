@@ -169,8 +169,11 @@ in the masthead role.
   (fixed by letting the baseline keep drifting slowly toward the tracked
   signal, `BASELINE_DRIFT_ALPHA`, instead of locking it once for the whole
   session). All five fixes are re-verified synthetically against sequences
-  built to reproduce each reported symptom, and the fifth is also reconfirmed
-  on a real camera. The rest of the human
+  built to reproduce each reported symptom; for the fifth, that replayed the
+  actual readings from the session that reported the asymmetry and got
+  comparable magnitudes both directions, but a fresh real-camera session has
+  not yet confirmed it. None is yet reconfirmed on a live real camera. The
+  rest of the human
   verification steps in AGENTS.md (keyboard traversal, both colour schemes,
   breakpoints, reduced motion, Lighthouse, and that real-camera pass) have
   not yet been run.

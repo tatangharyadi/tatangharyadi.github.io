@@ -52,11 +52,20 @@ something a deadzone-gated adapter could avoid, since the whole point is
 correcting drift that has already carried the rest point outside the
 deadzone. Each fix is re-verified with a synthetic sequence built to
 reproduce its specific reported symptom — see the inline comments in
-`js/mocap-retarget.js` for the exact sequences — but only the fifth
-(baseline drift) has been reconfirmed on a real camera after the fix; the
-first four were only re-verified against synthetic reproductions of the bugs
-they targeted. `applyHeadYaw()` as a whole still needs a full real-camera
-pass before its deadzone, clamp, damping, calibration and filtering can all
+`js/mocap-retarget.js` for the exact sequences. For the fifth fix, that
+synthetic check replayed the actual depthDiff readings from the real-camera
+session that reported the asymmetry (rest ≈ -15, strong turn -43.66, weak
+turn +12.47, each held for a 60-frame/2-second window) through the corrected
+logic, and it produced -30.9° and +36.7° — comparable magnitudes, not the
+reported ±45°/+9°. That is strong evidence the fix addresses the reported
+numbers, but it is still a replay, not a fresh real-camera session: the
+discriminating check proposed for this — a single continuous session
+holding straight → left → straight → right → straight, 2s each, capturing
+`depthDiff` throughout — has not yet been run. None of the five fixes has
+been reconfirmed on a live real camera after the fix, only against
+synthetic reproductions (real or replayed) of the bugs they targeted.
+`applyHeadYaw()` as a whole still needs that real-camera pass before its
+deadzone, clamp, damping, calibration, filtering and baseline drift can all
 be trusted together rather than each having only cleared the specific
 failure that motivated it. The remaining AGENTS.md human checks
 (keyboard-only traversal, both colour schemes, breakpoints, reduced motion,
