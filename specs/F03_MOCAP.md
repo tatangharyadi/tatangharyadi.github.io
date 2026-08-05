@@ -136,11 +136,24 @@ rig and are out of scope — see below.
 
 Head/neck orientation is in scope: BlazePose has no landmark at the base of
 the neck, so `js/mocap-retarget.js` drives the rig's `Neck` bone from the
-midpoint of the shoulder landmarks to the nose landmark, via a
+midpoint of the shoulder landmarks to the midpoint of the ear landmarks, via a
 `resolveLandmark()` helper that averages an array of landmark indices instead
 of reading one directly. Nothing turns the `Head` bone itself, so the
 character's face stays fixed relative to its neck rather than swivelling past
-it independently.
+it independently. The target was originally the nose landmark rather than the
+ear midpoint; the nose sits well forward of the head's actual vertical axis
+even when a subject looks straight ahead, which baked a permanent forward
+slump into every frame regardless of real head pose. The ears sit close to
+that axis at roughly head height, so their midpoint tracks real nodding and
+tilting without that built-in bias.
+
+MediaPipe's left/right landmark labels are anatomical, the same convention a
+photograph uses: a subject's own raised right hand is still `LEFT_WRIST`'s
+mirror counterpart in screen space, not `RIGHT_WRIST`'s. A character viewed
+face-on has to move the way a reflection does, so each `BONE_DIRECTIONS` pair
+crosses sides on purpose — the visitor's right arm drives the character's own
+left arm bone, and the same crossing applies to legs. This is not a naming
+mistake to "simplify" back to matching names.
 
 An earlier version of the retargeting math also had a Z-axis sign error:
 BlazePose's landmark `z` is depth relative to the hips, where a *smaller*
