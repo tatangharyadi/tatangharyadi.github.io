@@ -85,6 +85,39 @@ export const LANDMARK = Object.freeze({
 // disproportionate noise source) is not character-specific and still holds;
 // this rig's own magnitudes have not been measured.
 //
+// KNOWN REGRESSION (2026-08-05, real camera): head motion is visibly
+// jitterier on godette_rigged.glb than it was on RobotExpressive.glb. This
+// is not fixed by anything below — the constants and the flattenDepth
+// reasoning are carried over unchanged from the old rig, on the assumption
+// that they would still hold, and a real camera says that assumption is
+// wrong for at least one of: (a) Neck_1 being a shorter segment than the old
+// rig's single Neck bone, so the same angular noise swings Head through a
+// wider arc at the end of a longer downstream chain (Neck_2, Neck_3, Head);
+// (b) the unmeasured rest baseline mentioned above being far enough off that
+// small landmark noise crosses a threshold that was previously comfortably
+// inside the rest baseline's own slack; (c) Head_129's own baked rest
+// rotation (see levelHead() below) not being what it was measured as on the
+// old rig, so levelHead()'s correction is wrong in a way that compounds
+// per-frame rather than cancelling once. None of these three has been
+// isolated — this comment records that the regression is real and
+// unresolved, not which of them is the cause.
+//
+// Update (2026-08-05, same session, debug overlay + three head-on stills):
+// three screenshots taken seconds apart, subject facing the camera and not
+// moving, show yaw pinned at 0.0000 in every frame — the ear-depth deadzone
+// never opened, so applyHeadYaw() is provably not the source of what these
+// three frames show. What they show instead is the character's whole
+// rendered pose — legs and arms, not just head — changing shape frame to
+// frame while the input was, by the screenshots' own premise, not changing
+// at all. That does not clear (a)/(b)/(c) above; it says the visible jitter
+// is not confined to Head or to yaw, and a fix aimed only at Head's swing
+// rotation or only at applyHeadYaw's constants would leave the leg/arm
+// instability the stills show untouched. This still is not a diagnosis —
+// no per-bone value was logged across those three frames, only the
+// rendered result — but it rules out one specific candidate (yaw) and
+// widens the suspect list to every swing-retargeted bone, not just Neck and
+// Head.
+//
 // What flattenDepth costs, beyond what the arm and leg entries pay: Neck's
 // target is the vector from the shoulder midpoint to the ear midpoint, so it
 // has exactly two components left once z is dropped, x and y, and both are
@@ -141,6 +174,19 @@ const MIN_VISIBILITY = 0.5;
 // baked-in tilt on every frame. Call once, like buildRestDirections — the
 // identity this sets is the rest state applyHeadYaw() below turns away from
 // and back to every frame, not a value nothing touches again.
+//
+// That 4/9-degree figure was measured against RobotExpressive.glb's Head
+// bone; godette_rigged.glb's Head_129 rest rotation has not been
+// re-measured, and per the KNOWN REGRESSION note above this is no longer a
+// neutral gap: a real camera shows the head visibly jitterier on this rig
+// than on RobotExpressive.glb, and Head_129's own baked rest rotation being
+// different from what was measured is one of the three named suspects.
+// Forcing identity is correct regardless of what that baked rotation turns
+// out to be — it cancels whatever it is, once, at load — so this function
+// is not itself where a fix would land; it is named here because if Neck_1's
+// swing rotation is noisier on this rig (candidate (a) above), Head sitting
+// exactly on top of Neck_1 rather than absorbing any of that noise is what
+// carries it straight through to what a viewer sees on Head.
 export function levelHead(boneMap) {
   boneMap.get('Head_129')?.quaternion.identity();
 }
