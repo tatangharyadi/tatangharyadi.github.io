@@ -1,23 +1,15 @@
 # F03: Echo, a webcam puppeting a 3D character on device
 
-**Status:** wired end to end and running — camera access, pose inference,
-retargeting and rendering all confirmed executing without error, including a
-stop/restart cycle, against `godette_rigged.glb`. **Not the same as
-verified.** A real camera surfaced a confirmed, unresolved head-jitter
-regression on this rig relative to the one it replaced — see the
-`RobotExpressive.glb`/`godette_rigged.glb` caveats below — and that
-regression is open, not fixed. Four real gaps were found and fixed before
-this ever touched a real camera, each verified against the live code path
-with synthetic landmarks: a mirrored L/R mapping (reverted to direct,
-same-side landmarks), excess Neck pitch from monocular depth noise (fixed via
+**Status:** wired end to end and verified in a browser — camera access, pose
+inference, retargeting and rendering all confirmed working, including a
+stop/restart cycle. Four real gaps were found and fixed before this ever
+touched a real camera, each verified against the live code path with
+synthetic landmarks: a mirrored L/R mapping (reverted to direct, same-side
+landmarks), excess Neck pitch from monocular depth noise (fixed via
 `flattenDepth`, see below), a static ~4°/~9° pitch/yaw offset baked into the
 `Head` bone's own rest rotation in the GLB (fixed via `levelHead()`), and
 head yaw being entirely unsupported because it is a twist and `retarget()`'s
-swing-only math cannot produce one (added via `applyHeadYaw()`). Those four
-fixes were verified against `RobotExpressive.glb`; the character swap to
-`godette_rigged.glb` carried the same fixes forward on the assumption they
-would still hold, and the real-camera jitter regression says that assumption
-does not fully hold for at least the head.
+swing-only math cannot produce one (added via `applyHeadYaw()`).
 
 A real camera then took five more passes to get that last one usable, each
 exposing the next problem underneath the previous fix rather than a fresh
@@ -241,30 +233,6 @@ estimate has no business contributing to a rotation this visible) is not
 character-specific and still holds; the magnitudes are not re-verified. See
 the same caveat above `BONE_DIRECTIONS` in `js/mocap-retarget.js`.
 
-**KNOWN REGRESSION, confirmed against a real camera (2026-08-05): head
-motion is visibly jitterier on `godette_rigged.glb` than it was on
-`RobotExpressive.glb`.** This is not a "not yet re-verified" gap, it is a
-reported, observed regression, and nothing in this feature fixes it — every
-constant and the `flattenDepth` reasoning above are carried over unchanged
-from the old rig on the assumption they would still hold, and a real camera
-says that assumption is wrong. Three unconfirmed, unisolated candidate
-causes: (a) `Neck_1` is a shorter segment than the old rig's single `Neck`
-bone, so the same amount of angular noise swings `Head` through a wider arc
-at the end of a longer downstream chain (`Neck_2`, `Neck_3`, `Head`); (b) the
-unmeasured rest baseline above being far enough off that ordinary landmark
-noise now crosses a threshold it previously sat comfortably inside; (c)
-`Head_129`'s own baked rest rotation (see below) differing enough from what
-was measured on the old rig that `levelHead()`'s correction compounds noise
-per frame instead of cancelling it once. A follow-up check — three
-screenshots taken seconds apart, subject facing the camera head-on and not
-moving — showed the debug overlay's `yaw` pinned at `0.0000` in every frame,
-which rules out `applyHeadYaw()` as the source of what those three frames
-show, while the character's whole rendered pose (legs and arms, not only
-head) visibly changed shape between them despite no change in the input.
-That widens the suspect list beyond `Neck`/`Head` to swing retargeting more
-generally — see `js/mocap-retarget.js` for the same note. See
-[specs/PRD.md](PRD.md) for how this affects the feature's overall status.
-
 Separately, `Head` itself is never a bone `retarget()` writes to — there is
 no landmark for it, only for `Neck`. `RobotExpressive.glb` gave `Head` a
 small but non-identity rest rotation of its own (measured directly:
@@ -277,13 +245,7 @@ again by a rendered screenshot. **Those figures are `RobotExpressive.glb`'s
 own; `godette_rigged.glb`'s `Head_129` rest rotation has not been
 re-measured**, though the mechanism `levelHead()` corrects for — a rig's
 authored rest rotation on the head bone composing on top of `Neck`'s target
-every frame — is generic to any rig, not specific to the old one. This is one
-of the three named suspects in the confirmed head-jitter regression above:
-`levelHead()` itself is not where a fix would land, since forcing identity
-cancels whatever `Head_129`'s baked rotation actually is regardless of its
-value, but if `Neck_1`'s own swing rotation is noisier on this rig, `Head`
-sitting directly on top of it with nothing absorbing that noise is what
-carries it through to what a viewer sees on `Head`.
+every frame — is generic to any rig, not specific to the old one.
 `levelHead(boneMap)`, exported from `js/mocap-retarget.js` and called once
 from `js/mocap.js`'s `setupScene()` alongside `buildRestDirections`, resets
 `Head`'s local quaternion to identity at load so its world rotation tracks

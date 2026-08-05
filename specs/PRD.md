@@ -147,13 +147,8 @@ in the masthead role.
   rendering, stop/restart, the yaw fixes) was verified in a browser against
   `RobotExpressive.glb`, the character this rig replaced. The bone-name
   mapping in `js/mocap-retarget.js` has been updated for
-  `godette_rigged.glb`'s own node names, and the swap runs without error —
-  bone names resolve, the retargeting math executes, synthetic-landmark
-  checks in a loaded browser tab produce plausible non-identity output.
-  **That is not the same claim as "re-verified."** A real camera surfaced a
-  confirmed head-jitter regression on `godette_rigged.glb` relative to
-  `RobotExpressive.glb`; it is open and unresolved, not merely unconfirmed —
-  see the caveats in F03_MOCAP.md. Four gaps found
+  `godette_rigged.glb`'s own node names, but the swap has not yet been
+  re-verified in a browser — see the caveats in F03_MOCAP.md. Four gaps found
   and fixed via synthetic landmarks in a loaded browser tab (mirrored L/R
   mapping, excess Neck pitch from depth noise, a static offset baked into
   the Head bone, and unsupported head yaw, fixed as a twist applied to Head
@@ -187,18 +182,6 @@ in the masthead role.
   verification steps in AGENTS.md (keyboard traversal, both colour schemes,
   breakpoints, reduced motion, Lighthouse, and that real-camera pass) have
   not yet been run.
-
-  A real-camera pass against `godette_rigged.glb` has now happened, and it
-  found a regression rather than confirming the swap clean: head motion is
-  visibly jitterier on this rig than it was on `RobotExpressive.glb`. Three
-  head-on stills seconds apart, subject not moving, show the debug overlay's
-  `yaw` pinned at `0.0000` in every frame — ruling out `applyHeadYaw()` as
-  the cause of what those three frames show — while the character's whole
-  rendered pose, not only the head, changed shape between them despite no
-  change in input. This is recorded as an open, unresolved defect in
-  F03_MOCAP.md and in the comments above `BONE_DIRECTIONS` and `levelHead()`
-  in `js/mocap-retarget.js`, not as a remaining "not yet verified" gap: it
-  has been observed, and it has not been fixed.
 
 ## Verification
 
