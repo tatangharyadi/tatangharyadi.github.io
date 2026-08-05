@@ -2,18 +2,23 @@
 
 **Status:** wired end to end and verified in a browser — camera access, pose
 inference, retargeting and rendering all confirmed working, including a
-stop/restart cycle. Three real bugs found and fixed since, each verified
-against the live `retarget()`/`buildBoneMap`/`levelHead` code path with
-synthetic landmarks rather than by inspection: a mirrored L/R mapping
-(reverted to direct, same-side landmarks), excess Neck pitch from monocular
-depth noise (fixed via `flattenDepth`, see below), and a static ~4°/~9°
-pitch/yaw offset baked into the `Head` bone's own rest rotation in the GLB
-(fixed via `levelHead()`). None of these three fixes has been checked against
-a real webcam — only against synthetic landmarks fed through the real code in
-a loaded browser tab, which is strong evidence but not the same claim. The
-remaining AGENTS.md human checks (keyboard-only traversal, both colour
-schemes, breakpoints, reduced motion, Lighthouse, and a real-camera pass) have
-not yet been run.
+stop/restart cycle. Four real gaps found and addressed since, each verified
+against the live code path with synthetic landmarks rather than by
+inspection: a mirrored L/R mapping (reverted to direct, same-side landmarks),
+excess Neck pitch from monocular depth noise (fixed via `flattenDepth`, see
+below), a static ~4°/~9° pitch/yaw offset baked into the `Head` bone's own
+rest rotation in the GLB (fixed via `levelHead()`), and head yaw — turning
+left/right — being entirely unsupported because it is a twist rotation and
+`retarget()`'s swing-only math cannot produce one (added via `applyHeadYaw()`,
+see below). None of these four fixes has been checked against a real
+webcam — only against synthetic landmarks fed through the real code in a
+loaded browser tab, which is strong evidence but not the same claim, and
+`applyHeadYaw()` in particular reads the same noisy monocular depth channel
+that caused the Neck pitch bug, so it needs a real-camera pass before its
+deadzone and clamp can be trusted rather than just exercised. The remaining
+AGENTS.md human checks (keyboard-only traversal, both colour schemes,
+breakpoints, reduced motion, Lighthouse, and a real-camera pass) have not yet
+been run.
 
 ## Overview
 
@@ -147,9 +152,10 @@ Head/neck orientation is in scope: BlazePose has no landmark at the base of
 the neck, so `js/mocap-retarget.js` drives the rig's `Neck` bone from the
 midpoint of the shoulder landmarks to the midpoint of the ear landmarks, via a
 `resolveLandmark()` helper that averages an array of landmark indices instead
-of reading one directly. Nothing turns the `Head` bone itself, so the
-character's face stays fixed relative to its neck rather than swivelling past
-it independently. The target was originally the nose landmark rather than the
+of reading one directly. `Head` itself is turned separately, and only for
+yaw — see `applyHeadYaw()` below; the character's face otherwise stays fixed
+relative to its neck rather than swivelling past it independently. The target
+was originally the nose landmark rather than the
 ear midpoint; the nose sits well forward of the head's actual vertical axis
 even when a subject looks straight ahead, which baked a permanent forward
 slump into every frame regardless of real head pose. The ears sit close to
@@ -176,6 +182,50 @@ again by a rendered screenshot. `levelHead(boneMap)`, exported from
 alongside `buildRestDirections`, resets `Head`'s local quaternion to
 identity at load so its world rotation tracks `Neck`'s exactly instead of
 carrying that baked-in tilt forever after.
+
+Turning the head left or right is a twist around its own vertical axis, not a
+swing between two directions, and `setFromUnitVectors` — the only rotation
+`retarget()` knows how to compute — returns the minimal-arc rotation between
+two vectors, which by construction has zero component about the axis those
+vectors share. No landmark pair fed into that call, however the target vector
+is corrected, can ever produce a twist. Confirmed directly: an asymmetric
+ear-depth offset (one ear pushed toward the camera, the other away, x and y
+held fixed) produced no change at all in `Neck`'s rotation once `flattenDepth`
+zeroed the z term, and even without that flag `resolveLandmark()`'s midpoint
+averaging would have cancelled the same antisymmetric signal — only a
+*symmetric* depth change, both ears moving together, survives an average of
+two points, and that is the forward-lean slump signal `flattenDepth` already
+suppresses, not the turn signal. The difference between the two ears' `z` is
+where a turn actually shows up, and it never reached anything Neck's target
+vector could use.
+
+`applyHeadYaw(landmarks, boneMap, THREE, scratch)`, exported from
+`js/mocap-retarget.js` and called from `js/mocap.js`'s `renderFrame()` after
+`retarget()`, computes that ear-depth difference and writes it straight to
+`Head` as a `setFromAxisAngle` twist about world-up (rotated into `Head`'s
+parent-local frame the same way `retarget()` rotates its swing target).
+Writing `Head` rather than composing the twist onto `Neck` is deliberate:
+`Head` has no mapped children, so a wrong or noisy yaw here cannot leak into
+the swing rotation on `Neck` that already earned its own verification. A
+0.02-unit deadzone and a clamp to ±45° stand between the raw ear-depth
+difference and the applied angle, because this reads the same monocular `z`
+channel that produced the Neck pitch bug above: a realistic ~45° turn moves
+the ear-depth difference by roughly the same 0.05–0.10 magnitude that a
+forward lean once turned into 11°–26° of spurious pitch. That earlier failure
+was a constant bias, wrong the same way every frame; a yaw fix on the same
+channel, undamped, would instead be zero-mean jitter around a correct center
+— a different failure shape, and one a deadzone is the standard fix for, but
+still unverified against real noise. Confirmed with synthetic landmarks: a
+depth difference below the deadzone produces exactly zero rotation, a
+moderate difference (0.07) produces a clean ±22.5° yaw with pitch and roll
+held under a millionth of a degree, an extreme difference clamps at ±45°, and
+`Neck`'s own world rotation is unchanged across every case, confirming the
+isolation from `Neck` holds in practice as well as by construction. What this
+cannot confirm is the sign: whether a rightward turn actually reads as a
+rightward turn depends on both this file's `y`-depth-sign convention (already
+load-bearing for `retarget()`'s arm/leg z-flip) and the real noise floor of
+BlazePose's ear-depth estimate, neither of which a synthetic landmark can
+exercise. That needs a real camera.
 
 MediaPipe's left/right landmark labels are anatomical, the same convention a
 photograph uses: a subject's own raised right hand is still `LEFT_WRIST`'s
@@ -205,8 +255,9 @@ fix negates `z` the same way `y` is already negated.
   is live-only; closing or navigating away discards everything, which is also
   what keeps the privacy claim structural rather than promised.
 - **Body pose and head/neck orientation, not hands or face.** BlazePose's 33
-  landmarks cover torso, limbs and the nose. Head orientation follows via the
-  `Neck` bone (shoulder midpoint to ear midpoint); finger bones and facial
+  landmarks cover torso, limbs and the nose. Head orientation mostly follows
+  via the `Neck` bone (shoulder midpoint to ear midpoint), with yaw applied
+  separately to `Head` by `applyHeadYaw()` (above); finger bones and facial
   morph targets exist on the rig and are not driven.
 - **Neck does not convey a forward/backward nod or an in-place head tilt.**
   `flattenDepth` (above) removes the z term that a nod would have shown up

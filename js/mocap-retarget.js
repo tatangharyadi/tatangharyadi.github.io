@@ -106,8 +106,10 @@ export const BONE_DIRECTIONS = Object.freeze([
 // direction does more harm than freezing the limb in its last known pose.
 const MIN_VISIBILITY = 0.5;
 
-// Head is never in BONE_DIRECTIONS — there is no landmark for it, and
-// retarget() below only ever writes a bone it maps. Measured directly against
+// Head is never in BONE_DIRECTIONS — there is no landmark pair that names a
+// direction *through* the head the way an elbow-to-wrist pair names one
+// through a forearm, so it cannot be solved by the same setFromUnitVectors
+// swing retarget() uses for every other bone. Measured directly against
 // RobotExpressive.glb: even feeding retarget() a perfectly neutral, symmetric,
 // forward-facing, zero-depth pose (so Neck's own world rotation comes out
 // level, within a thousandth of a degree), Head's world orientation still
@@ -117,11 +119,95 @@ const MIN_VISIBILITY = 0.5;
 // vector can cancel a bias that lives one bone further down the chain.
 // levelHead() resets Head's local quaternion to identity once, at load, so
 // Head's world orientation tracks Neck's exactly rather than carrying that
-// baked-in tilt on every frame. Call once, like buildRestDirections — nothing
-// after load ever writes Head's local quaternion again, so nothing needs to
-// re-level it per frame.
+// baked-in tilt on every frame. Call once, like buildRestDirections — the
+// identity this sets is the rest state applyHeadYaw() below turns away from
+// and back to every frame, not a value nothing touches again.
 export function levelHead(boneMap) {
   boneMap.get('Head')?.quaternion.identity();
+}
+
+// Turning the head left/right is a twist around its own long axis, not a
+// swing between two directions, and setFromUnitVectors — everything else in
+// this file — has no way to produce a twist: it returns the minimal rotation
+// between two vectors, which by construction has no component about the axis
+// those vectors share. That is why yaw gets its own function instead of a new
+// BONE_DIRECTIONS entry. Confirmed against the real retarget() with synthetic
+// landmarks: feeding it a deliberately asymmetric ear-depth pair (one ear
+// pushed toward the camera, the other away, holding both ears' x and y fixed)
+// produced no change at all in Neck's rotation once flattenDepth zeroed the
+// term, and even without flattenDepth the shoulder/ear *midpoint* averaging
+// in resolveLandmark() would have cancelled that antisymmetric signal anyway
+// — only a symmetric depth change (both ears moving together, the forward-lean
+// slump flattenDepth exists to suppress) survives an average of two points.
+// The signal a turn actually leaves is the *difference* between the two ears'
+// z, which never reaches Neck under either mechanism.
+//
+// This writes Head, not Neck, and that is a deliberate choice, not an
+// arbitrary one: Head has no mapped children, so a wrong or noisy yaw here
+// cannot propagate into a swing rotation already verified against synthetic
+// landmarks and a rendered screenshot. Composing a twist onto Neck's own
+// quaternion would put the two fixes in the same rotation, so a mistake in
+// this new, unverified-on-a-real-camera code could not be told apart from a
+// regression in the Neck math that already earned that verification.
+//
+// The deadzone and clamp below exist because this reads the same monocular z
+// channel that produced the flattenDepth bug: a realistic ~45-degree turn
+// moves the ear-depth difference by roughly the same 0.05-0.10 magnitude that
+// a forward lean once turned into 11-26 degrees of spurious Neck pitch. That
+// earlier failure was a constant bias — wrong in the same direction every
+// frame — where this one, if the deadzone is too small, would be zero-mean
+// jitter around a correct center. Untested against a real webcam; a clean
+// synthetic signal proves this responds, not that the noise floor is
+// tolerable. See specs/F03_MOCAP.md.
+const EAR_DEPTH_DEADZONE = 0.02;
+const EAR_DEPTH_AT_MAX_YAW = 0.12;
+const MAX_HEAD_YAW = Math.PI / 4; // 45 degrees
+
+export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
+  const head = boneMap.get('Head');
+  if (!head) return;
+
+  const left = landmarks[LANDMARK.LEFT_EAR];
+  const right = landmarks[LANDMARK.RIGHT_EAR];
+  if (!left || !right || left.visibility < MIN_VISIBILITY || right.visibility < MIN_VISIBILITY) {
+    return;
+  }
+
+  // BlazePose z is depth relative to the hips with a *smaller* value meaning
+  // *closer* to the camera (see the coordinate-system note in retarget()
+  // below). Turning the head so the right ear leads — moves toward the
+  // camera, so smaller z — should read as a positive yaw in Three.js's
+  // right-handed convention (counter-clockwise looking down +Y), which is
+  // (left.z - right.z): right ear closer makes this positive. Untested
+  // against a real camera; this sign is derived from the same convention
+  // note retarget() already relies on, not independently verified here.
+  const depthDiff = left.z - right.z;
+  const magnitude = Math.min(Math.abs(depthDiff), EAR_DEPTH_AT_MAX_YAW);
+  if (magnitude < EAR_DEPTH_DEADZONE) {
+    head.quaternion.identity();
+    head.updateWorldMatrix(false, true);
+    return;
+  }
+
+  const t = (magnitude - EAR_DEPTH_DEADZONE) / (EAR_DEPTH_AT_MAX_YAW - EAR_DEPTH_DEADZONE);
+  const yaw = Math.sign(depthDiff) * t * MAX_HEAD_YAW;
+
+  scratch.headYawAxis ??= new THREE.Vector3();
+  scratch.headParentWorldQuat ??= new THREE.Quaternion();
+  scratch.headYawQuat ??= new THREE.Quaternion();
+  const { headYawAxis, headParentWorldQuat, headYawQuat } = scratch;
+
+  // The axis to twist about is world-up, not Head's own local Y: the rig's
+  // rest pose is not guaranteed to have the bone's local axes aligned with
+  // the world, and levelHead() only zeroed Head's own local rotation, not its
+  // parent chain's. Rotating world-up into Head's parent's local frame is the
+  // same parent-relative transform retarget() already uses for its swing
+  // target, applied here to an axis instead of a direction.
+  head.parent.getWorldQuaternion(headParentWorldQuat);
+  headYawAxis.set(0, 1, 0).applyQuaternion(headParentWorldQuat.clone().invert()).normalize();
+  headYawQuat.setFromAxisAngle(headYawAxis, yaw);
+  head.quaternion.copy(headYawQuat);
+  head.updateWorldMatrix(false, true);
 }
 
 // Walks the loaded glTF scene once and returns { name -> THREE.Bone }, using
@@ -180,9 +266,10 @@ function resolveLandmark(landmarks, ref) {
 // Rotates each mapped bone so the direction from it to its child matches the
 // corresponding landmark pair, leaving everything else (spine, hands, facial
 // expression) exactly as RobotExpressive.glb authored it — see F03_MOCAP.md's
-// scope cuts. Head orientation follows via the Neck bone above; nothing turns
-// the Head bone itself, so the character's face stays fixed relative to its
-// neck the way a real head does not independently swivel past it.
+// scope cuts. Head orientation mostly follows via the Neck bone above; the
+// one exception is yaw, applied separately by applyHeadYaw() straight to
+// Head, for the reason argued in the comment above that function — this loop
+// has no way to produce a twist.
 //
 // The math: a bone's world rotation is its parent's world rotation composed
 // with the bone's own local quaternion, so the world-space direction to its

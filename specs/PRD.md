@@ -138,19 +138,22 @@ in the masthead role.
   `internal`) are usable, because GitHub Pages cannot set the COOP/COEP
   headers cross-origin isolation needs — the same constraint `js/ask.js`
   already lives under.
-- One character (`RobotExpressive.glb`, CC0), body pose and a limited form of
-  head/neck orientation — lateral lean only, not nodding or in-place tilt, a
-  real scope cut and not yet a solved feature. No recording or export. Scope
+- One character (`RobotExpressive.glb`, CC0), body pose and head/neck
+  orientation — lateral lean and yaw, not nodding or in-place tilt, a real
+  scope cut and not yet a fully solved feature. No recording or export. Scope
   cuts are listed in full in F03_MOCAP.md.
 - Status: wired end to end and verified in a browser — camera access, pose
   inference, retargeting, rendering and a stop/restart cycle all confirmed
-  working. Three bugs found and fixed since (mirrored L/R mapping, excess
-  Neck pitch from depth noise, a static offset baked into the Head bone),
-  each verified against the real code path with synthetic landmarks in a
-  loaded browser tab, not yet against a real camera. The rest of the human
-  verification steps in AGENTS.md (keyboard traversal, both colour schemes,
-  breakpoints, reduced motion, Lighthouse, and a real-camera pass) have not
-  yet been run.
+  working. Four gaps found and fixed since (mirrored L/R mapping, excess
+  Neck pitch from depth noise, a static offset baked into the Head bone, and
+  unsupported head yaw, fixed as a twist applied to Head separately from
+  Neck's swing math), each verified against the real code path with
+  synthetic landmarks in a loaded browser tab, not yet against a real
+  camera — the yaw fix in particular reads the same noisy depth channel that
+  caused the pitch bug, so it needs that pass before its damping can be
+  trusted. The rest of the human verification steps in AGENTS.md (keyboard
+  traversal, both colour schemes, breakpoints, reduced motion, Lighthouse,
+  and a real-camera pass) have not yet been run.
 
 ## Verification
 

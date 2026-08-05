@@ -18,7 +18,7 @@
 import { loadLiteRt, unloadLiteRt, loadAndCompile, Tensor } from '../vendor/litert/litert-core.mjs';
 import * as THREE from 'three';
 import { GLTFLoader } from '../vendor/three/examples/jsm/loaders/GLTFLoader.js';
-import { buildBoneMap, buildRestDirections, levelHead, retarget } from './mocap-retarget.js';
+import { buildBoneMap, buildRestDirections, levelHead, retarget, applyHeadYaw } from './mocap-retarget.js';
 
 // A directory, not a file. loadLiteRt() picks between
 // litert_wasm_compat_internal.js and litert_wasm_internal.js itself, by
@@ -231,6 +231,7 @@ const retargetScratch = {};
 
 function renderFrame(landmarks) {
   retarget(landmarks, boneMap, restDirections, THREE, retargetScratch);
+  applyHeadYaw(landmarks, boneMap, THREE, retargetScratch);
   renderer.render(scene, camera);
 }
 
