@@ -163,6 +163,13 @@ const EAR_DEPTH_DEADZONE = 0.02;
 const EAR_DEPTH_AT_MAX_YAW = 0.12;
 const MAX_HEAD_YAW = Math.PI / 4; // 45 degrees
 
+// How many tracked frames applyHeadYaw() averages together before locking in
+// the "forward" baseline described below — not a value a real camera has
+// tuned, just enough frames (roughly a third of a second at 30fps) that one
+// noisy sample cannot dominate the average the way it could dominate a
+// single-frame reading.
+const CALIBRATION_FRAMES = 10;
+
 // How far Head's current quaternion moves toward this frame's target each
 // call, via slerp — not a value derived from any measurement, since there is
 // no clean way to synthesize per-frame *noise* the way the deadzone/clamp
@@ -222,24 +229,43 @@ export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
     // BlazePose consistently misjudges relative to the other, and neither is
     // something a fixed deadzone can correct, because a bias that never
     // crosses zero never re-enters the deadzone to be caught by it.
-    // Calibrating out whatever `depthDiff` reads on the first tracked frame
-    // treats that frame as "forward" and measures every later frame as a
-    // delta from it, which is exactly the assumption this easter egg already
-    // makes implicitly — the visitor is expected to be facing the camera
-    // when the feature starts. Recalibrating only once, and only ever
-    // forward from module load (see the module-level `scratch` in
-    // js/mocap.js), means a deliberate held turn does not slowly get
-    // absorbed back into "center" the way a continuously-adapting baseline
-    // would.
+    // Calibrating out whatever `depthDiff` reads treats some early reading as
+    // "forward" and measures every later frame as a delta from it, which is
+    // exactly the assumption this easter egg already makes implicitly — the
+    // visitor is expected to be facing the camera when the feature starts.
+    //
+    // The first version of this calibration took a single frame as that
+    // reading, and a real camera showed the opposite failure: the head then
+    // defaulted to an exaggerated turn the *other* way. A single frame is
+    // exactly as exposed to per-frame noise as the depthDiff signal it is
+    // meant to correct — the very first tracked frame is also the one most
+    // likely to catch the camera mid-auto-exposure-adjustment or the model's
+    // own temporal smoothing not yet warmed up, so a noisy sample there
+    // becomes a wrong, permanent baseline for the rest of the session.
+    // Averaging over CALIBRATION_FRAMES tracked frames before locking the
+    // baseline in — holding yaw at 0 for that short window rather than
+    // computing it against an incomplete average — trades a brief, unmoving
+    // start for a baseline no single noisy frame can dominate. Untested
+    // against a real camera; verified only that a synthetic single noisy
+    // outlier frame among otherwise-stable readings no longer swings the
+    // locked baseline the way a single-frame calibration did.
+    scratch.headYawCalibrationSum ??= 0;
+    scratch.headYawCalibrationCount ??= 0;
     if (scratch.headYawBaseline === undefined) {
-      scratch.headYawBaseline = depthDiff;
+      scratch.headYawCalibrationSum += depthDiff;
+      scratch.headYawCalibrationCount += 1;
+      if (scratch.headYawCalibrationCount >= CALIBRATION_FRAMES) {
+        scratch.headYawBaseline = scratch.headYawCalibrationSum / scratch.headYawCalibrationCount;
+      }
     }
-    const adjustedDiff = depthDiff - scratch.headYawBaseline;
 
-    const magnitude = Math.min(Math.abs(adjustedDiff), EAR_DEPTH_AT_MAX_YAW);
-    if (magnitude >= EAR_DEPTH_DEADZONE) {
-      const t = (magnitude - EAR_DEPTH_DEADZONE) / (EAR_DEPTH_AT_MAX_YAW - EAR_DEPTH_DEADZONE);
-      yaw = Math.sign(adjustedDiff) * t * MAX_HEAD_YAW;
+    if (scratch.headYawBaseline !== undefined) {
+      const adjustedDiff = depthDiff - scratch.headYawBaseline;
+      const magnitude = Math.min(Math.abs(adjustedDiff), EAR_DEPTH_AT_MAX_YAW);
+      if (magnitude >= EAR_DEPTH_DEADZONE) {
+        const t = (magnitude - EAR_DEPTH_DEADZONE) / (EAR_DEPTH_AT_MAX_YAW - EAR_DEPTH_DEADZONE);
+        yaw = Math.sign(adjustedDiff) * t * MAX_HEAD_YAW;
+      }
     }
   }
 
