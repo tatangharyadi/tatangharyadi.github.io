@@ -196,7 +196,7 @@ const HEAD_YAW_SLERP = 0.25;
 
 export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
   const head = boneMap.get('Head');
-  if (!head) return;
+  if (!head) return undefined;
 
   scratch.headYawAxis ??= new THREE.Vector3();
   scratch.headParentWorldQuat ??= new THREE.Quaternion();
@@ -215,6 +215,13 @@ export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
   // confidence on the far ear. Falling through to yaw = 0 here instead means
   // a lost ear eases Head back toward front through the same slerp below,
   // rather than holding the last value forever.
+  // Temporary diagnostics, not part of the shipped rule: see the debug
+  // overlay wired up in js/mocap.js. Returned rather than logged from in
+  // here so this file stays free of a DOM/console dependency it does not
+  // otherwise have. Strip this and the overlay together once the real
+  // camera noise floor is measured — see specs/F03_MOCAP.md.
+  const diagnostics = { tracked };
+
   let yaw = 0;
   if (tracked) {
     // BlazePose z is depth relative to the hips with a *smaller* value
@@ -227,6 +234,7 @@ export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
     // the same convention note retarget() already relies on, not
     // independently verified here.
     const depthDiff = left.z - right.z;
+    diagnostics.depthDiff = depthDiff;
 
     // A real camera showed this defaulting to a left turn while the subject
     // faced the camera dead on. That is not jitter around zero — jitter
@@ -268,8 +276,11 @@ export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
       }
     }
 
+    diagnostics.baseline = scratch.headYawBaseline;
+
     if (scratch.headYawBaseline !== undefined) {
       const adjustedDiff = depthDiff - scratch.headYawBaseline;
+      diagnostics.adjustedDiff = adjustedDiff;
 
       // Every fix above still fed the deadzone a raw, single-frame
       // adjustedDiff, and a real camera showed exactly the failure that
@@ -296,6 +307,7 @@ export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
       scratch.headYawFilteredDiff ??= adjustedDiff;
       scratch.headYawFilteredDiff += DEPTH_DIFF_FILTER_ALPHA * (adjustedDiff - scratch.headYawFilteredDiff);
       const filteredDiff = scratch.headYawFilteredDiff;
+      diagnostics.filteredDiff = filteredDiff;
 
       const magnitude = Math.min(Math.abs(filteredDiff), EAR_DEPTH_AT_MAX_YAW);
       if (magnitude >= EAR_DEPTH_DEADZONE) {
@@ -304,6 +316,7 @@ export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
       }
     }
   }
+  diagnostics.yaw = yaw;
 
   // The axis to twist about is world-up, not Head's own local Y: the rig's
   // rest pose is not guaranteed to have the bone's local axes aligned with
@@ -316,6 +329,7 @@ export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
   headYawQuat.setFromAxisAngle(headYawAxis, yaw);
   head.quaternion.slerp(headYawQuat, HEAD_YAW_SLERP);
   head.updateWorldMatrix(false, true);
+  return diagnostics;
 }
 
 // Walks the loaded glTF scene once and returns { name -> THREE.Bone }, using

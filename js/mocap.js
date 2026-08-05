@@ -229,10 +229,38 @@ function resizeRenderer() {
 
 const retargetScratch = {};
 
+// Temporary measurement instrument, not part of the shipped feature — see
+// specs/F03_MOCAP.md's note that every head-yaw fix so far was tuned against
+// synthetic sequences invented for the purpose, never against the actual
+// noise floor of a real camera and a real face. This reads the raw signal
+// applyHeadYaw() is already computing and puts it on screen so that can
+// finally be measured instead of guessed. Remove this block, the diagnostics
+// return from applyHeadYaw(), and #echo--debug from mocap.html together once
+// that measurement is done.
+let debugEl = null;
+let debugFrame = 0;
+
 function renderFrame(landmarks) {
   retarget(landmarks, boneMap, restDirections, THREE, retargetScratch);
-  applyHeadYaw(landmarks, boneMap, THREE, retargetScratch);
+  const diagnostics = applyHeadYaw(landmarks, boneMap, THREE, retargetScratch);
   renderer.render(scene, camera);
+
+  debugFrame++;
+  if (debugEl && diagnostics) {
+    const fmt = (n) => (typeof n === 'number' ? n.toFixed(4) : 'n/a');
+    debugEl.textContent =
+      `tracked: ${diagnostics.tracked}\n` +
+      `depthDiff: ${fmt(diagnostics.depthDiff)}\n` +
+      `baseline: ${fmt(diagnostics.baseline)}\n` +
+      `adjustedDiff: ${fmt(diagnostics.adjustedDiff)}\n` +
+      `filteredDiff: ${fmt(diagnostics.filteredDiff)}\n` +
+      `yaw (deg): ${fmt(diagnostics.yaw !== undefined ? (diagnostics.yaw * 180) / Math.PI : undefined)}`;
+    // Logged every 15 frames (~0.5s at 30fps) rather than every frame, so the
+    // console stays readable enough to copy a run of readings back out.
+    if (debugFrame % 15 === 0) {
+      console.info('Echo debug', JSON.stringify(diagnostics));
+    }
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -336,6 +364,18 @@ async function start() {
     prepareFrameCanvas(model.getInputDetails()[0]);
     setupScene(characterRoot);
 
+    // Temporary — see the comment above renderFrame(). aria-hidden because
+    // this is a debug instrument, not content, and it is never the only
+    // place a value is available: everything it shows is also logged to the
+    // console.
+    debugEl = document.createElement('pre');
+    debugEl.id = 'echo--debug';
+    debugEl.setAttribute('aria-hidden', 'true');
+    debugEl.style.cssText =
+      'position:fixed;bottom:1rem;left:1rem;z-index:999;margin:0;padding:0.75rem;' +
+      'background:rgba(0,0,0,0.75);color:#0f0;font:12px monospace;white-space:pre;pointer-events:none;';
+    document.body.appendChild(debugEl);
+
     // Focus the destination before hiding the origin, same order js/ask.js
     // uses for its own gate: an element must still be in the accessibility
     // tree to receive focus, so hiding #echo--gate first would drop focus to
@@ -398,6 +438,10 @@ async function stop() {
   restDirections = null;
   model = null;
   unloadLiteRt();
+
+  debugEl?.remove();
+  debugEl = null;
+  debugFrame = 0;
 
   els.main.hidden = true;
   els.gate.hidden = false;
