@@ -227,7 +227,15 @@ function resizeRenderer() {
   camera.updateProjectionMatrix();
 }
 
-const retargetScratch = {};
+// Reassigned to a fresh object at the top of start(), not just declared
+// once: a real camera showed identical calibration numbers (headYawBaseline,
+// among others) across repeated stop()/start() cycles, because this object
+// was never cleared and the calibration branch in applyHeadYaw() only ever
+// runs once per key (`if (scratch.headYawBaseline === undefined)`). A
+// visitor who stops and restarts is very likely to have moved or
+// repositioned, so reusing the previous session's "forward" silently skips
+// recalibration exactly when it is most needed.
+let retargetScratch = {};
 
 // Temporary measurement instrument, not part of the shipped feature — see
 // specs/F03_MOCAP.md's note that every head-yaw fix so far was tuned against
@@ -351,6 +359,8 @@ async function start() {
   loading = true;
   els.load.setAttribute('aria-disabled', 'true');
   els.status.textContent = 'Asking for camera access…';
+
+  retargetScratch = {};
 
   try {
     const [cameraStream, poseModel, characterRoot] = await Promise.all([

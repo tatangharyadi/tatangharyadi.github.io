@@ -150,25 +150,42 @@ export function levelHead(boneMap) {
 // this new, unverified-on-a-real-camera code could not be told apart from a
 // regression in the Neck math that already earned that verification.
 //
-// The deadzone and clamp below exist because this reads the same monocular z
-// channel that produced the flattenDepth bug: a realistic ~45-degree turn
-// moves the ear-depth difference by roughly the same 0.05-0.10 magnitude that
-// a forward lean once turned into 11-26 degrees of spurious Neck pitch. That
-// earlier failure was a constant bias — wrong in the same direction every
-// frame — where this one, if the deadzone is too small, would be zero-mean
-// jitter around a correct center. Untested against a real webcam; a clean
-// synthetic signal proves this responds, not that the noise floor is
-// tolerable. See specs/F03_MOCAP.md.
-const EAR_DEPTH_DEADZONE = 0.02;
-const EAR_DEPTH_AT_MAX_YAW = 0.12;
+// The deadzone and clamp below were originally sized for a normalized
+// signal in the range ~0.05-0.10, on the assumption that this reads the same
+// small monocular z channel that produced the flattenDepth bug. A debug
+// overlay measured against a real camera (see js/mocap.js) showed that
+// assumption was wrong by two to three orders of magnitude: this model's raw
+// landmark z is not normalized to roughly [-1, 1] the way x and y are — it is
+// in the same untransformed units the "Identity" tensor emits everything in,
+// which for this signal came out to a real full-turn magnitude of roughly
+// 29-35 and a real at-rest noise band of roughly ±10 around baseline
+// (measured swinging from -8.8 to +2.5 while holding still). At the old
+// 0.12 clamp, every one of those real readings was already 25-280x past it,
+// so `magnitude` below was pinned to EAR_DEPTH_AT_MAX_YAW on every tracked
+// frame and yaw was always exactly ±45 degrees, never anything in between —
+// "never looks straight" is not a damping problem, it is this saturation.
+// The noise band crossing zero while genuinely at rest is what then read as
+// fidgeting: a sign flip on a saturated signal jumps straight from one
+// pinned extreme to the other.
+//
+// EAR_DEPTH_AT_MAX_YAW is set below the smallest measured real-turn
+// magnitude so an actual turn can still reach the clamp. EAR_DEPTH_DEADZONE
+// is set above the measured at-rest noise band so that band reads as still
+// facing forward instead of a small persistent turn. Both are first cuts
+// from four data points on one camera and one face, not a general
+// calibration — re-measure with the same overlay before trusting these on a
+// different camera. See specs/F03_MOCAP.md.
+const EAR_DEPTH_DEADZONE = 12;
+const EAR_DEPTH_AT_MAX_YAW = 30;
 const MAX_HEAD_YAW = Math.PI / 4; // 45 degrees
 
 // How many tracked frames applyHeadYaw() averages together before locking in
-// the "forward" baseline described below — not a value a real camera has
-// tuned, just enough frames (roughly a third of a second at 30fps) that one
-// noisy sample cannot dominate the average the way it could dominate a
-// single-frame reading.
-const CALIBRATION_FRAMES = 10;
+// the "forward" baseline described below. Raised from 10 once the real
+// at-rest noise band turned out to be roughly ±10 (see above) rather than the
+// ~0.05 this was first tuned against — a noise band that large needs more
+// than a third of a second of averaging to land the lock near the true
+// center rather than near whatever the first few frames happened to read.
+const CALIBRATION_FRAMES = 30;
 
 // How much each frame's raw ear-depth-difference reading moves the running
 // filtered value used for the deadzone and sign check below, toward that
