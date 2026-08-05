@@ -221,12 +221,23 @@ const DEPTH_DIFF_FILTER_ALPHA = 0.15;
 // DEPTH_DIFF_FILTER_ALPHA so a held turn (which also sits away from zero) is
 // not mistaken for a new rest point for many seconds — long enough for any
 // deliberate pose, short enough that the baseline does not need a second
-// explicit calibration if the session runs long. The known cost: hold a turn
-// for tens of seconds and the character eases back toward front under you,
-// because the baseline has drifted onto your held position. Acceptable for an
-// easter egg; not something a deadzone gate could avoid, since the whole
-// point is correcting drift that has already carried the rest point outside
-// the deadzone.
+// explicit calibration if the session runs long.
+//
+// That was the theory. A real camera showed the predicted cost happening much
+// sooner than "tens of seconds": a held turn eased back to center within one
+// short test, which reads exactly like something is pulling the head back —
+// because something is, and it is this constant. The bug was applying it
+// unconditionally, on every tracked frame, with no way to tell "the rest
+// point has drifted" apart from "the subject is deliberately holding a turn
+// right now" — the two look identical to this alpha, since both are just
+// depthDiff sitting away from baseline for a while. applyHeadYaw() below now
+// only drifts the baseline on a frame that already reads as within the yaw
+// deadzone, i.e. a frame yaw itself has decided is "facing forward" rather
+// than an active turn, which is the actual distinction this constant needs
+// and the deadzone gate already computes for free. A genuine slow drift
+// while at rest still gets corrected, at the same rate as before; a held
+// turn no longer erases itself, because it is never read as "at rest" in the
+// first place.
 const BASELINE_DRIFT_ALPHA = 0.003;
 
 // How far Head's current quaternion moves toward this frame's target each
@@ -344,8 +355,6 @@ export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
       if (scratch.headYawCalibrationCount >= CALIBRATION_FRAMES) {
         scratch.headYawBaseline = scratch.headYawCalibrationSum / scratch.headYawCalibrationCount;
       }
-    } else {
-      scratch.headYawBaseline += BASELINE_DRIFT_ALPHA * (depthDiff - scratch.headYawBaseline);
     }
 
     diagnostics.baseline = scratch.headYawBaseline;
@@ -385,6 +394,12 @@ export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
       if (magnitude >= EAR_DEPTH_DEADZONE) {
         const t = (magnitude - EAR_DEPTH_DEADZONE) / (EAR_DEPTH_AT_MAX_YAW - EAR_DEPTH_DEADZONE);
         yaw = Math.sign(filteredDiff) * t * MAX_HEAD_YAW;
+      } else {
+        // Only drift the baseline on a frame the deadzone already reads as
+        // "facing forward" — see the BASELINE_DRIFT_ALPHA comment above for
+        // why an unconditional drift here used to erase a held turn instead
+        // of tracking genuine at-rest camera drift.
+        scratch.headYawBaseline += BASELINE_DRIFT_ALPHA * (depthDiff - scratch.headYawBaseline);
       }
     }
   }
