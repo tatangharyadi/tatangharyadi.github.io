@@ -9,8 +9,8 @@ A static personal site: plain HTML and CSS, no build step, no package manager,
 served by GitHub Pages from `main`. There is nothing to install and nothing to
 compile. Edit the files directly.
 
-**There are exactly two JavaScript files of our own: `js/ask.js` and
-`js/game.js`.** Everything else — the work index on the home page — is
+**There are exactly four JavaScript files of our own: `js/ask.js`, `js/game.js`,
+`js/mocap.js` and `js/mocap-retarget.js`.** Everything else — the work index on the home page — is
 [htmx](https://htmx.org) asking for static HTML fragments under `fragments/` and
 swapping them in. htmx arrives from a CDN pinned by version and SRI digest.
 
@@ -58,6 +58,27 @@ this is worth attempting, the hash file carries the rustc version that produced
 the committed binary on a second line, written by the script rather than kept by
 hand. A different rustc gives a different hash, and that is not a fault: it is
 why the version is recorded.
+
+`js/mocap.js` earns the third exception on the same grounds as `js/game.js`: it
+is a boundary and a renderer, nothing more. It asks the browser for a camera,
+asks LiteRT.js (running MediaPipe's BlazePose) to turn each video frame into 33
+body landmarks, and asks Three.js to draw a rigged character. Nothing captured
+here is sent anywhere — there is no endpoint this page talks to at all, the same
+structural privacy property `js/ask.js` has for the same reason: the model, the
+runtime and the character are fetched same-origin, once, and every frame after
+that is inference against WebAssembly already sitting in the tab. GitHub Pages
+cannot set the COOP/COEP headers cross-origin isolation needs, so only the two
+non-threaded LiteRT WASM builds are reachable — the same constraint `js/ask.js`
+already lives under with `onnxruntime`.
+
+`js/mocap-retarget.js` earns the fourth exception on different grounds, and they
+are worth stating precisely because this file is not a boundary the way the other
+three are. Turning a landmark pair into a bone rotation is a rule with a real
+failure mode if it is wrong, so it is not folded into `js/mocap.js`'s "instantiate,
+call, draw" framing — it is argued on its own terms in
+[specs/F03_MOCAP.md](specs/F03_MOCAP.md). It touches no DOM and makes no network
+call; its only inputs are landmark coordinates, a bone map and a Three.js
+namespace, which is what keeps it a rule and not a second boundary.
 
 Do not introduce a bundler, framework or package manager to solve a problem that a
 few lines of CSS would solve. The absence of a toolchain is a design decision, not

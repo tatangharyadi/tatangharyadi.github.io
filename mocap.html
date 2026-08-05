@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Echo | Tatang Haryadi</title>
+    <meta name="description" content="Echo: a webcam-driven pose demo. A 33-point body-pose model and a rigged 3D character both run entirely in your browser; the video never leaves your device." />
+    <meta name="theme-color" content="#dce0e8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#11111b" media="(prefers-color-scheme: dark)" />
+    <link rel="canonical" href="https://tatangharyadi.github.io/mocap.html" />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Tatang Haryadi" />
+    <meta property="og:url" content="https://tatangharyadi.github.io/mocap.html" />
+    <meta property="og:title" content="Echo" />
+    <meta property="og:description" content="A webcam-driven pose demo: a body-pose model and a 3D character both run entirely in your browser, on device." />
+
+    <!-- Shared palette and reset, same file every other page uses, so this
+         page is not a sixth place scripts/check_palette.py would have to
+         track. css/mocap.css is layout only. -->
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/mocap.css" />
+
+    <!-- Bare specifiers in the vendored files ("three" in GLTFLoader.js,
+         "@litertjs/wasm-utils" in litert-core.mjs) have no bundler to resolve
+         them, so a browser-native import map does it instead. Both targets are
+         same-origin vendored files, not a CDN. -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "./vendor/three/three.module.min.js",
+            "@litertjs/wasm-utils": "./vendor/litert/wasm-utils.mjs"
+        }
+    }
+    </script>
+    <script type="module" src="js/mocap.js"></script>
+</head>
+
+<body>
+    <a class="skip-link" href="#echo--stage">Skip to the stage</a>
+
+    <header class="echo--head">
+        <h1>Echo</h1>
+        <p class="echo--sub">
+            Your own movement, puppeting a character. A pose model and a
+            rigged 3D character both run in this tab; nothing about you is
+            ever sent anywhere.
+        </p>
+        <p class="echo--sub"><a href="index.html">Back to the rest of the site</a></p>
+    </header>
+
+    <noscript>
+        <p class="echo--notice">
+            This page needs JavaScript to request your camera and run the
+            WebAssembly models that drive it. Everything else on this site
+            works without it; this one genuinely cannot.
+        </p>
+    </noscript>
+
+    <!-- Hidden until js/mocap.js reveals it, same rule as #ask--gate: a
+         no-JS visitor should never be shown a button that cannot do
+         anything. -->
+    <div class="echo--gate" id="echo--gate" hidden>
+        <p>
+            Pressing this asks your browser for camera access. The video
+            frame is read into an offscreen canvas and fed to a pose model
+            that runs on your device; no frame, image or measurement is
+            ever transmitted, because nothing here has anywhere to send it.
+        </p>
+        <button type="button" class="echo--load" id="echo--load">
+            Start the camera
+        </button>
+        <p class="echo--gate-cost">Also downloads the pose model and the
+            character, both served from this site, cached by your browser
+            afterwards.</p>
+    </div>
+
+    <p class="echo--notice" id="echo--status" role="status" aria-live="polite"></p>
+
+    <main class="echo" id="echo" hidden>
+        <!-- The video is the source of truth for inference, not the thing a
+             visitor is meant to watch — the rendered character is. It is
+             kept small rather than display:none so it stays a real decodable
+             frame source in every browser. -->
+        <video class="echo--video" id="echo--video" muted playsinline aria-hidden="true"></video>
+
+        <section class="echo--stage-wrap" aria-labelledby="echo--stage-title">
+            <h2 id="echo--stage-title" class="visually-hidden">The puppeted character</h2>
+            <canvas class="echo--stage" id="echo--stage"></canvas>
+        </section>
+
+        <button type="button" class="echo--stop" id="echo--stop">
+            Stop and release the camera
+        </button>
+    </main>
+</body>
+
+</html>
