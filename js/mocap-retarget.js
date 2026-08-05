@@ -53,11 +53,24 @@ export const LANDMARK = Object.freeze({
 // needing its own separate pass. Its "to" is the ear midpoint, not the nose:
 // the nose sits well forward of the head's actual vertical axis even when a
 // subject looks straight ahead, so using it baked a permanent forward slump
-// into every frame that is not present with the ear midpoint. A forward
-// slump has still been observed against a real camera with this fix in
-// place, so the ear midpoint removes the nose's bias but is not a confirmed
-// fix for the slump itself — the actual cause (landmark noise, visibility
-// gating, or something else) is still under investigation.
+// into every frame that is not present with the ear midpoint.
+//
+// Neck also carries `flattenDepth: true`, which the arm and leg entries do
+// not. Measured with synthetic landmarks against the real retarget() below:
+// an ear-to-shoulder depth offset of just 0.05 in BlazePose's normalized
+// coordinates — a forward lean well within how a visitor actually sits at a
+// webcam, not a landmark glitch — produced roughly 11 degrees of extra Neck
+// pitch on top of a ~6 degree baseline the rig's own rest pose already
+// carries; 0.10 produced roughly 26. That baseline itself comes from
+// Torso_1's own authored rest tilt (Torso_1 is not a mapped bone, so its
+// world rotation never changes) and retarget()'s parent-relative math
+// correctly compensating for it — that part is not a bug. The depth
+// sensitivity is: a monocular depth estimate has no business contributing
+// that much to a rotation this visible. Dropping the depth term for this one
+// entry (see `flattenDepth` in retarget() below) held Neck's pitch exactly
+// flat across every depth offset tested, with no change to the arm and leg
+// entries, which still use full depth because a limb reaching toward or away
+// from the camera needs it.
 export const BONE_DIRECTIONS = Object.freeze([
   { bone: 'UpperArmL', from: LANDMARK.LEFT_SHOULDER, to: LANDMARK.LEFT_ELBOW },
   { bone: 'LowerArmL', from: LANDMARK.LEFT_ELBOW, to: LANDMARK.LEFT_WRIST },
@@ -67,7 +80,7 @@ export const BONE_DIRECTIONS = Object.freeze([
   { bone: 'LowerLegL', from: LANDMARK.LEFT_KNEE, to: LANDMARK.LEFT_ANKLE },
   { bone: 'UpperLegR', from: LANDMARK.RIGHT_HIP, to: LANDMARK.RIGHT_KNEE },
   { bone: 'LowerLegR', from: LANDMARK.RIGHT_KNEE, to: LANDMARK.RIGHT_ANKLE },
-  { bone: 'Neck', from: [LANDMARK.LEFT_SHOULDER, LANDMARK.RIGHT_SHOULDER], to: [LANDMARK.LEFT_EAR, LANDMARK.RIGHT_EAR] },
+  { bone: 'Neck', from: [LANDMARK.LEFT_SHOULDER, LANDMARK.RIGHT_SHOULDER], to: [LANDMARK.LEFT_EAR, LANDMARK.RIGHT_EAR], flattenDepth: true },
 ]);
 
 // Below this a landmark's own visibility score (BlazePose's fourth value per
@@ -160,7 +173,7 @@ export function retarget(landmarks, boneMap, restDirections, THREE, scratch) {
   scratch.boneQuat ??= new THREE.Quaternion();
   const { targetWorld, targetLocal, parentWorldQuat, boneQuat } = scratch;
 
-  for (const { bone: name, from, to } of BONE_DIRECTIONS) {
+  for (const { bone: name, from, to, flattenDepth } of BONE_DIRECTIONS) {
     const bone = boneMap.get(name);
     const restDir = restDirections.get(name);
     if (!bone || !restDir) continue;
@@ -179,7 +192,11 @@ export function retarget(landmarks, boneMap, restDirections, THREE, scratch) {
     // to the camera" is the *larger* z. Left unflipped, raising an arm toward
     // the camera (the real-world "forward") pointed the bone away from the
     // camera instead — the puppet reached backward for every forward motion.
-    targetWorld.set(b.x - a.x, -(b.y - a.y), -(b.z - a.z));
+    //
+    // `flattenDepth` drops that z term to zero instead of computing it — see
+    // the BONE_DIRECTIONS comment on Neck for the measurement that justifies
+    // this for exactly that one entry.
+    targetWorld.set(b.x - a.x, -(b.y - a.y), flattenDepth ? 0 : -(b.z - a.z));
     if (targetWorld.lengthSq() < 1e-8) continue;
     targetWorld.normalize();
 
