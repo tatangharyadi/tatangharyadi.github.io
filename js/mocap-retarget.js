@@ -71,6 +71,24 @@ export const LANDMARK = Object.freeze({
 // flat across every depth offset tested, with no change to the arm and leg
 // entries, which still use full depth because a limb reaching toward or away
 // from the camera needs it.
+//
+// What flattenDepth costs, beyond what the arm and leg entries pay: Neck's
+// target is the vector from the shoulder midpoint to the ear midpoint, so it
+// has exactly two components left once z is dropped, x and y, and both are
+// weaker than they look. Averaging two points cancels any difference between
+// them, so one ear higher than the other (a real lateral head tilt in place)
+// leaves the midpoint exactly where it was — confirmed empirically: a
+// 0.10-unit ear-height difference around an unmoved midpoint produced the
+// identical Neck rotation as a level pose. And when the midpoint sits
+// straight above the shoulder midpoint, as it does when facing the camera,
+// changing only its distance (y magnitude, with x untouched) does not change
+// the *direction* of a vector that is being normalized anyway — confirmed the
+// same way: a real forward nod's signal was almost entirely the z term this
+// flag just deleted, and moving only y produced no rotation at all. The one
+// motion that still reaches Neck is the ear midpoint shifting sideways in x
+// relative to the shoulder midpoint — leaning the whole head to one side —
+// which reads mostly as roll. Forward/backward nod and in-place lateral tilt
+// are both gone. That is a real scope cut, not a bug — see F03_MOCAP.md.
 export const BONE_DIRECTIONS = Object.freeze([
   { bone: 'UpperArmL', from: LANDMARK.LEFT_SHOULDER, to: LANDMARK.LEFT_ELBOW },
   { bone: 'LowerArmL', from: LANDMARK.LEFT_ELBOW, to: LANDMARK.LEFT_WRIST },
@@ -87,6 +105,24 @@ export const BONE_DIRECTIONS = Object.freeze([
 // point) says the model is guessing rather than seeing, and applying its
 // direction does more harm than freezing the limb in its last known pose.
 const MIN_VISIBILITY = 0.5;
+
+// Head is never in BONE_DIRECTIONS — there is no landmark for it, and
+// retarget() below only ever writes a bone it maps. Measured directly against
+// RobotExpressive.glb: even feeding retarget() a perfectly neutral, symmetric,
+// forward-facing, zero-depth pose (so Neck's own world rotation comes out
+// level, within a thousandth of a degree), Head's world orientation still
+// came out roughly 4 degrees pitched and 9 degrees yawed off level. That
+// residual is Head's *own* authored local rotation from the GLB, composed on
+// top of whatever Neck is doing, and no amount of correcting Neck's target
+// vector can cancel a bias that lives one bone further down the chain.
+// levelHead() resets Head's local quaternion to identity once, at load, so
+// Head's world orientation tracks Neck's exactly rather than carrying that
+// baked-in tilt on every frame. Call once, like buildRestDirections — nothing
+// after load ever writes Head's local quaternion again, so nothing needs to
+// re-level it per frame.
+export function levelHead(boneMap) {
+  boneMap.get('Head')?.quaternion.identity();
+}
 
 // Walks the loaded glTF scene once and returns { name -> THREE.Bone }, using
 // each bone's *first* traversal match — see the Torso note above. Built once

@@ -18,7 +18,7 @@
 import { loadLiteRt, unloadLiteRt, loadAndCompile, Tensor } from '../vendor/litert/litert-core.mjs';
 import * as THREE from 'three';
 import { GLTFLoader } from '../vendor/three/examples/jsm/loaders/GLTFLoader.js';
-import { buildBoneMap, buildRestDirections, retarget } from './mocap-retarget.js';
+import { buildBoneMap, buildRestDirections, levelHead, retarget } from './mocap-retarget.js';
 
 // A directory, not a file. loadLiteRt() picks between
 // litert_wasm_compat_internal.js and litert_wasm_internal.js itself, by
@@ -194,6 +194,7 @@ function setupScene(characterRoot) {
   scene.add(character);
   boneMap = buildBoneMap(character);
   restDirections = buildRestDirections(boneMap);
+  levelHead(boneMap);
 
   // Framed from the character's own measured size, not a hardcoded distance:
   // an assumed ~1.7-unit-tall figure put the camera inside RobotExpressive's
