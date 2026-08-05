@@ -138,8 +138,9 @@ in the masthead role.
   `internal`) are usable, because GitHub Pages cannot set the COOP/COEP
   headers cross-origin isolation needs — the same constraint `js/ask.js`
   already lives under.
-- One character (`RobotExpressive.glb`, CC0), body pose only, no recording or
-  export. Scope cuts are listed in full in F03_MOCAP.md.
+- One character (`RobotExpressive.glb`, CC0), body pose and head/neck
+  orientation, no recording or export. Scope cuts are listed in full in
+  F03_MOCAP.md.
 - Status: wired end to end and verified in a browser — camera access, pose
   inference, retargeting, rendering and a stop/restart cycle all confirmed
   working. The rest of the human verification steps in AGENTS.md (keyboard

@@ -18,6 +18,7 @@
 // this file — see assets/character/README.md.
 
 export const LANDMARK = Object.freeze({
+  NOSE: 0,
   LEFT_SHOULDER: 11,
   RIGHT_SHOULDER: 12,
   LEFT_ELBOW: 13,
@@ -39,6 +40,12 @@ export const LANDMARK = Object.freeze({
 // mirrored the way a mirror mirrors you, not the way a photo of you does. A
 // front-facing selfie camera needs no un-mirroring for this reason; a
 // rear-facing one would.
+//
+// Neck is the one entry whose "from" is not a single landmark: BlazePose has
+// no landmark at the base of the neck, so the shoulder midpoint stands in for
+// it. retarget() below resolves an array `from`/`to` by averaging the
+// landmarks it names, which is why Neck can sit in this same list rather than
+// needing its own separate pass.
 export const BONE_DIRECTIONS = Object.freeze([
   { bone: 'UpperArmL', from: LANDMARK.LEFT_SHOULDER, to: LANDMARK.LEFT_ELBOW },
   { bone: 'LowerArmL', from: LANDMARK.LEFT_ELBOW, to: LANDMARK.LEFT_WRIST },
@@ -48,6 +55,7 @@ export const BONE_DIRECTIONS = Object.freeze([
   { bone: 'LowerLegL', from: LANDMARK.LEFT_KNEE, to: LANDMARK.LEFT_ANKLE },
   { bone: 'UpperLegR', from: LANDMARK.RIGHT_HIP, to: LANDMARK.RIGHT_KNEE },
   { bone: 'LowerLegR', from: LANDMARK.RIGHT_KNEE, to: LANDMARK.RIGHT_ANKLE },
+  { bone: 'Neck', from: [LANDMARK.LEFT_SHOULDER, LANDMARK.RIGHT_SHOULDER], to: LANDMARK.NOSE },
 ]);
 
 // Below this a landmark's own visibility score (BlazePose's fourth value per
@@ -86,9 +94,34 @@ export function buildRestDirections(boneMap) {
   return rest;
 }
 
+// Resolves a BONE_DIRECTIONS `from`/`to` entry to a landmark. A plain index
+// reads landmarks[i] directly; an array (Neck's shoulder midpoint, currently
+// the only case) averages the named landmarks' positions and takes their
+// lowest visibility, so a midpoint is exactly as willing to freeze as a
+// single low-confidence landmark would be.
+function resolveLandmark(landmarks, ref) {
+  if (!Array.isArray(ref)) return landmarks[ref];
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  let visibility = Infinity;
+  for (const i of ref) {
+    const l = landmarks[i];
+    if (!l) return undefined;
+    x += l.x;
+    y += l.y;
+    z += l.z;
+    visibility = Math.min(visibility, l.visibility);
+  }
+  return { x: x / ref.length, y: y / ref.length, z: z / ref.length, visibility };
+}
+
 // Rotates each mapped bone so the direction from it to its child matches the
-// corresponding landmark pair, leaving everything else (spine, hands, face)
-// exactly as RobotExpressive.glb authored it — see F03_MOCAP.md's scope cuts.
+// corresponding landmark pair, leaving everything else (spine, hands, facial
+// expression) exactly as RobotExpressive.glb authored it — see F03_MOCAP.md's
+// scope cuts. Head orientation follows via the Neck bone above; nothing turns
+// the Head bone itself, so the character's face stays fixed relative to its
+// neck the way a real head does not independently swivel past it.
 //
 // The math: a bone's world rotation is its parent's world rotation composed
 // with the bone's own local quaternion, so the world-space direction to its
@@ -120,15 +153,21 @@ export function retarget(landmarks, boneMap, restDirections, THREE, scratch) {
     const restDir = restDirections.get(name);
     if (!bone || !restDir) continue;
 
-    const a = landmarks[from];
-    const b = landmarks[to];
+    const a = resolveLandmark(landmarks, from);
+    const b = resolveLandmark(landmarks, to);
     if (!a || !b || a.visibility < MIN_VISIBILITY || b.visibility < MIN_VISIBILITY) {
       continue;
     }
 
     // See the coordinate-system note in js/mocap.js: landmark y is flipped
-    // here to go from image-down to world-up before anything else touches it.
-    targetWorld.set(b.x - a.x, -(b.y - a.y), b.z - a.z);
+    // here to go from image-down to world-up. z needs the same treatment for
+    // the same kind of reason: BlazePose's z is depth relative to the hips
+    // with a *smaller* value meaning *closer* to the camera, while the scene
+    // in js/mocap.js sits the camera on the character's +z side, so "closer
+    // to the camera" is the *larger* z. Left unflipped, raising an arm toward
+    // the camera (the real-world "forward") pointed the bone away from the
+    // camera instead — the puppet reached backward for every forward motion.
+    targetWorld.set(b.x - a.x, -(b.y - a.y), -(b.z - a.z));
     if (targetWorld.lengthSq() < 1e-8) continue;
     targetWorld.normalize();
 

@@ -134,6 +134,23 @@ first time this ambiguity matters, rather than leaving a future reader to
 rediscover it from the GLB by hand. Finger and pole-target bones exist on the
 rig and are out of scope — see below.
 
+Head/neck orientation is in scope: BlazePose has no landmark at the base of
+the neck, so `js/mocap-retarget.js` drives the rig's `Neck` bone from the
+midpoint of the shoulder landmarks to the nose landmark, via a
+`resolveLandmark()` helper that averages an array of landmark indices instead
+of reading one directly. Nothing turns the `Head` bone itself, so the
+character's face stays fixed relative to its neck rather than swivelling past
+it independently.
+
+An earlier version of the retargeting math also had a Z-axis sign error:
+BlazePose's landmark `z` is depth relative to the hips, where a *smaller*
+value means *closer to the camera*, while the scene's camera sits on the
+character's `+z` side — so, in this scene, closer to the camera is the
+*larger* z. Left unflipped (only the image-down-to-world-up `y` flip was
+applied), reaching a limb toward the camera pointed the corresponding bone
+away from the camera instead, so every forward motion read as backward. The
+fix negates `z` the same way `y` is already negated.
+
 ---
 
 ## Scope cuts
@@ -144,9 +161,10 @@ rig and are out of scope — see below.
 - **No recording, no export, no photo/video capture of any kind.** The stage
   is live-only; closing or navigating away discards everything, which is also
   what keeps the privacy claim structural rather than promised.
-- **Body pose only, not hands or face.** BlazePose's 33 landmarks cover torso
-  and limbs. Finger bones and facial morph targets exist on the rig and are
-  not driven.
+- **Body pose and head/neck orientation, not hands or face.** BlazePose's 33
+  landmarks cover torso, limbs and the nose. Head orientation follows via the
+  `Neck` bone (shoulder midpoint to nose); finger bones and facial morph
+  targets exist on the rig and are not driven.
 - **WebGPU is never required.** `loadLiteRt` is called with no `options`, so
   it runs on WASM alone; a `getWebGpuDevice()` path is not used, keeping the
   feature working on any browser Ask already assumes.
