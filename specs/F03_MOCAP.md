@@ -2,23 +2,29 @@
 
 **Status:** wired end to end and verified in a browser — camera access, pose
 inference, retargeting and rendering all confirmed working, including a
-stop/restart cycle. Four real gaps found and addressed since, each verified
-against the live code path with synthetic landmarks rather than by
-inspection: a mirrored L/R mapping (reverted to direct, same-side landmarks),
-excess Neck pitch from monocular depth noise (fixed via `flattenDepth`, see
-below), a static ~4°/~9° pitch/yaw offset baked into the `Head` bone's own
-rest rotation in the GLB (fixed via `levelHead()`), and head yaw — turning
-left/right — being entirely unsupported because it is a twist rotation and
-`retarget()`'s swing-only math cannot produce one (added via `applyHeadYaw()`,
-see below). None of these four fixes has been checked against a real
-webcam — only against synthetic landmarks fed through the real code in a
-loaded browser tab, which is strong evidence but not the same claim, and
-`applyHeadYaw()` in particular reads the same noisy monocular depth channel
-that caused the Neck pitch bug, so it needs a real-camera pass before its
-deadzone and clamp can be trusted rather than just exercised. The remaining
+stop/restart cycle. Five real gaps found and addressed since, each verified
+against the live code path with synthetic landmarks unless noted: a mirrored
+L/R mapping (reverted to direct, same-side landmarks), excess Neck pitch from
+monocular depth noise (fixed via `flattenDepth`, see below), a static
+~4°/~9° pitch/yaw offset baked into the `Head` bone's own rest rotation in
+the GLB (fixed via `levelHead()`), head yaw being entirely unsupported
+because it is a twist and `retarget()`'s swing-only math cannot produce one
+(added via `applyHeadYaw()`), and — this one found on an actual camera, not
+synthetically — that first `applyHeadYaw()` snapping between left/right with
+nothing in between and never returning to front. Two real bugs caused it:
+losing confident tracking on the far ear (routine mid-turn) froze the last
+computed rotation instead of falling back toward front, and every frame
+snapped straight to its target with no damping against the noisy depth
+signal driving it. Both are fixed (fallback-to-front on lost tracking, a
+per-frame `slerp` toward the target) and re-verified with a synthetic frame
+sequence that holds a turn, drops the far ear's visibility mid-turn, and
+confirms the yaw eases back to zero rather than freezing — but that fix
+itself has not yet been re-confirmed on a real camera, only against the
+synthetic sequence that reproduces the reported symptom. `applyHeadYaw()` as
+a whole still needs that real-camera pass before its deadzone, clamp and
+damping constant can be trusted rather than just exercised. The remaining
 AGENTS.md human checks (keyboard-only traversal, both colour schemes,
-breakpoints, reduced motion, Lighthouse, and a real-camera pass) have not yet
-been run.
+breakpoints, reduced motion, Lighthouse) have not yet been run either.
 
 ## Overview
 

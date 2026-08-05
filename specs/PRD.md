@@ -144,16 +144,19 @@ in the masthead role.
   cuts are listed in full in F03_MOCAP.md.
 - Status: wired end to end and verified in a browser — camera access, pose
   inference, retargeting, rendering and a stop/restart cycle all confirmed
-  working. Four gaps found and fixed since (mirrored L/R mapping, excess
-  Neck pitch from depth noise, a static offset baked into the Head bone, and
-  unsupported head yaw, fixed as a twist applied to Head separately from
-  Neck's swing math), each verified against the real code path with
-  synthetic landmarks in a loaded browser tab, not yet against a real
-  camera — the yaw fix in particular reads the same noisy depth channel that
-  caused the pitch bug, so it needs that pass before its damping can be
-  trusted. The rest of the human verification steps in AGENTS.md (keyboard
-  traversal, both colour schemes, breakpoints, reduced motion, Lighthouse,
-  and a real-camera pass) have not yet been run.
+  working. Four gaps found and fixed via synthetic landmarks in a loaded
+  browser tab (mirrored L/R mapping, excess Neck pitch from depth noise, a
+  static offset baked into the Head bone, and unsupported head yaw, fixed as
+  a twist applied to Head separately from Neck's swing math). A real camera
+  then surfaced two more in that yaw fix — it froze on losing the far ear's
+  tracking mid-turn instead of easing back to front, and snapped between
+  left/right with no damping against the noisy depth signal driving it —
+  both now fixed (fallback-to-front on lost tracking, a per-frame slerp) and
+  re-verified synthetically against the exact sequence that reproduced the
+  symptom, but not yet reconfirmed on a real camera. The rest of the human
+  verification steps in AGENTS.md (keyboard traversal, both colour schemes,
+  breakpoints, reduced motion, Lighthouse, and that real-camera pass) have
+  not yet been run.
 
 ## Verification
 

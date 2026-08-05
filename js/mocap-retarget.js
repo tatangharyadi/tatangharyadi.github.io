@@ -163,39 +163,60 @@ const EAR_DEPTH_DEADZONE = 0.02;
 const EAR_DEPTH_AT_MAX_YAW = 0.12;
 const MAX_HEAD_YAW = Math.PI / 4; // 45 degrees
 
+// How far Head's current quaternion moves toward this frame's target each
+// call, via slerp — not a value derived from any measurement, since there is
+// no clean way to synthesize per-frame *noise* the way the deadzone/clamp
+// above were tuned against a synthetic offset. It exists because a first,
+// undamped version of this function snapped Head straight to whatever the
+// current frame's raw ear-depth reading computed, and on a real camera that
+// read as binary left/right with nothing in between: the depth channel is
+// noisy enough that consecutive frames swing between small and near-clamped
+// values rather than sweeping smoothly through the range in between, exactly
+// the kind of jitter flagged as a risk before this was ever pointed at a
+// camera. 0.25 means roughly a dozen frames to settle on a held pose, which
+// is a first guess to make the motion visibly continuous rather than a
+// number a real camera has confirmed is right.
+const HEAD_YAW_SLERP = 0.25;
+
 export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
   const head = boneMap.get('Head');
   if (!head) return;
-
-  const left = landmarks[LANDMARK.LEFT_EAR];
-  const right = landmarks[LANDMARK.RIGHT_EAR];
-  if (!left || !right || left.visibility < MIN_VISIBILITY || right.visibility < MIN_VISIBILITY) {
-    return;
-  }
-
-  // BlazePose z is depth relative to the hips with a *smaller* value meaning
-  // *closer* to the camera (see the coordinate-system note in retarget()
-  // below). Turning the head so the right ear leads — moves toward the
-  // camera, so smaller z — should read as a positive yaw in Three.js's
-  // right-handed convention (counter-clockwise looking down +Y), which is
-  // (left.z - right.z): right ear closer makes this positive. Untested
-  // against a real camera; this sign is derived from the same convention
-  // note retarget() already relies on, not independently verified here.
-  const depthDiff = left.z - right.z;
-  const magnitude = Math.min(Math.abs(depthDiff), EAR_DEPTH_AT_MAX_YAW);
-  if (magnitude < EAR_DEPTH_DEADZONE) {
-    head.quaternion.identity();
-    head.updateWorldMatrix(false, true);
-    return;
-  }
-
-  const t = (magnitude - EAR_DEPTH_DEADZONE) / (EAR_DEPTH_AT_MAX_YAW - EAR_DEPTH_DEADZONE);
-  const yaw = Math.sign(depthDiff) * t * MAX_HEAD_YAW;
 
   scratch.headYawAxis ??= new THREE.Vector3();
   scratch.headParentWorldQuat ??= new THREE.Quaternion();
   scratch.headYawQuat ??= new THREE.Quaternion();
   const { headYawAxis, headParentWorldQuat, headYawQuat } = scratch;
+
+  const left = landmarks[LANDMARK.LEFT_EAR];
+  const right = landmarks[LANDMARK.RIGHT_EAR];
+  const tracked =
+    left && right && left.visibility >= MIN_VISIBILITY && right.visibility >= MIN_VISIBILITY;
+
+  // Losing track of either ear used to leave Head's quaternion untouched —
+  // frozen at whatever the last confident frame computed, which on a real
+  // camera reads as the head getting stuck turned and never coming back to
+  // front, because a real turn is exactly when BlazePose tends to lose
+  // confidence on the far ear. Falling through to yaw = 0 here instead means
+  // a lost ear eases Head back toward front through the same slerp below,
+  // rather than holding the last value forever.
+  let yaw = 0;
+  if (tracked) {
+    // BlazePose z is depth relative to the hips with a *smaller* value
+    // meaning *closer* to the camera (see the coordinate-system note in
+    // retarget() below). Turning the head so the right ear leads — moves
+    // toward the camera, so smaller z — should read as a positive yaw in
+    // Three.js's right-handed convention (counter-clockwise looking down
+    // +Y), which is (left.z - right.z): right ear closer makes this
+    // positive. Untested against a real camera; this sign is derived from
+    // the same convention note retarget() already relies on, not
+    // independently verified here.
+    const depthDiff = left.z - right.z;
+    const magnitude = Math.min(Math.abs(depthDiff), EAR_DEPTH_AT_MAX_YAW);
+    if (magnitude >= EAR_DEPTH_DEADZONE) {
+      const t = (magnitude - EAR_DEPTH_DEADZONE) / (EAR_DEPTH_AT_MAX_YAW - EAR_DEPTH_DEADZONE);
+      yaw = Math.sign(depthDiff) * t * MAX_HEAD_YAW;
+    }
+  }
 
   // The axis to twist about is world-up, not Head's own local Y: the rig's
   // rest pose is not guaranteed to have the bone's local axes aligned with
@@ -206,7 +227,7 @@ export function applyHeadYaw(landmarks, boneMap, THREE, scratch) {
   head.parent.getWorldQuaternion(headParentWorldQuat);
   headYawAxis.set(0, 1, 0).applyQuaternion(headParentWorldQuat.clone().invert()).normalize();
   headYawQuat.setFromAxisAngle(headYawAxis, yaw);
-  head.quaternion.copy(headYawQuat);
+  head.quaternion.slerp(headYawQuat, HEAD_YAW_SLERP);
   head.updateWorldMatrix(false, true);
 }
 
