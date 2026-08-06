@@ -178,6 +178,35 @@ in the masthead role.
   breakpoints, reduced motion, Lighthouse, and that real-camera pass) have
   not yet been run.
 
+### F04: Twin → [F04_TWIN.md](F04_TWIN.md)
+
+A downloadable 3D copy of the visitor's own face, reached by a link from
+`mocap.html` rather than a third masthead word.
+
+- MediaPipe's Face Landmarker, run through `@mediapipe/tasks-vision`
+  (a second, independent vendored runtime, argued separately from
+  `js/mocap.js`'s LiteRT.js), turns a webcam capture into 468 landmark
+  positions in a fixed topology matching a vendored canonical face mesh.
+  Nothing is uploaded, for the same structural reason Ask's question and
+  Echo's video frame never are.
+- The visitor's own landmark positions deform the canonical mesh; the
+  visitor's own captured frame is baked onto its existing UVs. This is a
+  digital twin, not a puppeted avatar: there is no separate character and
+  nothing here is driven by expression.
+- Stylization is canvas/geometry-level filtering only — no generative model.
+  Export is a client-side `THREE.GLTFExporter` → `Blob` → `<a download>`,
+  never a fetch.
+- **Status: spec only.** Nothing is committed yet. The first thing any
+  implementation must confirm, before writing a second line of code, is
+  whether `@mediapipe/tasks-vision`'s WASM runs on GitHub Pages with no
+  `SharedArrayBuffer` and no COOP/COEP — unverified as of this writing. A
+  front-only milestone (capture, deform, bake, stylize, export) is scoped to
+  ship independently of a second, multi-angle milestone that depends on a
+  real-camera measurement of how far a turned head still yields a detection,
+  not an assumed angle. Full detail, including the scope cuts and why
+  multi-angle capture only ever extends texture and never geometry, is in
+  F04_TWIN.md.
+
 ## Verification
 
 There is no test suite for the site itself. The mechanical invariants are checked
