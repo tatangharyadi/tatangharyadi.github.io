@@ -17,7 +17,6 @@
 // fetch(). See specs/F04_TWIN.md#the-vendored-bundle-phones-home-and-the-mitigation.
 
 import * as THREE from 'three';
-import { OBJLoader } from '../vendor/three/examples/jsm/loaders/OBJLoader.js';
 import { GLTFExporter } from '../vendor/three/examples/jsm/exporters/GLTFExporter.js';
 import { FaceLandmarker, FilesetResolver } from '../vendor/mediapipe/tasks-vision/vision_bundle.mjs';
 
@@ -73,25 +72,62 @@ async function loadFaceLandmarker() {
 /* Canonical mesh                                                             */
 /* -------------------------------------------------------------------------- */
 
-// OBJLoader's own object model dedupes nothing for this file: every face in
-// canonical_face_model.obj already maps each vertex to exactly one UV (no
-// seams — verified by walking the file: 468 v, 468 vt, every f line pairing
-// a given v index with the same vt index everywhere it appears), so building
-// straight off the parsed BufferGeometry's own position/uv attributes is
-// exact, not an approximation of the raw file.
-async function loadCanonicalMesh() {
-  const loader = new OBJLoader();
-  const object = await loader.loadAsync(CANONICAL_MESH_URL);
-  const mesh = object.children.find((child) => child.isMesh);
-  if (!mesh) throw new Error('canonical_face_model.obj parsed with no mesh in it');
-  const geometry = mesh.geometry;
-  const positionAttr = geometry.attributes.position;
+// Three.js's own OBJLoader is not used here. It builds a *non-indexed*
+// BufferGeometry — one position/uv entry per face-corner rather than per
+// unique OBJ vertex — because that is the representation general OBJ meshes
+// (which can have multiple UVs per vertex) need. canonical_face_model.obj
+// has none of that ambiguity: every face in the file already maps each
+// vertex to exactly one UV (verified by walking the file: 468 v, 468 vt,
+// every f line pairing a given v index with the same vt index everywhere it
+// appears), so this file parses it directly into an *indexed* geometry that
+// keeps the OBJ's original 468 unique vertices as 468 unique positions. That
+// indexed vertex count is what F04-AC02's guard and deformToLandmarks() both
+// depend on to line landmark index i up with mesh vertex index i; the
+// flattened, per-corner count OBJLoader would have produced (898 faces x 3 =
+// 2694) breaks that correspondence outright.
+function parseCanonicalObj(text) {
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+  const vertexUv = [];
 
-  // FaceLandmarker's landmark count is read off the actual result at capture
-  // time and diffed against this, never assumed to be 468 — see F04-AC02 and
-  // the note in captureFront() below. positionAttr.count is this mesh's own
-  // vertex count, read the same way rather than hardcoded.
-  return { geometry, vertexCount: positionAttr.count };
+  for (const line of text.split('\n')) {
+    if (line.startsWith('v ')) {
+      const [, x, y, z] = line.trim().split(/\s+/);
+      positions.push(Number(x), Number(y), Number(z));
+    } else if (line.startsWith('vt ')) {
+      const [, u, v] = line.trim().split(/\s+/);
+      uvs.push(Number(u), Number(v));
+    } else if (line.startsWith('f ')) {
+      const corners = line.trim().split(/\s+/).slice(1);
+      for (const corner of corners) {
+        const [vStr, vtStr] = corner.split('/');
+        const vIndex = Number(vStr) - 1;
+        const vtIndex = Number(vtStr) - 1;
+        indices.push(vIndex);
+        // Written once per vertex is enough: the file's own no-seam property
+        // (see above) means every occurrence of this v index carries the
+        // same vt index anyway.
+        vertexUv[vIndex] = [uvs[vtIndex * 2], uvs[vtIndex * 2 + 1]];
+      }
+    }
+  }
+
+  const vertexCount = positions.length / 3;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(vertexUv.flat()), 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+
+  return { geometry, vertexCount };
+}
+
+async function loadCanonicalMesh() {
+  const response = await fetch(CANONICAL_MESH_URL);
+  if (!response.ok) throw new Error(`Could not fetch ${CANONICAL_MESH_URL}: ${response.status}`);
+  const text = await response.text();
+  return parseCanonicalObj(text);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -412,6 +448,10 @@ async function captureFront() {
 
       await nextFrame();
     }
+  } catch (err) {
+    console.error(err);
+    els.status.textContent = `Could not capture: ${err.message}`;
+    return;
   } finally {
     capturing = false;
     els.captureFront.removeAttribute('aria-disabled');
