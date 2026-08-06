@@ -18,6 +18,7 @@
 
 import * as THREE from 'three';
 import { GLTFExporter } from '../vendor/three/examples/jsm/exporters/GLTFExporter.js';
+import { OrbitControls } from '../vendor/three/examples/jsm/controls/OrbitControls.js';
 import { FaceLandmarker, FilesetResolver } from '../vendor/mediapipe/tasks-vision/vision_bundle.mjs';
 
 const WASM_BASE = 'vendor/mediapipe/tasks-vision/wasm';
@@ -336,7 +337,6 @@ function applyStylize(preset) {
   texture.needsUpdate = true;
   mesh.material.flatShading = preset === 'flat';
   mesh.material.needsUpdate = true;
-  renderer.render(scene, camera);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -346,8 +346,10 @@ function applyStylize(preset) {
 let renderer = null;
 let scene = null;
 let camera = null;
+let controls = null;
 let mesh = null;
 let texture = null;
+let animationFrameId = null;
 
 function setupScene(geometry) {
   scene = new THREE.Scene();
@@ -374,9 +376,28 @@ function setupScene(geometry) {
 
   renderer = new THREE.WebGLRenderer({ canvas: els.stage, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  // The static front-on framing above is still the default view — this only
+  // adds drag-to-orbit around the mesh's own center. Damping needs a render
+  // every frame rather than the render-once-per-action calls the rest of
+  // this file used before, which is why setupScene now starts a
+  // requestAnimationFrame loop instead of calling renderer.render() itself.
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.copy(center);
+  controls.enableDamping = true;
+  controls.minDistance = distance * 0.4;
+  controls.maxDistance = distance * 3;
+  controls.update();
+
   resizeRenderer();
   window.addEventListener('resize', resizeRenderer);
+  renderLoop();
+}
+
+function renderLoop() {
+  controls.update();
   renderer.render(scene, camera);
+  animationFrameId = requestAnimationFrame(renderLoop);
 }
 
 function resizeRenderer() {
@@ -385,7 +406,6 @@ function resizeRenderer() {
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.render(scene, camera);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -477,7 +497,6 @@ async function captureFront() {
   hasCapture = true;
   els.download.removeAttribute('aria-disabled');
   els.status.textContent = 'Captured. Pick a style, or download as-is.';
-  renderer.render(scene, camera);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -565,6 +584,10 @@ function stop() {
   els.video.srcObject = null;
 
   window.removeEventListener('resize', resizeRenderer);
+  if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
+  animationFrameId = null;
+  controls?.dispose();
+  controls = null;
   renderer?.dispose();
   renderer = null;
   scene = null;
