@@ -9,8 +9,8 @@ A static personal site: plain HTML and CSS, no build step, no package manager,
 served by GitHub Pages from `main`. There is nothing to install and nothing to
 compile. Edit the files directly.
 
-**There are exactly two JavaScript files of our own: `js/ask.js` and
-`js/game.js`.** Everything else — the work index on the home page — is
+**There are exactly five JavaScript files of our own: `js/ask.js`, `js/game.js`,
+`js/mocap.js`, `js/mocap-retarget.js` and `js/twin.js`.** Everything else — the work index on the home page — is
 [htmx](https://htmx.org) asking for static HTML fragments under `fragments/` and
 swapping them in. htmx arrives from a CDN pinned by version and SRI digest.
 
@@ -58,6 +58,48 @@ this is worth attempting, the hash file carries the rustc version that produced
 the committed binary on a second line, written by the script rather than kept by
 hand. A different rustc gives a different hash, and that is not a fault: it is
 why the version is recorded.
+
+`js/mocap.js` earns the third exception on the same grounds as `js/game.js`: it
+is a boundary and a renderer, nothing more. It asks the browser for a camera,
+asks LiteRT.js (running MediaPipe's BlazePose) to turn each video frame into 33
+body landmarks, and asks Three.js to draw a rigged character. Nothing captured
+here is sent anywhere — there is no endpoint this page talks to at all, the same
+structural privacy property `js/ask.js` has for the same reason: the model, the
+runtime and the character are fetched same-origin, once, and every frame after
+that is inference against WebAssembly already sitting in the tab. GitHub Pages
+cannot set the COOP/COEP headers cross-origin isolation needs, so only the two
+non-threaded LiteRT WASM builds are reachable — the same constraint `js/ask.js`
+already lives under with `onnxruntime`.
+
+`js/mocap-retarget.js` earns the fourth exception on different grounds, and they
+are worth stating precisely because this file is not a boundary the way the other
+three are. Turning a landmark pair into a bone rotation is a rule with a real
+failure mode if it is wrong, so it is not folded into `js/mocap.js`'s "instantiate,
+call, draw" framing — it is argued on its own terms in
+[specs/F03_MOCAP.md](specs/F03_MOCAP.md). It touches no DOM and makes no network
+call; its only inputs are landmark coordinates, a bone map and a Three.js
+namespace, which is what keeps it a rule and not a second boundary.
+
+`js/twin.js` earns the fifth exception on the same "boundary and renderer"
+grounds as `js/mocap.js`: camera in, MediaPipe Tasks Vision out, Three.js
+draws the result, `GLTFExporter` writes the download. It is a second,
+independent ML runtime rather than a reuse of `js/mocap.js`'s LiteRT — argued
+from scratch in [specs/F04_TWIN.md](specs/F04_TWIN.md#why-this-earns-a-new-runtime-instead-of-reusing-echos)
+because Twin needs MediaPipe Tasks' `face_geometry` calculator output, which
+LiteRT.js's low-level surface never computes.
+
+Unlike the other four, this boundary is not structurally leak-proof by
+vendoring alone. The vendored bundle carries its own usage-telemetry client
+that attempts a real cross-origin `fetch()` to a Google-controlled endpoint
+during ordinary inference, with no consumer-facing opt-out — see
+[specs/F04_TWIN.md](specs/F04_TWIN.md#the-vendored-bundle-phones-home-and-the-mitigation)
+for how that was traced. `twin.html` closes that gap with a page-level
+`Content-Security-Policy` meta tag scoped to `connect-src 'self' blob:`,
+which makes the browser refuse the request outright. This is the one place
+on the site where "vendored means same-origin means private" needed a second
+mechanism to actually be true, and the CSP violation line it produces in the
+console is deliberate, not a regression — see that section before "cleaning
+up" the console output on `twin.html`.
 
 Do not introduce a bundler, framework or package manager to solve a problem that a
 few lines of CSS would solve. The absence of a toolchain is a design decision, not

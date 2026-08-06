@@ -234,23 +234,27 @@ nav .logo a:hover {
   margin-bottom: 1.5rem;
 }
 
-/* The role is a link to game.html and looks like plain text until you touch it.
-   Undecorated links are usually a mistake, because a reader cannot find what
-   they cannot see. This one is deliberate and the trade is stated in the
-   markup: the target is a game, nobody needs it to read the page, and the
-   visitor who does want it is the one who hovers a title or tabs a page.
+/* Two words of the role are links, one to game.html and one to mocap.html, and
+   both look like plain text until you touch them. Undecorated links are
+   usually a mistake, because a reader cannot find what they cannot see. This
+   one is deliberate and the trade is stated in the markup: the targets are an
+   easter egg each, nobody needs either to read the page, and the visitor who
+   does want them is the one who hovers a title or tabs a page.
 
    Hidden is not the same as unreachable. Only text-decoration is touched, so
    the focus ring is whatever every other link on this site gets, which is the
    browser's own — measured identical to the nav's. The underline comes back on
    hover as well, so a wandering mouse finds it too. */
-.masthead--helm {
+.masthead--helm,
+.masthead--echo {
   color: inherit;
   text-decoration: none;
 }
 
 .masthead--helm:hover,
-.masthead--helm:focus-visible {
+.masthead--helm:focus-visible,
+.masthead--echo:hover,
+.masthead--echo:focus-visible {
   text-decoration: underline;
   text-underline-offset: 0.25em;
 }
