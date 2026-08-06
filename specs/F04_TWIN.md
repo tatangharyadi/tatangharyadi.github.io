@@ -1,8 +1,12 @@
 # F04: Twin, a downloadable 3D copy of the visitor's own face
 
-**Status:** spec only. Nothing under this feature exists yet — no page, no
-script, no vendored runtime, no committed model. This document is the design
-that a future scaffolding pass would implement against, in the same role
+**Status:** runtime vendored (`vendor/mediapipe/tasks-vision/`,
+`vendor/three/examples/jsm/{loaders/OBJLoader.js,exporters/GLTFExporter.js,utils/TextureUtils.js}`),
+`AGENTS.md`'s exception paragraph for `js/twin.js` written, and the telemetry
+risk below traced and mitigated. No page, script, or committed model yet —
+`twin.html`, `css/twin.css`, `js/twin.js` and the two `assets/models/*` files
+in the table below remain to be written. This document is the design that
+the scaffolding pass writing them would implement against, in the same role
 `F03_MOCAP.md` played before `mocap.html` was wired up.
 
 **Before any of this is built**, the first thing to run is F04-AC01 below: load
@@ -100,7 +104,7 @@ the masthead's two doors are plain links.
 visitor presses #twin--load
         │
         ├─ getUserMedia({video: true})
-        ├─ FilesetResolver.forVisionTasks('vendor/mediapipe/tasks-vision/')
+        ├─ FilesetResolver.forVisionTasks('vendor/mediapipe/tasks-vision/wasm')
         │        └─ FaceLandmarker.createFromOptions({ modelAssetPath: FACE_MODEL_URL,
         │                                                outputFaceBlendshapes: false,
         │                                                outputFacialTransformationMatrixes: false })
@@ -133,6 +137,14 @@ visitor presses #twin--capture-front
    #twin--download: THREE.GLTFExporter → ArrayBuffer → Blob →
    URL.createObjectURL → <a download> click → revokeObjectURL
 ```
+
+`FilesetResolver.forVisionTasks()`'s internal path builder appends
+`vision_{wasm|wasm_nosimd}_internal.{js,wasm}` directly onto the base path
+with no `wasm/` segment of its own — confirmed by reading the builder in
+`vendor/mediapipe/tasks-vision/vision_bundle.mjs`. The base path passed in
+above is therefore `.../tasks-vision/wasm`, matching where those four files
+are actually vendored, not the parent `tasks-vision/` directory the model
+and license file live in.
 
 ### Milestone 2: multi-angle capture, deferred until milestone 1 ships
 
@@ -212,13 +224,75 @@ plus a re-entry guard flag, same as the other two features.
 
 ---
 
+## The vendored bundle phones home, and the mitigation
+
+`vendor/mediapipe/tasks-vision/vision_bundle.mjs` contains its own usage-
+telemetry client, independent of anything Twin's code calls. Traced by
+reading the minified source directly:
+
+- A per-task usage tracker (the class holding call latencies, internally
+  `Dh`) is instantiated unconditionally inside the same async path that
+  creates any vision task — the same `createFromOptions()` call Twin makes
+  for `FaceLandmarker`. There is no option on `BaseOptions` or anywhere else
+  in the consumer-facing API to skip this; grepping the bundle for
+  `disableTelemetry`, `optOut`, or any similarly-named flag returns nothing.
+- That tracker's constructor immediately creates a log batcher
+  (internally `Fh`), which starts a 60-second `setInterval` the moment it
+  exists and, on each tick, `fetch()`s a POST to
+  `https://odml.pa.googleapis.com/v1/log` with an `x-goog-api-key` header —
+  whatever value was passed in, which for Twin's planned code (no API key is
+  ever configured, per this spec) is empty or absent.
+- The batcher only sends when its queue is non-empty. The queue is filled by
+  a second, per-inference path: roughly every 30 seconds of wall-clock time
+  since the last flush, the next `detectForVideo()` call pushes an
+  aggregated latency entry. Twin calls `detectForVideo()` every rendered
+  frame during calibration capture, so the 30-second threshold is
+  reached on ordinary use, not just under sustained/batch inference.
+
+The practical consequence: creating a `FaceLandmarker` and calling
+`detectForVideo()` for more than ~30 seconds — which milestone 1's
+calibration-window averaging does by design — results in an outbound
+`fetch()` to a Google-controlled host, with no code-level way to prevent it
+from inside `js/twin.js`. This is a materially different situation from
+Echo's LiteRT.js or Ask's `onnxruntime`: those runtimes only ever fetch their
+own vendored, same-origin assets once; this runtime, once vendored, attempts
+a genuine cross-origin network call during normal operation regardless of
+what Twin's own code does or doesn't send it.
+
+**Mitigation: a page-level `Content-Security-Policy` meta tag on
+`twin.html`.** `<meta http-equiv="Content-Security-Policy" content="connect-src
+'self' blob:">` makes the browser itself refuse the `fetch()` before it
+leaves the tab — `'self'` covers the same-origin model/WASM fetches
+`FilesetResolver` and `FaceLandmarker.createFromOptions()` need, `blob:`
+covers anything in the vendored loader or `GLTFExporter`'s download path
+that resolves a `blob:` URL, and the omission of `odml.pa.googleapis.com`
+from either list is what turns F04-AC03 from a claim about what Twin's own
+code does into a claim enforced by the browser regardless of what the
+vendored dependency tries to do. This is why Twin needs a CSP meta tag
+neither `mocap.html` nor `ask.html` needed: their vendored runtimes never
+attempt an outbound fetch in the first place, so there was nothing for a CSP
+to block.
+
+**This shows up as a console line, on purpose.** A blocked request logs a
+CSP violation to the console. AGENTS.md's verification step 5 calls for a
+clean console; this is the one deliberate exception, and the reason is the
+inverse of what a clean-console rule is usually protecting against — the
+violation line is the visible proof the block fired, not evidence something
+is broken. Verifying F04-AC03 by hand means confirming that line is present
+(not merely confirming the network panel shows no successful request, since
+a same-origin-only network panel and a CSP-blocked network panel look
+identical there) and confirming no other, unexpected console output
+accompanies it.
+
+---
+
 ## Acceptance criteria
 
 | ID | Criterion | Evidence |
 | --- | --- | --- |
 | F04-AC01 | The vendored `@mediapipe/tasks-vision` WASM bundle loads and `detectForVideo()` runs with no `SharedArrayBuffer` and no COOP/COEP response headers. | Human, real browser, served the way GitHub Pages serves it — **run this before anything else in this spec is built** |
 | F04-AC02 | `FaceLandmarker`'s reported landmark count and index order match `canonical_face_model.obj`'s vertex count and order one-for-one before any deform code assumes it. | Human: log `landmarks.length` and diff against the loaded mesh's vertex count — do not assume 468; MediaPipe's newer landmark sets include iris points some canonical assets don't, and Echo already has a precedent (F03-AC09) for a silent, unthrown mismatch here |
-| F04-AC03 | The video frame, the landmarks and the exported mesh are never transmitted anywhere. | Structural, and a network panel with no third-party host, including at download |
+| F04-AC03 | The video frame, the landmarks and the exported mesh are never transmitted anywhere. | Enforced by `twin.html`'s CSP `connect-src` meta tag (see "The vendored bundle phones home, and the mitigation" above), not by the vendored bundle's own behaviour — verify both a CSP-violation console line for the blocked `odml.pa.googleapis.com` request and no successful third-party request in the network panel, including at download |
 | F04-AC04 | The download is a `Blob` URL consumed by a same-page `<a download>`, not a `window.open` or a fetch. | Structural: `js/twin.js` |
 | F04-AC05 | None of `#twin--load`, `#twin--capture-front`, `#twin--download`, `#twin--stop` use the `disabled` property; focus survives camera grant, load, capture and export. | Human, keyboard traversal |
 | F04-AC06 | `twin.html` has no `nav-links--container`, matching `ask.html`/`mocap.html`'s precedent, so `check_repo.py`'s nav check does not need updating for it. | Structural, `scripts/check_repo.py` |
@@ -236,4 +310,3 @@ plus a re-entry guard flag, same as the other two features.
 | Parallax-based geometry refinement from multiple captures | Real additional work, not folded into milestone 2's texture-only scope. |
 | Hair, eyewear, accessory modeling | Canonical mesh has none; would need a different asset entirely. |
 | A stylized-avatar-driven-by-expression mode (reusing Echo's retargeting pattern against Face Landmarker's blendshapes) | A different, less advanced feature considered and set aside earlier in this feature's design discussion — Twin is a copy of the visitor's own face, not a puppeted character. |
-| `AGENTS.md`'s JavaScript-exception paragraph for `js/twin.js` | Not yet written. Belongs to the implementation PR that actually adds the file, argued from scratch the way `js/mocap.js`'s and `js/mocap-retarget.js`'s paragraphs were, not copied from this spec. |
