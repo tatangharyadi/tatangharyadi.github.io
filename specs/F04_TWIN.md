@@ -60,6 +60,19 @@ from the other costs nothing structural and needs no new "hidden word."
 `twin.html` still gets its own entry in `sitemap.xml` and its own page, same
 as `mocap.html` — it is just not a second easter egg.
 
+A separate chooser/landing page for "pick Echo or Twin" ahead of both was
+considered and rejected: it would add a third page, a third `sitemap.xml`
+entry and a third nav-check exemption for a single decision point, and it
+would force the masthead's `aria-label` on the "Officer" link — currently
+specific ("Echo: puppet a 3D character with your own movement, on device")
+— into something generic covering two features of very different
+readiness. Echo is shipped; Twin, as of this spec, is not. Presenting them
+as two equally-weighted doors overstates how done Twin is. The link lives
+inside `mocap.html`, framed as "also try," not as a mode switch — something
+close to *"Want a copy of your own face instead?"* — and is a plain `<a
+href="twin.html">`, not an htmx trigger, for the same JavaScript-off reason
+the masthead's two doors are plain links.
+
 ---
 
 ## Key files (none committed yet)
