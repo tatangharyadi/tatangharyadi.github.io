@@ -319,6 +319,45 @@ motionless?). Whatever those numbers show is what should drive the next
 change to `MIN_EYE_SPAN`, `RAW_GAZE_MEDIAN_WINDOW`, `IRIS_X_EMA_ALPHA`, or a
 different mechanism entirely — not another guess.
 
+### The numbers point away from the raw pipeline and at the calibration map
+
+A real session sent back two `?debug=1` readings, both captioned "eyes
+still": `smoothedGazeX` read 0.480 then 0.483, a delta of 0.003 — about one
+pixel of paddle travel on a 390px track. `dropped frames` stayed at 0 in
+both, ruling out the guard-flicker and blink theories above outright: there
+was no discontinuity to distinguish from noise, because there was no visible
+discontinuity in `smoothedGazeX` at all. The raw per-eye ratios wandered
+more (right ratio 0.479→0.490, left 0.572→0.548), but that is exactly what
+the median and EMA stages exist to absorb, and the numbers show them doing
+it.
+
+So two fixes were aimed at a stage that, on this evidence, was never the
+problem. The one stage `renderDebug()` didn't expose is `calibratedX()`:
+
+```js
+const t = (x - calMin) / (calMax - calMin);
+```
+
+`CAL_MIN_SEPARATION` only requires `calMax - calMin` to exceed 0.03 for a
+capture to be accepted. A visitor whose two calibration presses landed at,
+say, 0.04 apart has a gain of `1 / 0.04 = 25x` between `smoothedGazeX` and
+the paddle fraction. The 0.003 wander measured above, at that gain, is 0.075
+of the track — visible, constant, uncorrelated with anything the visitor's
+eyes are doing, and reproduced by a signal that the same numbers show is
+otherwise nearly still. This would explain why both prior fixes — each
+aimed upstream of `calibratedX()` — changed nothing a visitor could see.
+
+`renderDebug()` now also prints `calMin`, `calMax`, their difference, the
+resulting gain, and the final `paddle fraction` (`calibratedX(smoothedGazeX)`
+itself), so the next real session can confirm or kill this directly instead
+of us reasoning about it from `CAL_MIN_SEPARATION`'s value alone. Two
+numbers settle it: `calMax - calMin` from that session's own calibration,
+and whether `paddle fraction` swings by roughly `gain × 0.003` while the
+eyes are still. If confirmed, the fix is raising `CAL_MIN_SEPARATION` (to
+bound gain, at the cost of forcing a visitor with a genuinely narrow range
+to use "Skip calibration" instead) — not another change to the filtering
+constants above, which the evidence so far says were never the amplifier.
+
 ---
 
 ## The vendored bundle phones home, and Iris inherits the mitigation

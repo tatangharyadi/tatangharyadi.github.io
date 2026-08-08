@@ -301,10 +301,20 @@ function fmt(n) {
 }
 
 function renderDebug(f) {
+    // calMax - calMin is the thing to watch: calibratedX divides by it, so a
+    // narrow-but-passing capture (anything just above CAL_MIN_SEPARATION)
+    // turns ordinary smoothedGazeX wander into a much larger paddle swing.
+    // Two "fix" commits both targeted rawX/medianX/smoothedGazeX upstream of
+    // this and neither held — this line is here to test the theory that the
+    // amplifier was downstream of all of them the whole time.
+    const range = calMin === null ? null : calMax - calMin;
+    const gain = range === null ? 1 : 1 / range;
     els.debug.textContent =
         `right ratio ${fmt(f.rightRatio)}  span ${fmt(f.rightSpan)}\n` +
         `left  ratio ${fmt(f.leftRatio)}  span ${fmt(f.leftSpan)}\n` +
         `raw ${fmt(f.rawX)}  median ${fmt(f.medianX)}  smoothed ${fmt(smoothedGazeX)}\n` +
+        `calMin ${fmt(calMin)}  calMax ${fmt(calMax)}  range ${fmt(range)}  gain ${gain.toFixed(1)}x\n` +
+        `paddle fraction ${fmt(calibratedX(smoothedGazeX))}\n` +
         `dropped frames (both eyes unreliable): ${droppedFrames}`;
 }
 
