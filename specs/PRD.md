@@ -196,12 +196,10 @@ A downloadable 3D copy of the visitor's own face, reached by a link from
 - Stylization is canvas/geometry-level filtering only — no generative model.
   Export is a client-side `THREE.GLTFExporter` → `Blob` → `<a download>`,
   never a fetch.
-- **Status: spec only.** Nothing is committed yet. The first thing any
-  implementation must confirm, before writing a second line of code, is
-  whether `@mediapipe/tasks-vision`'s WASM runs on GitHub Pages with no
-  `SharedArrayBuffer` and no COOP/COEP — unverified as of this writing. A
-  front-only milestone (capture, deform, bake, stylize, export) is scoped to
-  ship independently of a second, multi-angle milestone that depends on a
+- **Status: shipped** (PR #24, 2026-08-06) — `twin.html`, `css/twin.css`,
+  `js/twin.js` and the vendored `@mediapipe/tasks-vision` runtime are all on
+  `main`. The front-only milestone (capture, deform, bake, stylize, export)
+  is live; a second, multi-angle milestone remains deferred, gated on a
   real-camera measurement of how far a turned head still yields a detection,
   not an assumed angle. Full detail, including the scope cuts and why
   multi-angle capture only ever extends texture and never geometry, is in
@@ -229,12 +227,15 @@ already reports and discards.
   browser's own `speechSynthesis` with no vendored runtime and no download,
   since voice availability is already whatever the visitor's OS/browser
   ships.
-- **Status: spec only.** Nothing is committed yet. The first thing any
-  implementation must confirm, before writing a second line of code, is
-  whether the iris landmarks are stable enough frame-to-frame, once
-  smoothed, to drive a paddle without a dwell-style discretization. Where a
-  visitor reaches the page from is an open question, listed in Deferred in
-  F05_IRIS.md rather than resolved here.
+- **Status: spec only.** Nothing is committed yet. The committed
+  `face_landmarker.task`'s landmark-detector output tensor is confirmed
+  `[1,1,1,1434]` (1434 = 478 × 3 coordinates), so the 478-landmark, iris-
+  included premise this spec depends on is structural, not assumed. What the
+  first implementation must still confirm, before writing a second line of
+  code, is whether those iris landmarks are stable enough frame-to-frame,
+  once smoothed, to drive a paddle without a dwell-style discretization.
+  Where a visitor reaches the page from is an open question, listed in
+  Deferred in F05_IRIS.md rather than resolved here.
 
 ## Verification
 

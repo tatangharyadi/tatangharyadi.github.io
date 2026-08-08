@@ -1,20 +1,20 @@
 # F04: Twin, a downloadable 3D copy of the visitor's own face
 
-**Status:** runtime vendored (`vendor/mediapipe/tasks-vision/`,
+**Status:** shipped. `twin.html`, `css/twin.css`, `js/twin.js`, the two
+`assets/models/*` files, the vendored runtime
+(`vendor/mediapipe/tasks-vision/`,
 `vendor/three/examples/jsm/{loaders/OBJLoader.js,exporters/GLTFExporter.js,utils/TextureUtils.js}`),
-`AGENTS.md`'s exception paragraph for `js/twin.js` written, and the telemetry
-risk below traced and mitigated. No page, script, or committed model yet —
-`twin.html`, `css/twin.css`, `js/twin.js` and the two `assets/models/*` files
-in the table below remain to be written. This document is the design that
-the scaffolding pass writing them would implement against, in the same role
-`F03_MOCAP.md` played before `mocap.html` was wired up.
+`AGENTS.md`'s exception paragraph for `js/twin.js`, and the telemetry
+mitigation below (`twin.html`'s CSP `connect-src` meta tag) are all merged to
+`main` (PR #24, 2026-08-06). This document remains the design record those
+files implement against, in the same role `F03_MOCAP.md` plays for
+`mocap.html`.
 
-**Before any of this is built**, the first thing to run is F04-AC01 below: load
-the vendored `@mediapipe/tasks-vision` WASM bundle on a page served the same
-way GitHub Pages serves this site (no COOP/COEP, no `SharedArrayBuffer`) and
-confirm `FaceLandmarker.detectForVideo()` actually runs. Everything past that
-point assumes it does. If it doesn't, this spec's runtime choice needs
-revisiting before a second line of `js/twin.js` gets written.
+F04-AC01 below — that the vendored `@mediapipe/tasks-vision` WASM bundle
+loads and `FaceLandmarker.detectForVideo()` runs on a page served the way
+GitHub Pages serves this site, with no COOP/COEP and no `SharedArrayBuffer`
+— was the first thing confirmed before `js/twin.js` was written, and holds
+in the shipped code.
 
 ---
 

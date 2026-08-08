@@ -5,13 +5,20 @@
 pass would implement against, in the same role `F03_MOCAP.md` played before
 `mocap.html` was wired up and `F04_TWIN.md` plays for `js/twin.js` today.
 
-**Before any of this is built**, confirm F05-AC01 below: that the iris
-landmarks (indices 468–477) Twin's already-vendored `FaceLandmarker` reports
-alongside its 468 face-mesh points are stable enough, frame to frame, to
-drive a paddle without the dwell/blink-style discretization other
-gaze-controlled games (Eye Aim Arena, evaluated separately) reach for.
-Everything past that point assumes plain per-frame iris position, smoothed,
-is enough.
+The premise that the iris landmarks exist at all is no longer assumed: the
+committed `assets/models/face-landmarker/face_landmarker.task`'s
+`face_landmarks_detector.tflite` was extracted and its output tensor
+inspected directly (`Interpreter.get_output_details()`), returning shape
+`[1, 1, 1, 1434]` — 1434 = 478 × 3 coordinates, confirming 478 landmarks
+(468 face-mesh points plus the 10 iris points at indices 468–477) come out
+of this exact committed model file, independent of any runtime flag. See
+F05-AC01.
+
+**Before any of this is built**, confirm F05-AC02 below: that those iris
+landmarks are stable enough, frame to frame, to drive a paddle without the
+dwell/blink-style discretization other gaze-controlled games (Eye Aim Arena,
+evaluated separately) reach for. Everything past that point assumes plain
+per-frame iris position, smoothed, is enough.
 
 ---
 
@@ -85,7 +92,7 @@ first draft.
 
 | File | Role |
 | --- | --- |
-| `iris.html` | The page: camera gate, canvas, paddle/ball/brick rendering, score/status region |
+| `iris.html` | The page: camera gate, canvas, paddle/ball/brick rendering, score/status region, and the `connect-src 'self' blob:` CSP meta tag (see "The vendored bundle phones home" below) |
 | `css/iris.css` | Stage/gate layout. No colour of its own beyond the shared palette. |
 | `js/iris.js` | Camera acquisition, Tasks Vision load (reusing Twin's `FaceLandmarker` boundary shape), iris-position smoothing, game loop, `speechSynthesis` calls |
 
@@ -159,6 +166,39 @@ made Breakout the right classic-game fit for this input in the first place
 
 ---
 
+## The vendored bundle phones home, and Iris inherits the mitigation
+
+Reusing Twin's runtime means reusing its risk, not just its capability.
+`vendor/mediapipe/tasks-vision/vision_bundle.mjs` contains a usage-telemetry
+client instantiated unconditionally inside `createFromOptions()` — the same
+call both `js/twin.js` and a prospective `js/iris.js` make. That client
+starts a 60-second flush interval on creation and, roughly every 30 seconds
+of wall-clock time since the last flush, the next `detectForVideo()` call
+queues a POST to `https://odml.pa.googleapis.com/v1/log`. There is no
+consumer-facing option to disable it (see `F04_TWIN.md`'s "The vendored
+bundle phones home, and the mitigation" for the full trace, kept there as
+the canonical write-up while `js/twin.js` still ships).
+
+Twin only reaches the 30-second threshold during its calibration window.
+Iris calls `detectForVideo()` every rendered frame for as long as a game
+runs — a strictly longer, harder-to-avoid exposure than Twin's. So
+`iris.html` needs the same mitigation Twin needed, more certainly than Twin
+did: a page-level `<meta http-equiv="Content-Security-Policy"
+content="connect-src 'self' blob:">` tag, which makes the browser refuse the
+`fetch()` before it leaves the tab. `'self'` covers the same-origin
+model/WASM fetches `FilesetResolver` and `FaceLandmarker.createFromOptions()`
+need; the omission of `odml.pa.googleapis.com` is what turns F05-AC04 into a
+claim the browser enforces, not one that depends on the vendored dependency
+behaving. As with Twin, the blocked request logs a CSP violation to the
+console on purpose — AGENTS.md's clean-console verification step treats this
+one case as the expected, visible proof the block fired, not as a defect.
+
+If Twin's files and `F04_TWIN.md` are deleted as part of Twin's retirement
+before this section is next revised, the paragraph above — not the
+cross-reference — is the part of the record that must survive that deletion.
+
+---
+
 ## The DOM contract
 
 Same shape as `#echo--*` and `#twin--*`: every id looked up once, at module
@@ -186,13 +226,14 @@ plus a re-entry guard flag, same as the other three features.
 
 | ID | Criterion | Evidence |
 | --- | --- | --- |
-| F05-AC01 | Iris landmarks (468–477) from Twin's already-vendored `FaceLandmarker` are stable enough frame-to-frame, after EMA smoothing, to drive continuous paddle movement without a dwell timer. | Human, real camera, real browser — **run this before anything else in this spec is built** |
-| F05-AC02 | No new file is vendored under `vendor/` or `assets/models/`; `js/iris.js` loads the same `face_landmarker.task` already committed for Twin. | Structural: diff against `git status` after implementation |
-| F05-AC03 | The video frame and landmarks are never transmitted anywhere. | Same structural privacy claim as Echo/Twin; no CSP mitigation is needed unless Iris's own vendored-bundle telemetry risk (see `F04_TWIN.md`'s "vendored bundle phones home" section) reapplies here — verify it does, since it's the same bundle |
-| F05-AC04 | Spoken lines are read from a small authored, fixed set, never generated at runtime. | Structural: `js/iris.js` |
-| F05-AC05 | None of `#iris--load`, `#iris--stop` use the `disabled` property; focus survives camera grant and load. | Human, keyboard traversal |
-| F05-AC06 | `iris.html` is listed in `sitemap.xml`. | `scripts/check_repo.py`, CI |
-| F05-AC07 | Contrast holds at 4.5:1 for text in both flavours, checked against Latte. | Human, per colour scheme |
+| F05-AC01 | The committed `face_landmarker.task`'s detector emits 478 landmarks (468 face mesh + 10 iris, indices 468–477), not 468. | **Verified 2026-08-09**: `face_landmarks_detector.tflite` extracted from the `.task` bundle and its output tensor inspected — shape `[1, 1, 1, 1434]`, 1434 = 478 × 3 |
+| F05-AC02 | Iris landmarks (468–477) from Twin's already-vendored `FaceLandmarker` are stable enough frame-to-frame, after EMA smoothing, to drive continuous paddle movement without a dwell timer. | Human, real camera, real browser — **run this before anything else in this spec is built** |
+| F05-AC03 | No new file is vendored under `vendor/` or `assets/models/`; `js/iris.js` loads the same `face_landmarker.task` already committed for Twin. | Structural: diff against `git status` after implementation |
+| F05-AC04 | The video frame and landmarks are never transmitted anywhere, including the same `odml.pa.googleapis.com` telemetry call the vendored `@mediapipe/tasks-vision` bundle makes unconditionally after ~30s of `detectForVideo()` (see "The vendored bundle phones home" above). `iris.html` ships the same `<meta http-equiv="Content-Security-Policy" content="connect-src 'self' blob:">` tag `twin.html` uses — Iris calls `detectForVideo()` every frame for the whole game, strictly longer exposure than Twin's calibration window, so this is required, not conditional. | Verify a CSP-violation console line for the blocked request and no successful third-party request in the network panel, same method as F04-AC03 |
+| F05-AC05 | Spoken lines are read from a small authored, fixed set, never generated at runtime. | Structural: `js/iris.js` |
+| F05-AC06 | None of `#iris--load`, `#iris--stop` use the `disabled` property; focus survives camera grant and load. | Human, keyboard traversal |
+| F05-AC07 | `iris.html` is listed in `sitemap.xml`. | `scripts/check_repo.py`, CI |
+| F05-AC08 | Contrast holds at 4.5:1 for text in both flavours, checked against Latte. | Human, per colour scheme |
 
 ---
 
@@ -202,5 +243,5 @@ plus a re-entry guard flag, same as the other three features.
 | --- | --- |
 | Where a visitor reaches Iris from (`game.html` link vs. its own entry point) | Not resolved by this spec; needs the same "also try" framing decision `F04_TWIN.md` made for `mocap.html` → `twin.html`, applied to whichever page is chosen. |
 | A launch/action gesture beyond continuous paddle position | Only needed if playtesting shows Breakout's classic serve-the-ball moment needs a discrete trigger; not assumed here. |
-| Per-visitor calibration or gain adjustment for iris x-position | Only added if F05-AC01's testing shows a fixed mapping is not usable across visitors. |
+| Per-visitor calibration or gain adjustment for iris x-position | Only added if F05-AC02's testing shows a fixed mapping is not usable across visitors. |
 | Reusing this same iris signal for a different classic game (Pong, considered and set aside earlier in this feature's design discussion) | Breakout was chosen because it needs only a continuous 1D position and no second discrete input; Pong fits the same constraints but offers less content/progression. Not pursued unless Breakout's scope turns out too small. |
