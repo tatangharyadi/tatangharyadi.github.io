@@ -207,6 +207,35 @@ A downloadable 3D copy of the visitor's own face, reached by a link from
   multi-angle capture only ever extends texture and never geometry, is in
   F04_TWIN.md.
 
+### F05: Iris → [F05_IRIS.md](F05_IRIS.md)
+
+A gaze-controlled Breakout, reusing the iris landmarks Twin's `FaceLandmarker`
+already reports and discards.
+
+- Twin's `FaceLandmarker` call returns 478 landmarks per detection — 468
+  face-mesh points plus 10 iris points at indices 468–477 — regardless of
+  which optional outputs are requested; Twin only ever reads the first 468.
+  Iris reads the other 10, mapping their mean position to a paddle's
+  horizontal position, smoothed with an EMA. No new model, no new vendored
+  runtime: it reuses `@mediapipe/tasks-vision` and `face_landmarker.task`
+  exactly as already committed for Twin, rather than falling back to
+  Echo's body-only LiteRT pipeline, which has no face model loaded at all.
+- Breakout was chosen over other classic games specifically because it
+  needs only a continuous 1D position signal and no second, discrete gaze
+  action (no dwell timer, no blink detector) — unlike shooting-gallery-style
+  gaze games, which need a separate "fire" trigger.
+- A short, fixed, authored set of spoken lines — not generated, not an LLM
+  — plays on level-clear, game-over and streak milestones, using the
+  browser's own `speechSynthesis` with no vendored runtime and no download,
+  since voice availability is already whatever the visitor's OS/browser
+  ships.
+- **Status: spec only.** Nothing is committed yet. The first thing any
+  implementation must confirm, before writing a second line of code, is
+  whether the iris landmarks are stable enough frame-to-frame, once
+  smoothed, to drive a paddle without a dwell-style discretization. Where a
+  visitor reaches the page from is an open question, listed in Deferred in
+  F05_IRIS.md rather than resolved here.
+
 ## Verification
 
 There is no test suite for the site itself. The mechanical invariants are checked
