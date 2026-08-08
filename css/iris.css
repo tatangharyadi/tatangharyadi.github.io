@@ -18,7 +18,7 @@
 }
 
 .iris--head {
-    max-width: var(--max-width);
+    max-width: var(--measure);
     margin: 0 auto;
     padding: 2rem 1.5rem 1rem;
 }
