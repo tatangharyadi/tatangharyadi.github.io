@@ -1,0 +1,134 @@
+/* Iris. Layout only — every colour below is one of css/style.css's shared
+   custom properties, so this file is not a sixth place
+   scripts/check_palette.py would have to track. */
+
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    background: var(--bg-alt);
+    color: var(--text);
+    padding: 0.5rem 1rem;
+    border-radius: 0 0 8px 0;
+    z-index: 10;
+}
+
+.skip-link:focus {
+    left: 0;
+}
+
+.iris--head {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 2rem 1.5rem 1rem;
+}
+
+.iris--sub {
+    max-width: var(--measure);
+    color: var(--text-muted);
+}
+
+.iris--sub a {
+    color: var(--accent-text);
+}
+
+.iris--notice {
+    max-width: var(--measure);
+    margin: 1rem auto;
+    padding: 0 1.5rem;
+    color: var(--text-muted);
+}
+
+.iris--gate {
+    max-width: var(--measure);
+    margin: 1rem auto 2rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.iris--gate p {
+    margin: 0 0 1rem;
+}
+
+.iris--gate-cost {
+    margin: 1rem 0 0 !important;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.iris--load,
+.iris--stop {
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.6rem 1.25rem;
+    border-radius: 6px;
+    color: var(--bg);
+    background: var(--accent-text);
+    border: 2px solid var(--accent-text);
+}
+
+.iris--load:hover,
+.iris--stop:hover {
+    color: var(--accent-text);
+    background: var(--bg);
+}
+
+.iris--load:focus-visible,
+.iris--stop:focus-visible {
+    outline: 3px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
+.iris--load[aria-disabled='true'],
+.iris--stop[aria-disabled='true'] {
+    cursor: progress;
+    opacity: 0.6;
+}
+
+.iris {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+/* The video is a real, decodable frame source the model reads from — never
+   display: none, which some browsers pause. Kept tiny and off to the side
+   instead, matching css/twin.css's approach. */
+.iris--video {
+    width: 1px;
+    height: 1px;
+    position: absolute;
+    overflow: hidden;
+}
+
+.iris--stage-wrap {
+    width: 100%;
+    max-width: 480px;
+}
+
+.iris--stage {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+@media (max-width: 750px) {
+    .iris--head {
+        padding: 1.5rem 1rem 0.75rem;
+    }
+
+    .iris {
+        padding: 0 1rem 2rem;
+    }
+}

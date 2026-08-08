@@ -227,15 +227,22 @@ already reports and discards.
   browser's own `speechSynthesis` with no vendored runtime and no download,
   since voice availability is already whatever the visitor's OS/browser
   ships.
-- **Status: spec only.** Nothing is committed yet. The committed
+- **Status: implemented, pending human verification.** `iris.html`,
+  `css/iris.css` and `js/iris.js` are written and pass every check this
+  repo can run without camera hardware. The committed
   `face_landmarker.task`'s landmark-detector output tensor is confirmed
   `[1,1,1,1434]` (1434 = 478 × 3 coordinates), so the 478-landmark, iris-
-  included premise this spec depends on is structural, not assumed. What the
-  first implementation must still confirm, before writing a second line of
-  code, is whether those iris landmarks are stable enough frame-to-frame,
-  once smoothed, to drive a paddle without a dwell-style discretization.
-  Where a visitor reaches the page from is an open question, listed in
-  Deferred in F05_IRIS.md rather than resolved here.
+  included premise this spec depends on is structural, not assumed. What
+  still needs a human with a webcam, and has not been checked, is whether
+  those iris landmarks are stable enough frame-to-frame, once smoothed, to
+  drive a paddle without a dwell-style discretization, plus the
+  CSP-violation line firing against a live session, full keyboard
+  traversal through a real camera grant, and canvas text contrast. A
+  visitor reaches the page from `index.html`'s masthead, the same "Chief
+  Technology Officer" job-title doors that already opened `game.html` and
+  `mocap.html`; `mocap.html` and `iris.html` now cross-link each other in
+  place of the masthead door `mocap.html` gave up. Full detail is in
+  F05_IRIS.md.
 
 ## Verification
 

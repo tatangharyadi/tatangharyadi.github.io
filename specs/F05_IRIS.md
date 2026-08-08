@@ -1,9 +1,15 @@
 # F05: Iris, a gaze-controlled Breakout
 
-**Status:** spec only. Nothing is committed yet — no `iris.html`, no
-`css/iris.css`, no `js/iris.js`. This document is the design a scaffolding
-pass would implement against, in the same role `F03_MOCAP.md` played before
-`mocap.html` was wired up and `F04_TWIN.md` plays for `js/twin.js` today.
+**Status:** implemented, pending human verification. `iris.html`,
+`css/iris.css` and `js/iris.js` are written and pass every check this repo
+can run without camera hardware (CI-mirroring scripts, a headless browser
+load with a clean console and the expected accessibility tree). F05-AC02
+(real-camera iris landmark stability), AC04 (the CSP-violation line firing
+against a live camera session), AC06 (full keyboard traversal through a
+real camera grant) and AC08 (canvas text contrast, which Lighthouse cannot
+read off canvas pixels) all need a human with a webcam and have not been
+checked. `MIRROR_GAZE_X` and `IRIS_X_EMA_ALPHA` in `js/iris.js` are
+first-guess constants pending that pass and should be expected to change.
 
 The premise that the iris landmarks exist at all is no longer assumed: the
 committed `assets/models/face-landmarker/face_landmarker.task`'s
@@ -77,18 +83,29 @@ repository's asset footprint.
 
 ### Where a visitor reaches it
 
-Not a masthead word or a `mocap.html` sub-link, following Twin's own
-reasoning against a third hidden word or a chooser page. Iris is reached
-from `game.html` — the site's other existing game — as an alternate control
-scheme, or as its own linked page from wherever `game.html` links out, in
-the same "also try" framing `mocap.html` uses to point at `twin.html`. This
-spec does not resolve which; it is listed as an open question in Deferred,
-same discipline `F04_TWIN.md` used for its own landing-page question in its
-first draft.
+**Resolved 2026-08-09.** Iris takes a masthead door outright rather than a
+sub-link from another page. The job title in `index.html`'s masthead —
+"Chief Technology Officer" — was already two doors, one word each:
+"Technology" opened `game.html` and "Officer" opened `mocap.html`. That job
+title now reads "Technology" → `iris.html` and "Officer" → `game.html`;
+`mocap.html` gives up its masthead door to Iris. (An earlier same-day draft
+put an "Also try Iris" footnote on `game.html` instead; reusing an existing
+masthead door reads as more consistent with the site's established
+two-doors pattern than adding a footnote to a page with no door of its
+own.)
+
+`mocap.html` does not lose reachability, it loses its *masthead* door.
+Losing the masthead door leaves it exactly as reachable as `twin.html`
+already was — sitemap, hover, tab order — plus a same-page cross-link:
+`mocap.html` and `iris.html` each carry an "Also try" paragraph pointing at
+the other, the same framing `mocap.html` already used for `twin.html`.
+`game.html` and `iris.html` deliberately do **not** cross-link each other:
+each now has its own masthead door, so a footnote pointing from one to the
+other would just be a second route to a page reachable in one hop already.
 
 ---
 
-## Key files (none committed yet)
+## Key files
 
 | File | Role |
 | --- | --- |
@@ -238,7 +255,6 @@ plus a re-entry guard flag, same as the other three features.
 
 | Item | Note |
 | --- | --- |
-| Where a visitor reaches Iris from (`game.html` link vs. its own entry point) | Not resolved by this spec; needs the same "also try" framing decision `F04_TWIN.md` made for `mocap.html` → `twin.html`, applied to whichever page is chosen. |
 | A launch/action gesture beyond continuous paddle position | Only needed if playtesting shows Breakout's classic serve-the-ball moment needs a discrete trigger; not assumed here. |
 | Per-visitor calibration or gain adjustment for iris x-position | Only added if F05-AC02's testing shows a fixed mapping is not usable across visitors. |
 | Reusing this same iris signal for a different classic game (Pong, considered and set aside earlier in this feature's design discussion) | Breakout was chosen because it needs only a continuous 1D position and no second discrete input; Pong fits the same constraints but offers less content/progression. Not pursued unless Breakout's scope turns out too small. |
