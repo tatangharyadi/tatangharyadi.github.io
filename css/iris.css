@@ -200,6 +200,20 @@
     border-radius: 8px;
 }
 
+.iris--debug {
+    width: 100%;
+    max-width: 480px;
+    margin: 0;
+    padding: 0.75rem 1rem;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    color: var(--text-muted);
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
 @media (max-width: 750px) {
     .iris--head {
         padding: 1.5rem 1rem 0.75rem;

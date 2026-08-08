@@ -273,17 +273,51 @@ lowering the EMA alone:
 - `IRIS_X_EMA_ALPHA` is lowered from 0.25 to 0.15 as an additional, smaller
   measure on top of the two above.
 
-**This is unverified.** Everything in this subsection is a diagnosis and a
-standard mitigation for it, not a confirmed fix — the sandbox's fake camera
-feed never moves, so it cannot exhibit the twitching this addresses in the
-first place, and therefore cannot confirm it is gone either. `MIN_EYE_SPAN`,
-`RAW_GAZE_MEDIAN_WINDOW` and the lowered `IRIS_X_EMA_ALPHA` should all be
-treated as first-guess constants alongside the ones already called out at
-the top of this spec, pending a real-camera pass that checks both that the
-twitch is gone with the eyes still *and* that the paddle still responds
-promptly to deliberate eye movement — the median window and a lower alpha
-both trade responsiveness for stability, and only real hardware can show
-whether that trade landed in a usable place.
+**This mitigation did not fix it.** A second real-camera pass reported the
+same class of failure as before: the paddle still moves on its own while
+the eyes hold still. That rules out "the filter just needs to be a little
+stronger" as the whole story — either the noise-amplification diagnosis was
+right but undersized (a bigger median window or lower alpha would still be
+guessing at a magnitude), or there's a mechanism the filter can't reach at
+all. Two candidates neither commit above has ruled out:
+
+- `MIN_EYE_SPAN`'s guard is itself a discontinuity source. If one eye's
+  span hovers near the 0.02 threshold, the guard flickers between using
+  both eyes' average and one eye alone every few frames. If the two eyes
+  don't share the same baseline ratio — plausible for any camera that
+  isn't perfectly centred on the face — every flicker is a *step*, not
+  noise, and a median filter does not touch steps it can't distinguish
+  from a real value.
+- A blink. At the camera's frame rate a blink is several consecutive
+  frames of degraded or extrapolated iris detection, comfortably longer
+  than `RAW_GAZE_MEDIAN_WINDOW` (5) can absorb, and it happens with the
+  eyes not "moving" in the sense a visitor means by that word.
+
+### Diagnostic instrumentation added instead of a third blind guess
+
+Two consecutive fixes, each a plausible theory tuned against no real data,
+have both failed on the only hardware that can judge them. A third constant
+change would be the same bet again. Instead, `js/iris.js` now exposes the
+raw pipeline: appending `?debug=1` to `iris.html`'s URL unhides
+`#iris--debug`, a `<pre>` below the canvas showing, every frame, both eyes'
+ratio and corner span, the pre-median raw combined reading, the post-median
+value, the post-EMA `smoothedGazeX`, and a running count of frames where
+both eyes were dropped as unreliable. `renderDebug()` in `js/iris.js` is the
+whole of it — no state that survives past the page, no colour (so it is not
+a seventh place `scripts/check_palette.py` has to track), hidden and
+`aria-hidden` by default so it changes nothing for anyone not testing this.
+
+This is deliberately not another fix. The sandbox's fake camera cannot
+exercise it meaningfully — a feed that never moves produces the same flat
+numbers whether or not the pipeline is healthy — so what this needs next is
+a real webcam session reading the on-screen numbers while staring at a
+fixed point (does the smoothed value wander, and does `dropped frames`
+climb?) and while looking hard left/right and holding (do the two eyes'
+ratios move together, or does one diverge, and does the smoothed value's
+range across that motion comfortably exceed the wander seen while
+motionless?). Whatever those numbers show is what should drive the next
+change to `MIN_EYE_SPAN`, `RAW_GAZE_MEDIAN_WINDOW`, `IRIS_X_EMA_ALPHA`, or a
+different mechanism entirely — not another guess.
 
 ---
 
@@ -338,6 +372,7 @@ scope, in `js/iris.js`.
 | `iris--cal-start` | `button type="button"` | Commits the calibration range and starts the game; `aria-disabled` until both ends are captured with enough separation |
 | `iris--cal-skip` | `button type="button"` | Starts the game with no calibration range (raw signal used directly) |
 | `iris--stage` | `canvas` | Paddle/ball/brick rendering |
+| `iris--debug` | `pre` | `hidden` and `aria-hidden` unless the URL carries `?debug=1`; raw per-eye gaze diagnostics, see "Diagnostic instrumentation" above |
 | `iris--status` | `p` | `role="status"`, `aria-live="polite"` |
 | `iris--recalibrate` | `button type="button"` | Re-enters the calibration step without releasing the camera or reloading the model |
 | `iris--stop` | `button type="button"` | Releases the camera stream's tracks and stops the game loop |

@@ -91,7 +91,19 @@ const els = {
     stage: document.getElementById('iris--stage'),
     recalibrate: document.getElementById('iris--recalibrate'),
     stop: document.getElementById('iris--stop'),
+    debug: document.getElementById('iris--debug'),
 };
+
+// ?debug=1 shows the raw per-eye signal on screen instead of just the
+// paddle it drives. Two "fix" commits (corner-relative normalization, then
+// noise filtering) have both been reported as not working against real
+// hardware, and the sandbox's fake camera never moves — it cannot exhibit
+// the failure either before or after a fix, so it cannot tell us which
+// theory is right. This readout is how a real webcam session tells us
+// instead of another blind guess at a filter constant.
+const DEBUG = new URLSearchParams(window.location.search).get('debug') === '1';
+if (DEBUG) els.debug.hidden = false;
+let droppedFrames = 0;
 
 const ctx = els.stage.getContext('2d');
 
@@ -262,10 +274,16 @@ function updateGazeFromLandmarks(landmarks) {
     const leftOuter = landmarks[LEFT_EYE_OUTER];
     if (!rightIris || !rightOuter || !rightInner || !leftIris || !leftInner || !leftOuter) return;
 
+    const rightSpan = Math.abs(rightOuter.x - rightInner.x);
+    const leftSpan = Math.abs(leftInner.x - leftOuter.x);
     const rightRatio = eyeRatio(rightIris, rightOuter, rightInner);
     const leftRatio = eyeRatio(leftIris, leftInner, leftOuter);
     const ratios = [rightRatio, leftRatio].filter((r) => r !== null);
-    if (ratios.length === 0) return; // both eyes unreliable this frame; hold the last position rather than guess
+    if (ratios.length === 0) {
+        droppedFrames += 1;
+        if (DEBUG) renderDebug({ rightRatio, leftRatio, rightSpan, leftSpan, rawX: null, medianX: null });
+        return; // both eyes unreliable this frame; hold the last position rather than guess
+    }
 
     const rawX = ratios.reduce((sum, r) => sum + r, 0) / ratios.length;
     rawGazeHistory.push(rawX);
@@ -274,6 +292,20 @@ function updateGazeFromLandmarks(landmarks) {
 
     const gazeX = MIRROR_GAZE_X ? 1 - medianX : medianX;
     smoothedGazeX = smoothedGazeX + IRIS_X_EMA_ALPHA * (gazeX - smoothedGazeX);
+
+    if (DEBUG) renderDebug({ rightRatio, leftRatio, rightSpan, leftSpan, rawX, medianX });
+}
+
+function fmt(n) {
+    return n === null || n === undefined ? ' -- ' : n.toFixed(3);
+}
+
+function renderDebug(f) {
+    els.debug.textContent =
+        `right ratio ${fmt(f.rightRatio)}  span ${fmt(f.rightSpan)}\n` +
+        `left  ratio ${fmt(f.leftRatio)}  span ${fmt(f.leftSpan)}\n` +
+        `raw ${fmt(f.rawX)}  median ${fmt(f.medianX)}  smoothed ${fmt(smoothedGazeX)}\n` +
+        `dropped frames (both eyes unreliable): ${droppedFrames}`;
 }
 
 function calibratedX(x) {
@@ -505,6 +537,7 @@ async function start() {
         voice = pickVoice();
         smoothedGazeX = 0.5;
         rawGazeHistory = [];
+        droppedFrames = 0;
         calMin = null;
         calMax = null;
 

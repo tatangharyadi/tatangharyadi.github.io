@@ -134,6 +134,15 @@
             <canvas class="iris--stage" id="iris--stage" width="480" height="360"></canvas>
         </section>
 
+        <!-- Diagnostic-only readout of the raw gaze signal, gated behind
+             ?debug=1 by js/iris.js. Not part of the game; exists to let a
+             real webcam session show us what the eye-corner-ratio pipeline
+             is actually seeing, instead of guessing another filter constant
+             blind. Never shown by default, so it carries no colour and
+             needs no accessibility treatment beyond staying out of the tab
+             order when hidden. -->
+        <pre class="iris--debug" id="iris--debug" hidden aria-hidden="true"></pre>
+
         <div class="iris--controls">
             <button type="button" class="iris--recalibrate" id="iris--recalibrate">
                 Recalibrate
