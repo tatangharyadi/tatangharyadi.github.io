@@ -16,9 +16,9 @@ F05-AC01.
 
 **Before any of this is built**, confirm F05-AC02 below: that those iris
 landmarks are stable enough, frame to frame, to drive a paddle without the
-dwell/blink-style discretization other gaze-controlled games (Eye Aim Arena,
-evaluated separately) reach for. Everything past that point assumes plain
-per-frame iris position, smoothed, is enough.
+dwell/blink-style discretization other gaze-controlled games reach for.
+Everything past that point assumes plain per-frame iris position, smoothed,
+is enough.
 
 ---
 
@@ -121,21 +121,19 @@ every rendered frame
    mapped to paddle x-position across the canvas width
         │
    game loop: ball/brick/paddle collision, scoring, deterministic difficulty
-   (same "rule-based, not model-based" shape as Echo's retargeting math,
-   not Eye Aim Arena's LLM-driven adjustment)
+   (same "rule-based, not model-based" shape as Echo's retargeting math)
         │
    on level-clear / game-over / N-hit streak: a short, fixed phrase (or one
    picked from a small fixed set, not generated) is spoken via
    speechSynthesis.speak(), voice chosen by a scoring heuristic over
-   speechSynthesis.getVoices() the same way Eye Aim Arena's README describes,
-   minus any LLM-generated text — the phrases themselves are authored, not
-   produced at runtime
+   speechSynthesis.getVoices() — the phrases themselves are authored, not
+   produced at runtime, and nothing here is LLM-generated
 ```
 
-No dwell timer and no blink detector: unlike Eye Aim Arena's shoot
-mechanics, Iris only needs a continuous position, the same property that
-made Breakout the right classic-game fit for this input in the first place
-— it does not need a second, discrete gaze action for anything.
+No dwell timer and no blink detector: Iris only needs a continuous position,
+the same property that made Breakout the right classic-game fit for this
+input in the first place — it does not need a second, discrete gaze action
+for anything.
 
 ---
 
@@ -148,8 +146,7 @@ made Breakout the right classic-game fit for this input in the first place
   one.
 - **No LLM, no adaptive coaching, no generated dialogue.** All spoken lines
   are authored text, picked from a small fixed set by rule, not produced at
-  runtime. Compare Eye Aim Arena's Aria, which this spec deliberately does
-  not replicate.
+  runtime.
 - **No calibration flow.** Twin's front-only capture calibrates a face mesh
   against a canonical topology; Iris only needs a relative left-right
   signal for a paddle, not an absolute position, so no calibration step is
@@ -157,9 +154,9 @@ made Breakout the right classic-game fit for this input in the first place
   gain, that is a new acceptance criterion, not assumed here.
 - **One difficulty curve, rule-based.** Whatever deterministic
   speed-up/brick-pattern progression Breakout traditionally uses; no
-  jitter detection, no per-visitor tremor filtering the way Eye Aim Arena's
-  accessibility design does. Iris is a game reusing a tracking signal, not
-  a rehabilitation tool, and does not inherit that scope.
+  jitter detection, no per-visitor tremor filtering. Iris is a game reusing
+  a tracking signal, not a rehabilitation tool, and does not carry that
+  scope.
 - **No recording, no server-side anything.** Same structural privacy claim
   as Echo and Twin: the capture frame and the landmarks never cross a
   network boundary.
