@@ -14,8 +14,20 @@ import { FaceLandmarker, FilesetResolver } from '../vendor/mediapipe/tasks-visio
 const WASM_BASE = 'vendor/mediapipe/tasks-vision/wasm';
 const FACE_MODEL_URL = 'assets/models/face-landmarker/face_landmarker.task';
 
-const IRIS_LANDMARK_START = 468;
-const IRIS_LANDMARK_END = 478; // exclusive; 468-477 inclusive, 10 points
+// FaceLandmarker's 478-point layout gives each eye an iris centre plus its
+// own pair of horizontal corner landmarks. The centre's raw x moves just as
+// much when the head translates as when the eye itself moves in its
+// socket — averaging the raw landmark.x values (an earlier version of this
+// file did exactly that) tracks head position, not gaze, which is exactly
+// what real-camera testing surfaced. Normalizing each iris centre against
+// its own eye's corner-to-corner span cancels head translation because
+// both corners move with the head by the same amount the iris does.
+const RIGHT_IRIS_CENTER = 468;
+const RIGHT_EYE_OUTER = 33;
+const RIGHT_EYE_INNER = 133;
+const LEFT_IRIS_CENTER = 473;
+const LEFT_EYE_INNER = 362;
+const LEFT_EYE_OUTER = 263;
 
 // Frame-to-frame iris position is noisy; this is the first smoothing
 // constant, not a verified one — F05-AC02 is exactly the test that tells us
@@ -27,6 +39,13 @@ const IRIS_X_EMA_ALPHA = 0.25;
 // left from the visitor's own point of view. Flip this if AC02 testing
 // shows it feels backwards.
 const MIRROR_GAZE_X = true;
+
+// Below this separation between the two captured points, calibration
+// treats the pair as noise rather than a real range — smoothedGazeX is
+// already EMA-smoothed, so two captures this close together are almost
+// certainly the same point measured twice, not a deliberate look-left vs.
+// look-right pair.
+const CAL_MIN_SEPARATION = 0.03;
 
 const PADDLE_WIDTH = 90;
 const PADDLE_HEIGHT = 12;
@@ -51,9 +70,16 @@ const els = {
     gate: document.getElementById('iris--gate'),
     load: document.getElementById('iris--load'),
     status: document.getElementById('iris--status'),
+    calibrate: document.getElementById('iris--calibrate'),
+    calMarker: document.getElementById('iris--cal-marker'),
+    calLeft: document.getElementById('iris--cal-left'),
+    calRight: document.getElementById('iris--cal-right'),
+    calStart: document.getElementById('iris--cal-start'),
+    calSkip: document.getElementById('iris--cal-skip'),
     main: document.getElementById('iris'),
     video: document.getElementById('iris--video'),
     stage: document.getElementById('iris--stage'),
+    recalibrate: document.getElementById('iris--recalibrate'),
     stop: document.getElementById('iris--stop'),
 };
 
@@ -66,7 +92,22 @@ let rafId = null;
 let smoothedGazeX = 0.5;
 let voice = null;
 
-let game = null; // set up fresh each start()
+// 'idle' | 'calibrating' | 'playing'. The rAF loop in frame() keeps reading
+// the camera and updating smoothedGazeX in every mode once it starts —
+// only what frame() does with that value (move the live marker vs. step
+// the game) depends on this.
+let mode = 'idle';
+
+// Raw smoothedGazeX captured at each calibration press; calMin/calMax are
+// the range stepGame() actually maps through. Null means uncalibrated
+// (skipped), which is the pre-calibration behaviour: smoothedGazeX used
+// directly as the 0..1 fraction of the paddle track.
+let calLeftRaw = null;
+let calRightRaw = null;
+let calMin = null;
+let calMax = null;
+
+let game = null; // set up fresh each beginGame()
 
 // Cached --text/--accent-text/--border/--bg-alt, read once here rather than
 // every drawGame() call, and refreshed on a scheme change below. Read at
@@ -178,25 +219,41 @@ function resetBall(g) {
     g.ball.vy = -140;
 }
 
+// Where the iris centre sits between the eye's own two corners, as a 0..1
+// fraction. Order-independent (min/max rather than assuming which corner
+// has the smaller x) because the two eyes' corner pairs run in opposite
+// left-right order in FaceLandmarker's output.
+function eyeRatio(iris, cornerA, cornerB) {
+    const lo = Math.min(cornerA.x, cornerB.x);
+    const hi = Math.max(cornerA.x, cornerB.x);
+    if (hi - lo < 1e-6) return 0.5;
+    return (iris.x - lo) / (hi - lo);
+}
+
 function updateGazeFromLandmarks(landmarks) {
-    let sum = 0;
-    let n = 0;
-    for (let i = IRIS_LANDMARK_START; i < IRIS_LANDMARK_END; i++) {
-        const p = landmarks[i];
-        if (!p) continue;
-        sum += p.x;
-        n++;
-    }
-    if (n === 0) return;
-    const rawX = sum / n;
+    const rightIris = landmarks[RIGHT_IRIS_CENTER];
+    const rightOuter = landmarks[RIGHT_EYE_OUTER];
+    const rightInner = landmarks[RIGHT_EYE_INNER];
+    const leftIris = landmarks[LEFT_IRIS_CENTER];
+    const leftInner = landmarks[LEFT_EYE_INNER];
+    const leftOuter = landmarks[LEFT_EYE_OUTER];
+    if (!rightIris || !rightOuter || !rightInner || !leftIris || !leftInner || !leftOuter) return;
+
+    const rawX = (eyeRatio(rightIris, rightOuter, rightInner) + eyeRatio(leftIris, leftInner, leftOuter)) / 2;
     const gazeX = MIRROR_GAZE_X ? 1 - rawX : rawX;
     smoothedGazeX = smoothedGazeX + IRIS_X_EMA_ALPHA * (gazeX - smoothedGazeX);
+}
+
+function calibratedX(x) {
+    if (calMin === null || calMax === null) return x;
+    const t = (x - calMin) / (calMax - calMin);
+    return Math.max(0, Math.min(1, t));
 }
 
 function stepGame(g, dt) {
     if (g.over) return;
 
-    g.paddleX = smoothedGazeX * (g.width - PADDLE_WIDTH);
+    g.paddleX = calibratedX(smoothedGazeX) * (g.width - PADDLE_WIDTH);
     g.paddleX = Math.max(0, Math.min(g.width - PADDLE_WIDTH, g.paddleX));
 
     const b = g.ball;
@@ -315,12 +372,16 @@ function frame(now) {
     const landmarks = result.faceLandmarks && result.faceLandmarks[0];
     if (landmarks) updateGazeFromLandmarks(landmarks);
 
-    if (game.lastTime === null) game.lastTime = now;
-    const dt = Math.min(0.05, (now - game.lastTime) / 1000);
-    game.lastTime = now;
+    if (mode === 'calibrating') {
+        els.calMarker.style.left = `${smoothedGazeX * 100}%`;
+    } else if (mode === 'playing' && game) {
+        if (game.lastTime === null) game.lastTime = now;
+        const dt = Math.min(0.05, (now - game.lastTime) / 1000);
+        game.lastTime = now;
 
-    stepGame(game, dt);
-    drawGame(game);
+        stepGame(game, dt);
+        drawGame(game);
+    }
 
     rafId = requestAnimationFrame(frame);
 }
@@ -330,6 +391,73 @@ function stopTracks() {
         for (const track of stream.getTracks()) track.stop();
         stream = null;
     }
+}
+
+function updateCalStartEnabled() {
+    const ready =
+        calLeftRaw !== null &&
+        calRightRaw !== null &&
+        Math.abs(calRightRaw - calLeftRaw) >= CAL_MIN_SEPARATION;
+    if (ready) {
+        els.calStart.removeAttribute('aria-disabled');
+    } else {
+        els.calStart.setAttribute('aria-disabled', 'true');
+    }
+    return ready;
+}
+
+function captureLeft() {
+    calLeftRaw = smoothedGazeX;
+    updateCalStartEnabled();
+    setStatus('Left captured. Now look at the right edge and press "Capture right".');
+}
+
+function captureRight() {
+    calRightRaw = smoothedGazeX;
+    updateCalStartEnabled();
+    setStatus('Right captured. Press "Start playing" when ready.');
+}
+
+function enterCalibration() {
+    mode = 'calibrating';
+    calLeftRaw = null;
+    calRightRaw = null;
+    updateCalStartEnabled();
+    els.main.hidden = true;
+    els.calibrate.hidden = false;
+    setStatus('Look at the left edge of your screen and press "Capture left".');
+    els.calLeft.focus();
+}
+
+function beginGame() {
+    mode = 'playing';
+    game = newGame();
+    readTheme();
+    els.calibrate.hidden = true;
+    els.main.hidden = false;
+    els.stop.removeAttribute('aria-disabled');
+    els.stop.focus();
+    setStatus('Look left and right to move the paddle.');
+    say(SPEECH_LINES.start);
+}
+
+function finishCalibration() {
+    if (!updateCalStartEnabled()) return;
+    calMin = Math.min(calLeftRaw, calRightRaw);
+    calMax = Math.max(calLeftRaw, calRightRaw);
+    beginGame();
+}
+
+function skipCalibration() {
+    calMin = null;
+    calMax = null;
+    beginGame();
+}
+
+function recalibrate() {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    game = null;
+    enterCalibration();
 }
 
 async function start() {
@@ -343,17 +471,12 @@ async function start() {
         setStatus('Loading the face model…');
         faceLandmarker = await loadFaceLandmarker();
         voice = pickVoice();
-
-        game = newGame();
         smoothedGazeX = 0.5;
-        readTheme();
+        calMin = null;
+        calMax = null;
 
         els.gate.hidden = true;
-        els.main.hidden = false;
-        els.stop.removeAttribute('aria-disabled');
-        els.stop.focus();
-        setStatus('Look left and right to move the paddle.');
-        say(SPEECH_LINES.start);
+        enterCalibration();
 
         rafId = requestAnimationFrame(frame);
     } catch (err) {
@@ -379,8 +502,12 @@ function stop() {
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     els.video.srcObject = null;
     game = null;
+    mode = 'idle';
+    calMin = null;
+    calMax = null;
 
     els.main.hidden = true;
+    els.calibrate.hidden = true;
     els.gate.hidden = false;
     setStatus('');
     els.load.focus();
@@ -404,3 +531,8 @@ els.gate.hidden = false;
 
 els.load.addEventListener('click', start);
 els.stop.addEventListener('click', stop);
+els.calLeft.addEventListener('click', captureLeft);
+els.calRight.addEventListener('click', captureRight);
+els.calStart.addEventListener('click', finishCalibration);
+els.calSkip.addEventListener('click', skipCalibration);
+els.recalibrate.addEventListener('click', recalibrate);

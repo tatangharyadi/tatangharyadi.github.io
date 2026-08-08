@@ -3,13 +3,20 @@
 **Status:** implemented, pending human verification. `iris.html`,
 `css/iris.css` and `js/iris.js` are written and pass every check this repo
 can run without camera hardware (CI-mirroring scripts, a headless browser
-load with a clean console and the expected accessibility tree). F05-AC02
-(real-camera iris landmark stability), AC04 (the CSP-violation line firing
-against a live camera session), AC06 (full keyboard traversal through a
-real camera grant) and AC08 (canvas text contrast, which Lighthouse cannot
+load with a clean console and the expected accessibility tree). First
+real-camera testing (2026-08-09) found the gaze signal was tracking head
+position rather than eye movement; the fix (eye-corner-relative
+normalization, see "Calibration" below) and a two-point calibration step
+are both implemented but not yet re-verified against real hardware. AC02
+(real-camera iris landmark stability, now specifically: does the corrected
+signal track eye movement independent of head position), AC04 (the
+CSP-violation line firing against a live camera session), AC06 (full
+keyboard traversal through a real camera grant, now including the
+calibration step) and AC08 (canvas text contrast, which Lighthouse cannot
 read off canvas pixels) all need a human with a webcam and have not been
-checked. `MIRROR_GAZE_X` and `IRIS_X_EMA_ALPHA` in `js/iris.js` are
-first-guess constants pending that pass and should be expected to change.
+checked. `MIRROR_GAZE_X`, `IRIS_X_EMA_ALPHA` and `CAL_MIN_SEPARATION` in
+`js/iris.js` are first-guess constants pending that pass and should be
+expected to change.
 
 The premise that the iris landmarks exist at all is no longer assumed: the
 committed `assets/models/face-landmarker/face_landmarker.task`'s
@@ -134,8 +141,10 @@ every rendered frame
         │
    detectForVideo() → 478 landmarks
         │
-   landmarks[468..477] (iris ring, both eyes) → mean x → EMA-smoothed →
-   mapped to paddle x-position across the canvas width
+   each eye's iris centre (468, 473) normalized against that eye's own
+   corner-to-corner span (33/133, 362/263) → averaged across both eyes →
+   EMA-smoothed → remapped through the session's calibration range (if any)
+   → mapped to paddle x-position across the canvas width
         │
    game loop: ball/brick/paddle collision, scoring, deterministic difficulty
    (same "rule-based, not model-based" shape as Echo's retargeting math)
@@ -164,11 +173,9 @@ for anything.
 - **No LLM, no adaptive coaching, no generated dialogue.** All spoken lines
   are authored text, picked from a small fixed set by rule, not produced at
   runtime.
-- **No calibration flow.** Twin's front-only capture calibrates a face mesh
-  against a canonical topology; Iris only needs a relative left-right
-  signal for a paddle, not an absolute position, so no calibration step is
-  planned. If early testing shows raw iris x needs a per-visitor offset or
-  gain, that is a new acceptance criterion, not assumed here.
+- ~~**No calibration flow.**~~ Superseded: real-camera testing under F05-AC02
+  showed a fixed mapping does need a per-visitor range. See "Calibration"
+  below.
 - **One difficulty curve, rule-based.** Whatever deterministic
   speed-up/brick-pattern progression Breakout traditionally uses; no
   jitter detection, no per-visitor tremor filtering. Iris is a game reusing
@@ -177,6 +184,56 @@ for anything.
 - **No recording, no server-side anything.** Same structural privacy claim
   as Echo and Twin: the capture frame and the landmarks never cross a
   network boundary.
+
+---
+
+## Calibration
+
+First real-camera testing of F05-AC02 (2026-08-09) found the original
+mapping was tracking head position, not eye movement: `updateGazeFromLandmarks`
+averaged the raw, frame-absolute x of the ten iris landmarks, and that value
+moves just as much when the head translates left-right as when the eyes
+move within their sockets — the two are not distinguishable from landmark
+position alone. The fix normalizes each eye's iris centre (landmark 468 for
+the right eye, 473 for the left) against that same eye's own corner-to-corner
+span (33/133 and 362/263), which cancels head translation because both
+corners move with the head by the same amount the iris does. This is now
+the actual gaze signal `smoothedGazeX` carries, in `js/iris.js`.
+
+Even head-translation-corrected, a comfortable eye-movement range rarely
+spans the full 0..1 the corner-relative ratio can theoretically reach, and
+that range differs by visitor (eye shape, camera angle, glasses). A fixed
+linear map from that ratio to the paddle track therefore leaves part of
+the track unreachable for most people — the scope cut above assumed a
+relative signal wouldn't need this, and real testing showed otherwise.
+
+The fix is a two-point calibration step inserted between camera+model load
+and gameplay: look at the left edge, press "Capture left"; look at the
+right edge, press "Capture right". The two raw `smoothedGazeX` readings
+become `calMin`/`calMax`, and `stepGame` maps through that range instead of
+the raw 0..1 signal directly. A "Skip calibration" control keeps the
+original fixed mapping available for a visitor who would rather not do the
+capture step, or whose setup makes it unnecessary. A "Recalibrate" control
+in the game view re-enters the same step without re-requesting the camera
+or reloading the model — only the mapping range needs to change.
+
+`CAL_MIN_SEPARATION` (0.03) rejects a capture pair too close together to be
+a deliberate left/right pair rather than the same point measured twice;
+below it, "Start playing" stays `aria-disabled` and the visitor is asked to
+try again or skip. This is also the shape a static/synthetic camera feed
+hits directly — anything that never moves produces two nearly identical
+captures and never satisfies the guard, which is expected: it does not
+mean calibration is broken, only that there is no real head or eye motion
+to calibrate against.
+
+The camera/model lifecycle is shared across calibration and gameplay: the
+capture rAF loop keeps calling `detectForVideo()` and updating
+`smoothedGazeX` throughout, and a small `aria-hidden` marker gives sighted
+visitors live visual feedback of the current (uncalibrated) position while
+capturing — deliberately not a live text region, since an `aria-live`
+announcement on every animation frame would be unusable noise for a screen
+reader user. The status text before and after each capture is the
+non-visual equivalent.
 
 ---
 
@@ -224,8 +281,15 @@ scope, in `js/iris.js`.
 | `iris--gate` | `div` | States what camera access is used for and that nothing leaves the tab, before the press |
 | `iris--load` | `button type="button"` | Requests the camera and starts loading the runtime and model |
 | `iris--video` | `video` | `muted`, `playsinline` |
+| `iris--calibrate` | `div` | Two-point calibration step, shown after load succeeds and before gameplay |
+| `iris--cal-marker` | `div` | `aria-hidden` live visual readout of the current raw gaze position, decorative only |
+| `iris--cal-left` | `button type="button"` | Captures the current gaze position as the left end of the range |
+| `iris--cal-right` | `button type="button"` | Captures the current gaze position as the right end of the range |
+| `iris--cal-start` | `button type="button"` | Commits the calibration range and starts the game; `aria-disabled` until both ends are captured with enough separation |
+| `iris--cal-skip` | `button type="button"` | Starts the game with no calibration range (raw signal used directly) |
 | `iris--stage` | `canvas` | Paddle/ball/brick rendering |
 | `iris--status` | `p` | `role="status"`, `aria-live="polite"` |
+| `iris--recalibrate` | `button type="button"` | Re-enters the calibration step without releasing the camera or reloading the model |
 | `iris--stop` | `button type="button"` | Releases the camera stream's tracks and stops the game loop |
 
 None of these use the `disabled` property, for the same reason
@@ -241,13 +305,14 @@ plus a re-entry guard flag, same as the other three features.
 | ID | Criterion | Evidence |
 | --- | --- | --- |
 | F05-AC01 | The committed `face_landmarker.task`'s detector emits 478 landmarks (468 face mesh + 10 iris, indices 468–477), not 468. | **Verified 2026-08-09**: `face_landmarks_detector.tflite` extracted from the `.task` bundle and its output tensor inspected — shape `[1, 1, 1, 1434]`, 1434 = 478 × 3 |
-| F05-AC02 | Iris landmarks (468–477) from Twin's already-vendored `FaceLandmarker` are stable enough frame-to-frame, after EMA smoothing, to drive continuous paddle movement without a dwell timer. | Human, real camera, real browser — **run this before anything else in this spec is built** |
+| F05-AC02 | The eye-corner-relative gaze signal is stable enough frame-to-frame, after EMA smoothing, to drive continuous paddle movement without a dwell timer, and tracks eye movement independent of head position (the original mean-landmark-x version failed this — see "Calibration"). | Human, real camera, real browser — **run this before anything else in this spec is built** |
 | F05-AC03 | No new file is vendored under `vendor/` or `assets/models/`; `js/iris.js` loads the same `face_landmarker.task` already committed for Twin. | Structural: diff against `git status` after implementation |
 | F05-AC04 | The video frame and landmarks are never transmitted anywhere, including the same `odml.pa.googleapis.com` telemetry call the vendored `@mediapipe/tasks-vision` bundle makes unconditionally after ~30s of `detectForVideo()` (see "The vendored bundle phones home" above). `iris.html` ships the same `<meta http-equiv="Content-Security-Policy" content="connect-src 'self' blob:">` tag `twin.html` uses — Iris calls `detectForVideo()` every frame for the whole game, strictly longer exposure than Twin's calibration window, so this is required, not conditional. | Verify a CSP-violation console line for the blocked request and no successful third-party request in the network panel, same method as F04-AC03 |
 | F05-AC05 | Spoken lines are read from a small authored, fixed set, never generated at runtime. | Structural: `js/iris.js` |
 | F05-AC06 | None of `#iris--load`, `#iris--stop` use the `disabled` property; focus survives camera grant and load. | Human, keyboard traversal |
 | F05-AC07 | `iris.html` is listed in `sitemap.xml`. | `scripts/check_repo.py`, CI |
 | F05-AC08 | Contrast holds at 4.5:1 for text in both flavours, checked against Latte. | Human, per colour scheme |
+| F05-AC09 | The two-point calibration step is reachable and completable by keyboard alone, `iris--cal-start` stays `aria-disabled` (never `disabled`) until both ends are captured with enough separation, and "Skip calibration" and "Recalibrate" both leave the page in a state a keyboard user can continue from without a focus loss to `<body>`. | Human, keyboard traversal, real camera |
 
 ---
 
@@ -256,5 +321,4 @@ plus a re-entry guard flag, same as the other three features.
 | Item | Note |
 | --- | --- |
 | A launch/action gesture beyond continuous paddle position | Only needed if playtesting shows Breakout's classic serve-the-ball moment needs a discrete trigger; not assumed here. |
-| Per-visitor calibration or gain adjustment for iris x-position | Only added if F05-AC02's testing shows a fixed mapping is not usable across visitors. |
 | Reusing this same iris signal for a different classic game (Pong, considered and set aside earlier in this feature's design discussion) | Breakout was chosen because it needs only a continuous 1D position and no second discrete input; Pong fits the same constraints but offers less content/progression. Not pursued unless Breakout's scope turns out too small. |

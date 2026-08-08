@@ -82,6 +82,46 @@
 
     <p class="iris--notice" id="iris--status" role="status" aria-live="polite"></p>
 
+    <!-- Shown once the camera and model are ready, before gameplay starts.
+         The raw iris-x mean the model reads rarely spans the full 0-1 range
+         for a comfortable head-camera distance, so a straight linear map to
+         paddle position (the pre-calibration behaviour) leaves part of the
+         track unreachable for most visitors. Two captures — look left, look
+         right — record the visitor's own usable range once per session; see
+         specs/F05_IRIS.md. -->
+    <div class="iris--calibrate" id="iris--calibrate" hidden>
+        <h2 class="visually-hidden">Calibrate your gaze</h2>
+        <p>
+            Look at the left edge of your screen and press "Capture left".
+            Then look at the right edge and press "Capture right". This maps
+            your own comfortable range of eye movement to the full width of
+            the paddle track.
+        </p>
+        <!-- Decorative live readout of the current smoothed gaze position,
+             not a substitute for the text status above — aria-hidden so it
+             doesn't turn every animation frame into a screen-reader
+             announcement. -->
+        <div class="iris--cal-track" aria-hidden="true">
+            <div class="iris--cal-marker" id="iris--cal-marker"></div>
+        </div>
+        <div class="iris--cal-buttons">
+            <button type="button" class="iris--cal-btn" id="iris--cal-left">
+                Capture left
+            </button>
+            <button type="button" class="iris--cal-btn" id="iris--cal-right">
+                Capture right
+            </button>
+        </div>
+        <button type="button" class="iris--cal-start" id="iris--cal-start" aria-disabled="true">
+            Start playing
+        </button>
+        <p class="iris--cal-skip">
+            <button type="button" class="iris--cal-skip-btn" id="iris--cal-skip">
+                Skip calibration
+            </button>
+        </p>
+    </div>
+
     <main class="iris" id="iris" hidden>
         <!-- The video is the source of truth for gaze inference, not a
              thing a visitor is meant to watch — the game is. Kept small
@@ -94,9 +134,14 @@
             <canvas class="iris--stage" id="iris--stage" width="480" height="360"></canvas>
         </section>
 
-        <button type="button" class="iris--stop" id="iris--stop">
-            Stop and release the camera
-        </button>
+        <div class="iris--controls">
+            <button type="button" class="iris--recalibrate" id="iris--recalibrate">
+                Recalibrate
+            </button>
+            <button type="button" class="iris--stop" id="iris--stop">
+                Stop and release the camera
+            </button>
+        </div>
     </main>
 </body>
 
