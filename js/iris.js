@@ -29,10 +29,20 @@ const LEFT_IRIS_CENTER = 473;
 const LEFT_EYE_INNER = 362;
 const LEFT_EYE_OUTER = 263;
 
-// Frame-to-frame iris position is noisy; this is the first smoothing
-// constant, not a verified one — F05-AC02 is exactly the test that tells us
-// whether it needs to move.
-const IRIS_X_EMA_ALPHA = 0.25;
+// Dividing by an eye's own corner span (below) amplifies whatever
+// landmark-detection noise was already there, in rough proportion to how
+// small that span is relative to the frame — real testing showed this as
+// the paddle visibly twitching with no eye movement at all. Two guards
+// against that, applied before the EMA below: a per-eye reading is
+// discarded outright if its span is too small to trust, and the combined
+// per-frame reading is median-filtered over a short window so a single
+// noisy detection can't move the paddle — only a run of several
+// consistent frames can. Neither constant is verified against real
+// hardware yet; F05-AC02 is exactly the test that tells us whether either
+// needs to move.
+const MIN_EYE_SPAN = 0.02;
+const RAW_GAZE_MEDIAN_WINDOW = 5;
+const IRIS_X_EMA_ALPHA = 0.15;
 
 // Looking left is looking toward the camera's right in an unmirrored feed
 // (the camera faces the visitor). Flip so "look left" moves the paddle
@@ -220,15 +230,28 @@ function resetBall(g) {
 }
 
 // Where the iris centre sits between the eye's own two corners, as a 0..1
-// fraction. Order-independent (min/max rather than assuming which corner
-// has the smaller x) because the two eyes' corner pairs run in opposite
-// left-right order in FaceLandmarker's output.
+// fraction, or null if the span is too small to trust (near-profile head
+// angle, partial occlusion, a bad detection). Order-independent (min/max
+// rather than assuming which corner has the smaller x) because the two
+// eyes' corner pairs run in opposite left-right order in FaceLandmarker's
+// output. A small span is exactly where dividing by it turns ordinary
+// landmark jitter into a large swing in the result, so it is discarded
+// rather than trusted.
 function eyeRatio(iris, cornerA, cornerB) {
     const lo = Math.min(cornerA.x, cornerB.x);
     const hi = Math.max(cornerA.x, cornerB.x);
-    if (hi - lo < 1e-6) return 0.5;
+    if (hi - lo < MIN_EYE_SPAN) return null;
     return (iris.x - lo) / (hi - lo);
 }
+
+function medianOf(values) {
+    const sorted = values.slice().sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)];
+}
+
+// Recent raw (pre-EMA) readings, oldest first, capped at
+// RAW_GAZE_MEDIAN_WINDOW — see the constant's comment for why this exists.
+let rawGazeHistory = [];
 
 function updateGazeFromLandmarks(landmarks) {
     const rightIris = landmarks[RIGHT_IRIS_CENTER];
@@ -239,8 +262,17 @@ function updateGazeFromLandmarks(landmarks) {
     const leftOuter = landmarks[LEFT_EYE_OUTER];
     if (!rightIris || !rightOuter || !rightInner || !leftIris || !leftInner || !leftOuter) return;
 
-    const rawX = (eyeRatio(rightIris, rightOuter, rightInner) + eyeRatio(leftIris, leftInner, leftOuter)) / 2;
-    const gazeX = MIRROR_GAZE_X ? 1 - rawX : rawX;
+    const rightRatio = eyeRatio(rightIris, rightOuter, rightInner);
+    const leftRatio = eyeRatio(leftIris, leftInner, leftOuter);
+    const ratios = [rightRatio, leftRatio].filter((r) => r !== null);
+    if (ratios.length === 0) return; // both eyes unreliable this frame; hold the last position rather than guess
+
+    const rawX = ratios.reduce((sum, r) => sum + r, 0) / ratios.length;
+    rawGazeHistory.push(rawX);
+    if (rawGazeHistory.length > RAW_GAZE_MEDIAN_WINDOW) rawGazeHistory.shift();
+    const medianX = medianOf(rawGazeHistory);
+
+    const gazeX = MIRROR_GAZE_X ? 1 - medianX : medianX;
     smoothedGazeX = smoothedGazeX + IRIS_X_EMA_ALPHA * (gazeX - smoothedGazeX);
 }
 
@@ -472,6 +504,7 @@ async function start() {
         faceLandmarker = await loadFaceLandmarker();
         voice = pickVoice();
         smoothedGazeX = 0.5;
+        rawGazeHistory = [];
         calMin = null;
         calMax = null;
 

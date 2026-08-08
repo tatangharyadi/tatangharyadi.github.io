@@ -7,16 +7,24 @@ load with a clean console and the expected accessibility tree). First
 real-camera testing (2026-08-09) found the gaze signal was tracking head
 position rather than eye movement; the fix (eye-corner-relative
 normalization, see "Calibration" below) and a two-point calibration step
-are both implemented but not yet re-verified against real hardware. AC02
-(real-camera iris landmark stability, now specifically: does the corrected
-signal track eye movement independent of head position), AC04 (the
-CSP-violation line firing against a live camera session), AC06 (full
-keyboard traversal through a real camera grant, now including the
-calibration step) and AC08 (canvas text contrast, which Lighthouse cannot
-read off canvas pixels) all need a human with a webcam and have not been
-checked. `MIRROR_GAZE_X`, `IRIS_X_EMA_ALPHA` and `CAL_MIN_SEPARATION` in
-`js/iris.js` are first-guess constants pending that pass and should be
-expected to change.
+are both implemented. A second real-camera pass the same day found that fix
+introduced a new problem — the paddle twitching on its own with the eyes
+still, from landmark noise amplified by the corner-span division. A second
+fix (a degenerate-span guard, a median pre-filter and a lower EMA alpha —
+see "The corner-relative fix traded head-tracking for noise amplification"
+below) is implemented but **not yet verified against real hardware at
+all** — the fake camera this sandbox has access to cannot exhibit either
+the head-tracking failure or the twitching, so neither fix has been
+confirmed by anything other than a human eye on a webcam. AC02 (real-camera
+iris landmark stability: tracks eye movement independent of head position,
+and does not drift or twitch with the eyes still), AC04 (the CSP-violation
+line firing against a live camera session), AC06 (full keyboard traversal
+through a real camera grant, now including the calibration step) and AC08
+(canvas text contrast, which Lighthouse cannot read off canvas pixels) all
+need a human with a webcam and have not been checked. `MIRROR_GAZE_X`,
+`IRIS_X_EMA_ALPHA`, `MIN_EYE_SPAN`, `RAW_GAZE_MEDIAN_WINDOW` and
+`CAL_MIN_SEPARATION` in `js/iris.js` are first-guess constants pending that
+pass and should be expected to change.
 
 The premise that the iris landmarks exist at all is no longer assumed: the
 committed `assets/models/face-landmarker/face_landmarker.task`'s
@@ -234,6 +242,48 @@ capturing — deliberately not a live text region, since an `aria-live`
 announcement on every animation frame would be unusable noise for a screen
 reader user. The status text before and after each capture is the
 non-visual equivalent.
+
+### The corner-relative fix traded head-tracking for noise amplification
+
+The same real-camera pass that confirmed the head-tracking fix above also
+found a second, worse problem: with the eyes held still, the paddle
+twitched left and right on its own. The corner-relative ratio divides by
+the eye's own corner-to-corner span, which is a small number — it is the
+width of one eye in frame-normalized coordinates, not the width of the
+frame. Landmark detection carries some amount of per-frame noise
+regardless of what it's measuring, and dividing that noise by a small span
+scales it up by roughly the inverse of the span. Noise that was negligible
+against the old, frame-absolute signal became visible against this one,
+and the EMA alone (`IRIS_X_EMA_ALPHA` was 0.25) wasn't a low-enough pass
+filter to remove it without adding unacceptable lag.
+
+Three changes address this, all applied before the EMA rather than by
+lowering the EMA alone:
+
+- `MIN_EYE_SPAN` (0.02) discards a per-eye reading outright when that eye's
+  corner span is below it, instead of trusting a ratio computed from a
+  near-zero denominator. `eyeRatio` now returns `null` in that case, and
+  `updateGazeFromLandmarks` drops it from the average; if both eyes are
+  unreliable in a given frame, the frame is skipped and `smoothedGazeX`
+  holds its last value rather than jumping to a guess.
+- A rolling median over the last `RAW_GAZE_MEDIAN_WINDOW` (5) raw combined-
+  eye readings runs before the EMA. A median rejects single-frame outlier
+  spikes outright, which an EMA can only ever attenuate — this is why the
+  two are combined instead of relying on either alone.
+- `IRIS_X_EMA_ALPHA` is lowered from 0.25 to 0.15 as an additional, smaller
+  measure on top of the two above.
+
+**This is unverified.** Everything in this subsection is a diagnosis and a
+standard mitigation for it, not a confirmed fix — the sandbox's fake camera
+feed never moves, so it cannot exhibit the twitching this addresses in the
+first place, and therefore cannot confirm it is gone either. `MIN_EYE_SPAN`,
+`RAW_GAZE_MEDIAN_WINDOW` and the lowered `IRIS_X_EMA_ALPHA` should all be
+treated as first-guess constants alongside the ones already called out at
+the top of this spec, pending a real-camera pass that checks both that the
+twitch is gone with the eyes still *and* that the paddle still responds
+promptly to deliberate eye movement — the median window and a lower alpha
+both trade responsiveness for stability, and only real hardware can show
+whether that trade landed in a usable place.
 
 ---
 
