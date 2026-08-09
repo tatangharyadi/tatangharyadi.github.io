@@ -204,7 +204,7 @@
 
 /* The video is a real, decodable frame source the model reads from — never
    display: none, which some browsers pause. Kept tiny and off to the side
-   instead, matching css/twin.css's approach. */
+   instead. */
 .iris--video {
     width: 1px;
     height: 1px;

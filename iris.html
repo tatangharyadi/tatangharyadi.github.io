@@ -17,15 +17,15 @@
     <meta property="og:title" content="Iris" />
     <meta property="og:description" content="A gaze-controlled Breakout, entirely on device." />
 
-    <!-- See specs/F05_IRIS.md#the-vendored-bundle-phones-home-and-iris-inherits-the-mitigation.
-         Iris loads the same vendor/mediapipe/tasks-vision/vision_bundle.mjs
-         Twin does, which carries its own usage-telemetry client that attempts
-         a fetch() to a Google-controlled host during ordinary inference, with
-         no consumer-facing opt-out. Iris calls detectForVideo() every frame
-         for the whole game, a longer exposure than Twin's calibration window,
-         so this mitigation is required here too. 'self' covers the
-         same-origin model/WASM fetches this page needs; 'blob:' covers the
-         vendored WASM loader's own blob: URL use. Neither list includes the
+    <!-- See specs/F05_IRIS.md#the-vendored-bundle-phones-home-and-iris-has-to-mitigate-it.
+         vendor/mediapipe/tasks-vision/vision_bundle.mjs carries its own
+         usage-telemetry client that attempts a fetch() to a
+         Google-controlled host during ordinary inference, with no
+         consumer-facing opt-out. Iris calls detectForVideo() every frame
+         for the whole game, so this mitigation runs for the entire session,
+         not just a calibration window. 'self' covers the same-origin
+         model/WASM fetches this page needs; 'blob:' covers the vendored
+         WASM loader's own blob: URL use. Neither list includes the
          telemetry host, so the browser refuses that request outright. Do not
          "fix" the resulting console line; it is the proof the block fired. -->
     <meta http-equiv="Content-Security-Policy" content="connect-src 'self' blob:" />
@@ -69,9 +69,9 @@
          calibration steps. -->
     <main class="iris--page">
 
-    <!-- Hidden until js/iris.js reveals it, same rule as #echo--gate and
-         #twin--gate: a no-JS visitor should never be shown a button that
-         cannot do anything. -->
+    <!-- Hidden until js/iris.js reveals it, same rule as #echo--gate:
+         a no-JS visitor should never be shown a button that cannot do
+         anything. -->
     <div class="iris--gate" id="iris--gate" hidden>
         <p>
             Pressing this asks your browser for camera access. The video
