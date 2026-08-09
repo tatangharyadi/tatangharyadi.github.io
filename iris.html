@@ -83,37 +83,32 @@
     <p class="iris--notice" id="iris--status" role="status" aria-live="polite"></p>
 
     <!-- Shown once the camera and model are ready, before gameplay starts.
-         The raw iris-x mean the model reads rarely spans the full 0-1 range
-         for a comfortable head-camera distance, so a straight linear map to
-         paddle position (the pre-calibration behaviour) leaves part of the
-         track unreachable for most visitors. Two captures — look left, look
-         right — record the visitor's own usable range once per session; see
-         specs/F05_IRIS.md. -->
+         The raw gaze score the model reads rarely spans the full 0-1 range
+         for a comfortable head-camera distance, and doesn't do so linearly,
+         so a straight two-point min/max map (this page's original
+         calibration) left the fit either too loose or too eager for most
+         visitors. Five captures — far left, quarter-left, center,
+         quarter-right, far right — are fit with a weighted polynomial
+         instead; see specs/F05_IRIS.md. -->
     <div class="iris--calibrate" id="iris--calibrate" hidden>
         <h2 class="visually-hidden">Calibrate your gaze</h2>
-        <p>
-            Look at the left edge of your screen and press "Capture left".
-            Then look at the right edge and press "Capture right". This maps
-            your own comfortable range of eye movement to the full width of
-            the paddle track.
+        <p id="iris--cal-instructions">
+            Look at the highlighted point below and press "Capture this
+            point". Five points, one at a time, map your own comfortable
+            range of eye movement to the paddle track.
         </p>
-        <!-- Decorative live readout of the current smoothed gaze position,
-             not a substitute for the text status above — aria-hidden so it
-             doesn't turn every animation frame into a screen-reader
-             announcement. -->
+        <!-- iris--cal-target: where to look, positioned by showCalStep().
+             iris--cal-marker: the live smoothed gaze reading, positioned
+             every frame in frame(). Both decorative — aria-hidden so
+             neither turns every animation frame into a screen-reader
+             announcement; the text status above is the accessible version
+             of the same information. -->
         <div class="iris--cal-track" aria-hidden="true">
+            <div class="iris--cal-target" id="iris--cal-target"></div>
             <div class="iris--cal-marker" id="iris--cal-marker"></div>
         </div>
-        <div class="iris--cal-buttons">
-            <button type="button" class="iris--cal-btn" id="iris--cal-left">
-                Capture left
-            </button>
-            <button type="button" class="iris--cal-btn" id="iris--cal-right">
-                Capture right
-            </button>
-        </div>
-        <button type="button" class="iris--cal-start" id="iris--cal-start" aria-disabled="true">
-            Start playing
+        <button type="button" class="iris--cal-btn" id="iris--cal-capture">
+            Capture this point
         </button>
         <p class="iris--cal-skip">
             <button type="button" class="iris--cal-skip-btn" id="iris--cal-skip">
