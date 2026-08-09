@@ -9,8 +9,8 @@ A static personal site: plain HTML and CSS, no build step, no package manager,
 served by GitHub Pages from `main`. There is nothing to install and nothing to
 compile. Edit the files directly.
 
-**There are exactly five JavaScript files of our own: `js/ask.js`, `js/game.js`,
-`js/mocap.js`, `js/mocap-retarget.js` and `js/twin.js`.** Everything else — the work index on the home page — is
+**There are exactly six JavaScript files of our own: `js/ask.js`, `js/game.js`,
+`js/mocap.js`, `js/mocap-retarget.js`, `js/twin.js` and `js/iris.js`.** Everything else — the work index on the home page — is
 [htmx](https://htmx.org) asking for static HTML fragments under `fragments/` and
 swapping them in. htmx arrives from a CDN pinned by version and SRI digest.
 
@@ -100,6 +100,22 @@ on the site where "vendored means same-origin means private" needed a second
 mechanism to actually be true, and the CSP violation line it produces in the
 console is deliberate, not a regression — see that section before "cleaning
 up" the console output on `twin.html`.
+
+`js/iris.js` earns the sixth exception on the same "boundary and renderer"
+grounds as `js/mocap.js` and `js/twin.js`: camera in, the same vendored
+MediaPipe Tasks Vision `FaceLandmarker` Twin already loads out, a Breakout
+game drawn to a `<canvas>`. It is not a new runtime and not a new committed
+model — it reuses `vendor/mediapipe/tasks-vision` and
+`assets/models/face-landmarker/face_landmarker.task` exactly as already
+committed for Twin, reading the model's face-blendshapes classifier output
+(`outputFaceBlendshapes: true`) that Twin's own code leaves off and never
+looks at, argued from scratch in
+[specs/F05_IRIS.md](specs/F05_IRIS.md). It also inherits Twin's CSP
+mitigation: `iris.html` carries the same `connect-src 'self' blob:` meta
+tag, for the same reason — the vendored bundle's usage-telemetry `fetch()`
+fires here too, and `js/iris.js` holds the camera open for a whole game
+rather than Twin's brief calibration window, so the exposure this closes is
+longer, not shorter.
 
 Do not introduce a bundler, framework or package manager to solve a problem that a
 few lines of CSS would solve. The absence of a toolchain is a design decision, not

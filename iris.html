@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Iris | Tatang Haryadi</title>
+    <meta name="description" content="Iris: a Breakout-style game where the paddle follows your gaze, read from a webcam by an on-device face model. Runs entirely in your browser; nothing about you ever leaves the tab." />
+    <meta name="theme-color" content="#dce0e8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#11111b" media="(prefers-color-scheme: dark)" />
+    <link rel="canonical" href="https://tatangharyadi.github.io/iris.html" />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Tatang Haryadi" />
+    <meta property="og:url" content="https://tatangharyadi.github.io/iris.html" />
+    <meta property="og:title" content="Iris" />
+    <meta property="og:description" content="A gaze-controlled Breakout, entirely on device." />
+
+    <!-- See specs/F05_IRIS.md#the-vendored-bundle-phones-home-and-iris-inherits-the-mitigation.
+         Iris loads the same vendor/mediapipe/tasks-vision/vision_bundle.mjs
+         Twin does, which carries its own usage-telemetry client that attempts
+         a fetch() to a Google-controlled host during ordinary inference, with
+         no consumer-facing opt-out. Iris calls detectForVideo() every frame
+         for the whole game, a longer exposure than Twin's calibration window,
+         so this mitigation is required here too. 'self' covers the
+         same-origin model/WASM fetches this page needs; 'blob:' covers the
+         vendored WASM loader's own blob: URL use. Neither list includes the
+         telemetry host, so the browser refuses that request outright. Do not
+         "fix" the resulting console line; it is the proof the block fired. -->
+    <meta http-equiv="Content-Security-Policy" content="connect-src 'self' blob:" />
+
+    <!-- Shared palette and reset, same file every other page uses, so this
+         page is not a sixth place scripts/check_palette.py would have to
+         track. css/iris.css is layout only. -->
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/iris.css" />
+
+    <script type="module" src="js/iris.js"></script>
+</head>
+
+<body>
+    <a class="skip-link" href="#iris--stage">Skip to the game</a>
+
+    <header class="iris--head">
+        <h1>Iris</h1>
+        <p class="iris--sub">
+            A Breakout-style game. The paddle follows your gaze, read from a
+            webcam by an on-device face model, downloaded once and cached.
+        </p>
+        <p class="iris--sub"><a href="index.html">Back to the rest of the site</a></p>
+        <p class="iris--sub">Also try <a href="mocap.html">Echo</a>, which
+            puppets a 3D character with your own movement instead of reading
+            your gaze.</p>
+    </header>
+
+    <noscript>
+        <p class="iris--notice">
+            This page needs JavaScript to request your camera and run the
+            WebAssembly model that drives it. Everything else on this site
+            works without it; this one genuinely cannot.
+        </p>
+    </noscript>
+
+    <!-- A landmark that exists for the whole session, unlike any one child
+         below: the game area toggles `hidden` on and off across the
+         gate/calibrate/game sequence, and a <main> that disappears with it
+         left the document without one at all during the gate and
+         calibration steps. -->
+    <main class="iris--page">
+
+    <!-- Hidden until js/iris.js reveals it, same rule as #echo--gate and
+         #twin--gate: a no-JS visitor should never be shown a button that
+         cannot do anything. -->
+    <div class="iris--gate" id="iris--gate" hidden>
+        <p>
+            Pressing this asks your browser for camera access. The video
+            frame is read directly by a face model that runs on your device.
+            No frame or landmark is ever transmitted — the page-level policy
+            above refuses any request that isn't to this same site, so
+            nothing here has anywhere else to send it.
+        </p>
+        <button type="button" class="iris--load" id="iris--load">
+            Start the camera
+        </button>
+        <p class="iris--gate-cost">Also downloads the face model, served
+            from this site and cached by your browser afterwards.</p>
+    </div>
+
+    <p class="iris--notice" id="iris--status" role="status" aria-live="polite"></p>
+
+    <!-- Shown once the camera and model are ready, before gameplay starts.
+         The raw gaze score the model reads rarely spans the full 0-1 range
+         for a comfortable head-camera distance, and doesn't do so linearly,
+         so a straight two-point min/max map (this page's original
+         calibration) left the fit either too loose or too eager for most
+         visitors. Five captures — far left, quarter-left, center,
+         quarter-right, far right — are fit with a weighted polynomial
+         instead; see specs/F05_IRIS.md. -->
+    <div class="iris--calibrate" id="iris--calibrate" hidden>
+        <h2 class="visually-hidden">Calibrate your gaze</h2>
+        <p id="iris--cal-instructions">
+            Look at the highlighted point below and press "Capture this
+            point". Five points, one at a time, map your own comfortable
+            range of eye movement to the paddle track.
+        </p>
+        <!-- iris--cal-target: where to look, positioned by showCalStep().
+             iris--cal-marker: the live smoothed gaze reading, positioned
+             every frame in frame(). Both decorative — aria-hidden so
+             neither turns every animation frame into a screen-reader
+             announcement; the text status above is the accessible version
+             of the same information. -->
+        <div class="iris--cal-track" aria-hidden="true">
+            <div class="iris--cal-target" id="iris--cal-target"></div>
+            <div class="iris--cal-marker" id="iris--cal-marker"></div>
+        </div>
+        <button type="button" class="iris--cal-btn" id="iris--cal-capture">
+            Capture this point
+        </button>
+        <p class="iris--cal-skip">
+            <button type="button" class="iris--cal-skip-btn" id="iris--cal-skip">
+                Skip calibration
+            </button>
+        </p>
+    </div>
+
+    <div class="iris" id="iris" hidden>
+        <!-- The video is the source of truth for gaze inference, not a
+             thing a visitor is meant to watch — the game is. Kept small
+             rather than display:none so it stays a real decodable frame
+             source in every browser. -->
+        <video class="iris--video" id="iris--video" muted playsinline aria-hidden="true"></video>
+
+        <section class="iris--stage-wrap" aria-labelledby="iris--stage-title">
+            <h2 id="iris--stage-title" class="visually-hidden">The game</h2>
+            <canvas class="iris--stage" id="iris--stage" width="480" height="360"></canvas>
+        </section>
+
+        <!-- Diagnostic-only readout of the raw gaze signal, gated behind
+             ?debug=1 by js/iris.js. Not part of the game; exists to let a
+             real webcam session show us what the eye-corner-ratio pipeline
+             is actually seeing, instead of guessing another filter constant
+             blind. Never shown by default, so it carries no colour and
+             needs no accessibility treatment beyond staying out of the tab
+             order when hidden. -->
+        <pre class="iris--debug" id="iris--debug" hidden aria-hidden="true"></pre>
+
+        <div class="iris--controls">
+            <button type="button" class="iris--recalibrate" id="iris--recalibrate">
+                Recalibrate
+            </button>
+            <button type="button" class="iris--stop" id="iris--stop">
+                Stop and release the camera
+            </button>
+        </div>
+    </div>
+
+    </main>
+</body>
+
+</html>

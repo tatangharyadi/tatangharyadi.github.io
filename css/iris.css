@@ -1,0 +1,252 @@
+/* Iris. Layout only — every colour below is one of css/style.css's shared
+   custom properties, so this file is not a sixth place
+   scripts/check_palette.py would have to track. */
+
+/* .iris, .iris--gate and .iris--calibrate all set their own `display` below,
+   which beats the browser's low-specificity `[hidden] { display: none }`
+   rule. Without this, toggling the `hidden` property in js/iris.js (the gate
+   -> calibrate -> game sequence) stops doing anything visually: every stage
+   renders at once. Same fix as css/game.css's [hidden] rule. */
+[hidden] {
+    display: none !important;
+}
+
+/* Landmark only — its children already carry their own layout rules
+   (.iris--gate, .iris--calibrate, .iris), so the wrapper itself must not
+   introduce a box of its own. */
+.iris--page {
+    display: contents;
+}
+
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    background: var(--bg-alt);
+    color: var(--text);
+    padding: 0.5rem 1rem;
+    border-radius: 0 0 8px 0;
+    z-index: 10;
+}
+
+.skip-link:focus {
+    left: 0;
+}
+
+.iris--head {
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: 2rem 1.5rem 1rem;
+}
+
+.iris--sub {
+    max-width: var(--measure);
+    color: var(--text-muted);
+}
+
+.iris--sub a {
+    color: var(--accent-text);
+    text-decoration: underline;
+}
+
+.iris--notice {
+    max-width: var(--measure);
+    margin: 1rem auto;
+    padding: 0 1.5rem;
+    color: var(--text-muted);
+}
+
+.iris--gate {
+    max-width: var(--measure);
+    margin: 1rem auto 2rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.iris--gate p {
+    margin: 0 0 1rem;
+}
+
+.iris--gate-cost {
+    margin: 1rem 0 0 !important;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.iris--load,
+.iris--stop,
+.iris--cal-btn,
+.iris--recalibrate {
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.6rem 1.25rem;
+    border-radius: 6px;
+    color: var(--bg);
+    background: var(--accent-text);
+    border: 2px solid var(--accent-text);
+}
+
+.iris--load:hover,
+.iris--stop:hover,
+.iris--cal-btn:hover,
+.iris--recalibrate:hover {
+    color: var(--accent-text);
+    background: var(--bg);
+}
+
+.iris--load:focus-visible,
+.iris--stop:focus-visible,
+.iris--cal-btn:focus-visible,
+.iris--recalibrate:focus-visible {
+    outline: 3px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
+.iris--load[aria-disabled='true'],
+.iris--stop[aria-disabled='true'] {
+    cursor: progress;
+    opacity: 0.6;
+}
+
+.iris--calibrate {
+    max-width: var(--measure);
+    margin: 1rem auto 2rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.iris--calibrate p {
+    margin: 0 0 1rem;
+}
+
+.iris--cal-track {
+    position: relative;
+    width: 100%;
+    height: 10px;
+    margin: 0 0 1rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+}
+
+.iris--cal-marker {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 14px;
+    height: 14px;
+    background: var(--accent-text);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* Where to look for the current calibration point, positioned by
+   showCalStep(). A hollow ring rather than a filled dot so it stays
+   visually distinct from .iris--cal-marker (the live reading) even when
+   both sit at the same position — that overlap is the visitor's cue that
+   the live signal matches the target. */
+.iris--cal-target {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    border: 3px solid var(--text);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.iris--cal-btn {
+    margin: 0 0 1rem;
+}
+
+.iris--cal-skip {
+    margin: 0.75rem 0 0 !important;
+}
+
+.iris--cal-skip-btn {
+    font: inherit;
+    color: var(--accent-text);
+    text-decoration: underline;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0.25rem;
+}
+
+.iris--cal-skip-btn:focus-visible {
+    outline: 3px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
+.iris--controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+}
+
+.iris {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+/* The video is a real, decodable frame source the model reads from — never
+   display: none, which some browsers pause. Kept tiny and off to the side
+   instead, matching css/twin.css's approach. */
+.iris--video {
+    width: 1px;
+    height: 1px;
+    position: absolute;
+    overflow: hidden;
+}
+
+.iris--stage-wrap {
+    width: 100%;
+    max-width: 480px;
+}
+
+.iris--stage {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.iris--debug {
+    width: 100%;
+    max-width: 480px;
+    margin: 0;
+    padding: 0.75rem 1rem;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    color: var(--text-muted);
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+@media (max-width: 750px) {
+    .iris--head {
+        padding: 1.5rem 1rem 0.75rem;
+    }
+
+    .iris {
+        padding: 0 1rem 2rem;
+    }
+}

@@ -105,14 +105,18 @@
             <div class="masthead--container">
                 <div class="masthead--identity">
                     <h1 class="masthead--name">Tatang Haryadi</h1>
-                    <!-- The job title is two doors, one word each. game.html is a
-                         trading simulation compiled to WebAssembly from Rust and
-                         mocap.html (nicknamed Echo) is a webcam-driven pose demo;
-                         neither is in the nav
-                         on purpose, because a hiring manager reading this page should
-                         not have to step over either to reach the work. Anyone who
-                         hovers the title, tabs through the page or reads the sitemap
-                         finds them, which is the right audience.
+                    <!-- The job title is two doors, one word each. iris.html is a
+                         gaze-controlled Breakout demo and game.html is a trading
+                         simulation compiled to WebAssembly from Rust; neither is in
+                         the nav on purpose, because a hiring manager reading this
+                         page should not have to step over either to reach the work.
+                         Anyone who hovers the title, tabs through the page or reads
+                         the sitemap finds them, which is the right audience.
+
+                         mocap.html (nicknamed Echo) used to hold the "Officer" door;
+                         it lost that spot to game.html when Iris shipped, so it is
+                         now reached from a link on iris.html instead — see the note
+                         on iris.html's own header.
 
                          Both stay plain <a href>s so they are real links: middle-click
                          opens a tab, the keyboard reaches them with no handler of ours,
@@ -121,12 +125,12 @@
                          word carrying the link — "Technology" reads as ordinary text
                          between them. -->
                     <p class="masthead--role">Chief
+                        <a class="masthead--iris" id="masthead-iris" href="iris.html"
+                           title="Follow the gaze"
+                           aria-label="Iris: a gaze-controlled Breakout game, on device">Technology</a>
                         <a class="masthead--helm" id="masthead-helm" href="game.html"
                            title="Take the helm"
-                           aria-label="Take the helm: a sailing and trading simulation">Technology</a>
-                        <a class="masthead--echo" id="masthead-echo" href="mocap.html"
-                           title="Find your echo"
-                           aria-label="Echo: puppet a 3D character with your own movement, on device">Officer</a>
+                           aria-label="Take the helm: a sailing and trading simulation">Officer</a>
                     </p>
                     <!-- Concrete before general, deliberately. An earlier version
                          opened with "I accelerate digital transformations and product
