@@ -231,6 +231,26 @@ let smoothedPaddleFraction = null;
 // correction itself is applied inline in updateGazeFromResult().
 let lastYaw = 0;
 
+// Latest frame's blendshape/yaw readout, kept so captureCalPoint() can
+// attach it to a telemetry entry without updateGazeFromResult() needing to
+// know calibration exists. null until the first frame with a detected face.
+let lastGazeInfo = null;
+
+// One entry per "Capture this point" press, DEBUG-only (see DEBUG's
+// comment) — this is a downloadable record of exactly what the model saw at
+// each capture, for a visitor to hand back after a real-hardware session
+// instead of transcribing ?debug=1 numbers by hand. Reset each start().
+let calTelemetry = [];
+
+// One entry per gameplay frame, DEBUG-only, capped at PLAY_TELEMETRY_MAX_SAMPLES
+// so a long session can't grow this unbounded — the calibration-only
+// telemetry above can show whether the raw signal has real range, but a
+// reported "jittery paddle" happens during play, not at a capture button
+// press, so nothing upstream of this array could have shown it. Downloaded
+// on "Stop and release the camera" alongside the calibration record.
+const PLAY_TELEMETRY_MAX_SAMPLES = 3000;
+let playTelemetry = [];
+
 let game = null; // set up fresh each beginGame()
 
 // Cached --text/--accent-text/--border/--bg-alt, read once here rather than
@@ -409,6 +429,8 @@ function updateGazeFromResult(result) {
     recentSmoothed.push(smoothedGazeX);
     if (recentSmoothed.length > CAPTURE_AVERAGE_WINDOW) recentSmoothed.shift();
 
+    lastGazeInfo = { right, left, score, rawX, medianX, yaw: lastYaw };
+
     if (DEBUG) renderDebug({ right, left, rawX, medianX, score });
 }
 
@@ -513,6 +535,17 @@ function stepGame(g, dt) {
 
     g.paddleX = smoothedPaddleFraction * (g.width - PADDLE_WIDTH);
     g.paddleX = Math.max(0, Math.min(g.width - PADDLE_WIDTH, g.paddleX));
+
+    if (DEBUG) {
+        playTelemetry.push({
+            t: performance.now(),
+            smoothedGazeX,
+            targetFraction,
+            smoothedPaddleFraction,
+            yaw: lastYaw,
+        });
+        if (playTelemetry.length > PLAY_TELEMETRY_MAX_SAMPLES) playTelemetry.shift();
+    }
 
     const b = g.ball;
     b.x += b.vx * dt;
@@ -669,11 +702,66 @@ function calWeightOf(sample) {
     return sample.target === 0 || sample.target === 1 ? CAL_EDGE_WEIGHT : CAL_INTERIOR_WEIGHT;
 }
 
+// Builds a downloadable JSON record of every calibration capture this
+// session — DEBUG-only, see calTelemetry's comment. Downloading is the only
+// way a static page with no backend can hand a visitor a file at all: a
+// Blob URL and a synthetic click, no server or network request involved,
+// consistent with nothing on this page having anywhere to send data to.
+function downloadCalTelemetry(outcome) {
+    const payload = {
+        capturedAt: new Date().toISOString(),
+        headYawCorrectionGain: HEAD_YAW_CORRECTION_GAIN,
+        calPolyDegree: CAL_POLY_DEGREE,
+        captureAverageWindow: CAPTURE_AVERAGE_WINDOW,
+        outcome,
+        coeffs: calCoeffs,
+        points: calTelemetry,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `iris-calibration-${Date.now()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
+// Mirrors downloadCalTelemetry() but for the gameplay trace — see
+// playTelemetry's comment for why this exists separately.
+function downloadPlayTelemetry() {
+    const payload = {
+        capturedAt: new Date().toISOString(),
+        paddleEmaAlpha: PADDLE_EMA_ALPHA,
+        irisXEmaAlpha: IRIS_X_EMA_ALPHA,
+        coeffs: calCoeffs,
+        samples: playTelemetry,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `iris-gameplay-${Date.now()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
 function captureCalPoint() {
     const raw = recentSmoothed.length
         ? recentSmoothed.reduce((sum, v) => sum + v, 0) / recentSmoothed.length
         : smoothedGazeX;
     calSamples.push({ raw, target: CAL_POINTS[calStepIndex].target });
+
+    if (DEBUG) {
+        calTelemetry.push({
+            step: calStepIndex,
+            target: CAL_POINTS[calStepIndex].target,
+            label: CAL_POINTS[calStepIndex].label,
+            capturedRaw: raw,
+            recentSmoothed: recentSmoothed.slice(),
+            lastFrame: lastGazeInfo,
+        });
+    }
+
     calStepIndex += 1;
 
     if (calStepIndex < CAL_POINTS.length) {
@@ -692,11 +780,13 @@ function captureCalPoint() {
         // fall back to uncalibrated rather than fit a polynomial to noise.
         calCoeffs = null;
         setStatus("Those five points read almost the same — skipping calibration for this session.");
+        if (DEBUG) downloadCalTelemetry('skipped-min-separation');
         beginGame();
         return;
     }
 
     calCoeffs = fitPolynomial(calSamples, CAL_POLY_DEGREE, calWeightOf);
+    if (DEBUG) downloadCalTelemetry('fitted');
     beginGame();
 }
 
@@ -704,6 +794,7 @@ function enterCalibration() {
     mode = 'calibrating';
     calStepIndex = 0;
     calSamples = [];
+    calTelemetry = [];
     els.main.hidden = true;
     els.calibrate.hidden = false;
     showCalStep();
@@ -750,6 +841,8 @@ async function start() {
         smoothedPaddleFraction = null;
         droppedFrames = 0;
         calCoeffs = null;
+        calTelemetry = [];
+        playTelemetry = [];
 
         els.gate.hidden = true;
         enterCalibration();
@@ -766,6 +859,8 @@ async function start() {
 }
 
 function stop() {
+    if (DEBUG && playTelemetry.length) downloadPlayTelemetry();
+
     if (rafId !== null) {
         cancelAnimationFrame(rafId);
         rafId = null;
