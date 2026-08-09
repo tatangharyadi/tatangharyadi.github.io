@@ -2,6 +2,22 @@
    custom properties, so this file is not a sixth place
    scripts/check_palette.py would have to track. */
 
+/* .iris, .iris--gate and .iris--calibrate all set their own `display` below,
+   which beats the browser's low-specificity `[hidden] { display: none }`
+   rule. Without this, toggling the `hidden` property in js/iris.js (the gate
+   -> calibrate -> game sequence) stops doing anything visually: every stage
+   renders at once. Same fix as css/game.css's [hidden] rule. */
+[hidden] {
+    display: none !important;
+}
+
+/* Landmark only — its children already carry their own layout rules
+   (.iris--gate, .iris--calibrate, .iris), so the wrapper itself must not
+   introduce a box of its own. */
+.iris--page {
+    display: contents;
+}
+
 .skip-link {
     position: absolute;
     left: -9999px;
@@ -30,6 +46,7 @@
 
 .iris--sub a {
     color: var(--accent-text);
+    text-decoration: underline;
 }
 
 .iris--notice {

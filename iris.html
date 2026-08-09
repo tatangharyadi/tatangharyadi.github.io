@@ -62,6 +62,13 @@
         </p>
     </noscript>
 
+    <!-- A landmark that exists for the whole session, unlike any one child
+         below: the game area toggles `hidden` on and off across the
+         gate/calibrate/game sequence, and a <main> that disappears with it
+         left the document without one at all during the gate and
+         calibration steps. -->
+    <main class="iris--page">
+
     <!-- Hidden until js/iris.js reveals it, same rule as #echo--gate and
          #twin--gate: a no-JS visitor should never be shown a button that
          cannot do anything. -->
@@ -117,7 +124,7 @@
         </p>
     </div>
 
-    <main class="iris" id="iris" hidden>
+    <div class="iris" id="iris" hidden>
         <!-- The video is the source of truth for gaze inference, not a
              thing a visitor is meant to watch — the game is. Kept small
              rather than display:none so it stays a real decodable frame
@@ -146,6 +153,8 @@
                 Stop and release the camera
             </button>
         </div>
+    </div>
+
     </main>
 </body>
 
