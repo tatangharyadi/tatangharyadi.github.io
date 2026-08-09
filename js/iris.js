@@ -40,8 +40,16 @@ const FACE_MODEL_URL = 'assets/models/face-landmarker/face_landmarker.task';
 // relative to the target. gazeScoreFromLandmarks() below returns to the
 // corner-ratio geometry, this time with the head-yaw correction below
 // applied to it — the ingredient the first three rounds never had.
-const RAW_GAZE_MEDIAN_WINDOW = 5;
-const IRIS_X_EMA_ALPHA = 0.15;
+// A real-hardware session with a "fitted" calibration (2026-08-09, second
+// round) still reported "barely moved": its own telemetry showed the paddle
+// *could* reach both edges, but only after ~3s of raw gaze movement — far
+// slower than a dodge in actual gameplay needs. PADDLE_EMA_ALPHA below is
+// what's meant to absorb the jitter calibration's steep gain amplifies (see
+// its own comment), which frees these two to cut latency without
+// reintroducing the jitter that pairing existed to solve. First-guess retune,
+// pending a fresh telemetry pair the same way every constant above it was.
+const RAW_GAZE_MEDIAN_WINDOW = 3;
+const IRIS_X_EMA_ALPHA = 0.3;
 
 // Public reference implementations that report working accuracy on the same
 // FaceLandmarker API (github.com/aciderix/React-Eye-Tracker-V1,
