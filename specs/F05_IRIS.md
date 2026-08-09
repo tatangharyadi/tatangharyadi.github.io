@@ -38,24 +38,22 @@ signal landed have each found and fixed a distinct problem:
   check whether the vertex falls inside the captured raw range and, if so,
   refit at degree 1 instead of keeping the degenerate quadratic.
 
-Neither fix has yet been confirmed against a fourth real-hardware session
-played, not just measured — see "Pending" below. AC02 (real-camera gaze
-signal stability and responsiveness), AC04 (the CSP-violation line firing
-against a live camera session), AC06 (full keyboard traversal through a
-real camera grant, including the calibration step) and AC08 (canvas text
-contrast, which Lighthouse cannot read off canvas pixels) all need a human
-with a webcam. `MIRROR_GAZE_X`, `HEAD_YAW_CORRECTION_GAIN`,
-`IRIS_X_EMA_ALPHA`, `RAW_GAZE_MEDIAN_WINDOW`, `PADDLE_EMA_ALPHA` and
-`CAL_MIN_SEPARATION` in `js/iris.js` are still first-guess constants (or,
-for the first two rounds' worth, retuned first guesses) and should be
-expected to change again as more sessions come in.
+A fourth real-hardware session (2026-08-09), played rather than only
+measured, confirmed both fixes: the paddle tracked at a usable speed and
+without the erratic swings session 3 found. The report was "pass for now,
+we can iterate again later" — a working baseline, not a claim that tuning
+is done. AC04 (the CSP-violation line firing against a live camera
+session), AC06 (full keyboard traversal through a real camera grant,
+including the calibration step) and AC08 (canvas text contrast, which
+Lighthouse cannot read off canvas pixels) were not specifically exercised
+by this session and still need a human with a webcam to check.
+`MIRROR_GAZE_X`, `HEAD_YAW_CORRECTION_GAIN`, `IRIS_X_EMA_ALPHA`,
+`RAW_GAZE_MEDIAN_WINDOW`, `PADDLE_EMA_ALPHA` and `CAL_MIN_SEPARATION` in
+`js/iris.js` are still first-guess constants (or, for the first two
+rounds' worth, retuned first guesses) and should be expected to change
+again as more sessions come in.
 
 ### Pending
-
-A fourth real-hardware telemetry pair, played rather than only measured,
-is needed to confirm both `bf37945` and `2b104c5` actually fixed what they
-targeted — the analysis behind each was telemetry-only, not a person
-reporting the paddle feels right.
 
 The premise that the iris landmarks exist at all is no longer assumed: the
 committed `assets/models/face-landmarker/face_landmarker.task`'s
@@ -612,9 +610,9 @@ monotonic map) and a prior session's (vertex ≈0.542, outside its range
 [0.480, 0.526] → unaffected), by replicating `fitPolynomial()` outside the
 browser against both sessions' actual telemetry.
 
-Neither `bf37945` nor `2b104c5` has yet been confirmed by a person playing
-the game and reporting on it, only by re-deriving properties of past
-telemetry — see "Pending" at the top of this document.
+Both `bf37945` and `2b104c5` were confirmed by a person playing the game
+(2026-08-09), not only by re-deriving properties of past telemetry — see
+"Pending" at the top of this document.
 
 ---
 
@@ -686,7 +684,7 @@ plus a re-entry guard flag, same as the other three features.
 | ID | Criterion | Evidence |
 | --- | --- | --- |
 | F05-AC01 | The committed `face_landmarker.task`'s detector emits 478 landmarks (468 face mesh + 10 iris, indices 468–477), not 468. | **Verified 2026-08-09**: `face_landmarks_detector.tflite` extracted from the `.task` bundle and its output tensor inspected — shape `[1, 1, 1, 1434]`, 1434 = 478 × 3 |
-| F05-AC02 | The head-yaw-corrected eye-corner-relative gaze signal, run through calibration, is stable enough frame-to-frame to drive continuous paddle movement without a dwell timer, tracks eye movement independent of head position, and responds to a gaze shift within roughly a second rather than several (the original mean-landmark-x version and an intervening blendshapes-classifier version both failed this — see "How this got here"). | Human, real camera, real browser, actually played rather than only measured from telemetry — see "Pending" at the top of this document |
+| F05-AC02 | The head-yaw-corrected eye-corner-relative gaze signal, run through calibration, is stable enough frame-to-frame to drive continuous paddle movement without a dwell timer, tracks eye movement independent of head position, and responds to a gaze shift within roughly a second rather than several (the original mean-landmark-x version and an intervening blendshapes-classifier version both failed this — see "How this got here"). | **Verified 2026-08-09**: human, real camera, real browser, actually played (not just measured from telemetry) — reported pass, further tuning expected as more sessions come in |
 | F05-AC03 | No new file is vendored under `vendor/` or `assets/models/`; `js/iris.js` loads the same `face_landmarker.task` already committed for Twin. | Structural: diff against `git status` after implementation |
 | F05-AC04 | The video frame and landmarks are never transmitted anywhere, including the same `odml.pa.googleapis.com` telemetry call the vendored `@mediapipe/tasks-vision` bundle makes unconditionally after ~30s of `detectForVideo()` (see "The vendored bundle phones home" above). `iris.html` ships the same `<meta http-equiv="Content-Security-Policy" content="connect-src 'self' blob:">` tag `twin.html` uses — Iris calls `detectForVideo()` every frame for the whole game, strictly longer exposure than Twin's calibration window, so this is required, not conditional. | Verify a CSP-violation console line for the blocked request and no successful third-party request in the network panel, same method as F04-AC03 |
 | F05-AC05 | Spoken lines are read from a small authored, fixed set, never generated at runtime. | Structural: `js/iris.js` |
