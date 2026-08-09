@@ -812,6 +812,29 @@ function captureCalPoint() {
     }
 
     calCoeffs = fitPolynomial(calSamples, CAL_POLY_DEGREE, calWeightOf);
+
+    // A degree-2 fit's vertex is where its slope hits zero: everything on
+    // one side of it is flat (paddle pinned at an edge no matter how the
+    // gaze moves) and everything near it is steep (ordinary per-frame noise
+    // reads as a full-track swing). If the vertex lands inside the raw
+    // range this session actually captured, that pathology sits right where
+    // gameplay will spend its time. It doesn't need five points that happen
+    // to be well separated overall — two adjacent captures landing this
+    // close (e.g. an undershot "quarter of the way" target) is exactly the
+    // shape that produces it, and CAL_MIN_SEPARATION's overall-spread check
+    // above can't see it. A straight line can't have this problem, so
+    // degrading to degree 1 keeps the fit rather than discarding it outright
+    // the way the min-separation fallback does.
+    const [, c1, c2] = calCoeffs;
+    if (c2 !== undefined && Math.abs(c2) > 1e-9) {
+        const vertex = -c1 / (2 * c2);
+        const minRaw = Math.min(...rawValues);
+        const maxRaw = Math.max(...rawValues);
+        if (vertex > minRaw && vertex < maxRaw) {
+            calCoeffs = fitPolynomial(calSamples, 1, calWeightOf);
+        }
+    }
+
     if (DEBUG) downloadCalTelemetry('fitted');
     beginGame();
 }
