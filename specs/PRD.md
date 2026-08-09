@@ -178,46 +178,40 @@ in the masthead role.
   breakpoints, reduced motion, Lighthouse, and that real-camera pass) have
   not yet been run.
 
-### F04: Twin → [F04_TWIN.md](F04_TWIN.md)
+### F04: Twin — retired
 
 A downloadable 3D copy of the visitor's own face, reached by a link from
 `mocap.html` rather than a third masthead word.
 
 - MediaPipe's Face Landmarker, run through `@mediapipe/tasks-vision`
   (a second, independent vendored runtime, argued separately from
-  `js/mocap.js`'s LiteRT.js), turns a webcam capture into 468 landmark
+  `js/mocap.js`'s LiteRT.js), turned a webcam capture into 468 landmark
   positions in a fixed topology matching a vendored canonical face mesh.
-  Nothing is uploaded, for the same structural reason Ask's question and
+  Nothing was uploaded, for the same structural reason Ask's question and
   Echo's video frame never are.
-- The visitor's own landmark positions deform the canonical mesh; the
-  visitor's own captured frame is baked onto its existing UVs. This is a
-  digital twin, not a puppeted avatar: there is no separate character and
-  nothing here is driven by expression.
-- Stylization is canvas/geometry-level filtering only — no generative model.
-  Export is a client-side `THREE.GLTFExporter` → `Blob` → `<a download>`,
-  never a fetch.
-- **Status: shipped** (PR #24, 2026-08-06) — `twin.html`, `css/twin.css`,
-  `js/twin.js` and the vendored `@mediapipe/tasks-vision` runtime are all on
-  `main`. The front-only milestone (capture, deform, bake, stylize, export)
-  is live; a second, multi-angle milestone remains deferred, gated on a
-  real-camera measurement of how far a turned head still yields a detection,
-  not an assumed angle. Full detail, including the scope cuts and why
-  multi-angle capture only ever extends texture and never geometry, is in
-  F04_TWIN.md.
+- The visitor's own landmark positions deformed the canonical mesh; the
+  visitor's own captured frame was baked onto its existing UVs. This was a
+  digital twin, not a puppeted avatar: there was no separate character and
+  nothing was driven by expression.
+- **Status: shipped, then retired.** Shipped in PR #24 (2026-08-06);
+  `twin.html`, `css/twin.css`, `js/twin.js` and `specs/F04_TWIN.md` were
+  removed as part of Twin's retirement. `@mediapipe/tasks-vision` and
+  `face_landmarker.task` stayed vendored — F05 (Iris) depends on both
+  independently; see F05_IRIS.md.
 
 ### F05: Iris → [F05_IRIS.md](F05_IRIS.md)
 
-A gaze-controlled Breakout, reusing the iris landmarks Twin's `FaceLandmarker`
-already reports and discards.
+A gaze-controlled Breakout, reading iris position from MediaPipe's
+`FaceLandmarker`.
 
-- Twin's `FaceLandmarker` call returns 478 landmarks per detection — 468
-  face-mesh points plus 10 iris points at indices 468–477 — regardless of
-  which optional outputs are requested; Twin only ever reads the first 468.
-  Iris reads the other 10, mapping their mean position to a paddle's
-  horizontal position, smoothed with an EMA. No new model, no new vendored
-  runtime: it reuses `@mediapipe/tasks-vision` and `face_landmarker.task`
-  exactly as already committed for Twin, rather than falling back to
-  Echo's body-only LiteRT pipeline, which has no face model loaded at all.
+- `FaceLandmarker.createFromOptions()` returns 478 landmarks per detection —
+  468 face-mesh points plus 10 iris points at indices 468–477 — regardless
+  of which optional outputs are requested. Iris reads only the 10 iris
+  points, mapping their mean position to a paddle's horizontal position,
+  smoothed with an EMA. It vendors `@mediapipe/tasks-vision` and
+  `face_landmarker.task` for this on its own terms (see F05_IRIS.md), rather
+  than falling back to Echo's body-only LiteRT pipeline, which has no face
+  model loaded at all.
 - Breakout was chosen over other classic games specifically because it
   needs only a continuous 1D position signal and no second, discrete gaze
   action (no dwell timer, no blink detector) — unlike shooting-gallery-style

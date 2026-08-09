@@ -1,14 +1,13 @@
 // Iris: a Breakout-style game whose paddle follows the visitor's gaze.
 //
 // The boundary shape below — start camera, load FaceLandmarker, run
-// detectForVideo() every frame, stop and release everything on demand — is
-// the same one js/twin.js uses, reusing Twin's already-vendored runtime and
-// already-committed model (see specs/F05_IRIS.md, F05-AC03). What differs
-// is what happens with the model's output: Twin deforms a mesh with the 468
-// face-mesh points; Iris reads the position of each eye's iris landmark
+// detectForVideo() every frame, stop and release everything on demand —
+// reuses the vendored vision_bundle.mjs runtime and committed
+// face_landmarker.task model (see specs/F05_IRIS.md, F05-AC03) without a
+// 3D renderer: Iris reads the position of each eye's iris landmark
 // relative to that eye's own corner-to-corner span (see
 // gazeScoreFromLandmarks()) to drive a paddle, and never touches the DOM
-// with a 3D renderer at all — the "renderer" here is a plain 2D canvas.
+// with anything but a plain 2D canvas.
 // This file has already tried, and abandoned, two other gaze signals on
 // real hardware before landing here — see gazeScoreFromLandmarks()'s own
 // comment and specs/F05_IRIS.md for why each one failed.
@@ -66,9 +65,9 @@ const IRIS_X_EMA_ALPHA = 0.3;
 // by different amounts under perspective, which is a plausible reason the
 // very first hand-rolled attempt (before this correction existed) showed no
 // usable range. facialTransformationMatrixes is the same already-committed
-// model's own head-pose output (no new asset, exactly the "flip a flag on
-// the call Twin already makes" pattern), so head yaw is available for free
-// rather than estimated from landmarks a second way.
+// model's own head-pose output — just a flag on the same detectForVideo()
+// call — so head yaw is available for free rather than estimated from
+// landmarks a second way.
 const HEAD_YAW_CORRECTION_GAIN = 0.2;
 
 // CAL_POINTS replaces the old two-point (left, right) capture with five,

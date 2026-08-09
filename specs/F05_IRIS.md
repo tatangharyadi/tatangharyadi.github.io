@@ -86,33 +86,28 @@ landmarks to drive a rig, but there is no rig, no mesh deform, no capture,
 and no download here. The visitor never sees their own face; they see a
 ball and bricks respond to where they're looking.
 
-### Why this reuses Twin's runtime instead of Echo's, and adds no third
+### Why this needs MediaPipe Tasks Vision instead of Echo's LiteRT
 
 `js/mocap.js` calls LiteRT.js directly for BlazePose's 33 *body* landmarks
 — no face model is loaded at all, so there is nothing in Echo's pipeline
-resembling gaze. `js/twin.js` already vendors `@mediapipe/tasks-vision` and
-calls `FaceLandmarker.createFromOptions()`; the Tasks Vision face model
-unconditionally returns 478 landmarks per detection — 468 face-mesh points
-plus 10 iris points at indices 468–477 — regardless of the
-`outputFaceBlendshapes` / `outputFacialTransformationMatrixes` flags, which
-only gate *additional* outputs, not the base landmark set. Twin's own code
-never reads indices 468–477; it only uses the 468 mesh points to deform the
-canonical face.
+resembling gaze, and no flag or option on that pipeline can produce one:
+BlazePose is a body-pose model, full stop.
 
-Iris needs exactly the ten landmarks Twin already receives and discards. So
-this spec reuses Twin's vendored runtime and boundary shape
-(`FilesetResolver.forVisionTasks()` → `FaceLandmarker.createFromOptions()`
-→ `detectForVideo()` in a loop) rather than vendoring a second face model or
-falling back to Echo's body-only LiteRT pipeline, which cannot produce this
-signal at all. `js/twin.js` and a prospective `js/iris.js` would therefore
-both load the same `face_landmarker.task` already committed for Twin — no
-new model file, no new vendored runtime — but remain two separate files:
-Twin deforms a mesh from 468 points and exports a `.glb`; Iris reads 10
-points and moves a paddle. Folding gaze-controlled gameplay into
-`js/twin.js` would mean a face-copying feature and a game sharing one file
-for no reason beyond both starting from the same detector call, which is
-the same "argued from scratch, not from precedent" standard `AGENTS.md`
-already holds Twin to against Echo.
+MediaPipe Tasks Vision's `FaceLandmarker` does the job. Loading it —
+`FilesetResolver.forVisionTasks()` → `FaceLandmarker.createFromOptions()` →
+`detectForVideo()` in a loop — unconditionally returns 478 landmarks per
+detection: 468 face-mesh points plus 10 iris points at indices 468–477,
+regardless of the `outputFaceBlendshapes` / `outputFacialTransformationMatrixes`
+flags, which only gate *additional* outputs, not the base landmark set.
+Iris reads exactly those ten iris-position landmarks and ignores the other
+468; it never deforms a mesh, exports anything, or renders the face back to
+the visitor at all.
+
+This is `js/iris.js`'s own exception in `AGENTS.md`, argued from scratch
+there rather than as an extension of Echo's: Echo's boundary is LiteRT.js
+and BlazePose, Iris's is MediaPipe Tasks Vision and `FaceLandmarker`, and
+the two runtimes and their committed models are vendored and loaded
+independently of each other.
 
 ### TTS needs no new vendoring at all
 
@@ -120,7 +115,7 @@ Unlike the face model, speech needs nothing committed to the repo. The
 browser's own `speechSynthesis.speak()` and `speechSynthesis.getVoices()`
 use whatever voices the visitor's OS/browser ships — no model download, no
 network fetch, no vendored runtime. This is a structurally different
-situation from Ask's `onnxruntime` weights or Twin's `face_landmarker.task`:
+situation from Ask's `onnxruntime` weights or Iris's own `face_landmarker.task`:
 TTS is available or it silently isn't (a device with no installed voices
 simply produces no audio), and either way nothing here can grow the
 repository's asset footprint.
@@ -139,10 +134,10 @@ two-doors pattern than adding a footnote to a page with no door of its
 own.)
 
 `mocap.html` does not lose reachability, it loses its *masthead* door.
-Losing the masthead door leaves it exactly as reachable as `twin.html`
-already was — sitemap, hover, tab order — plus a same-page cross-link:
-`mocap.html` and `iris.html` each carry an "Also try" paragraph pointing at
-the other, the same framing `mocap.html` already used for `twin.html`.
+Losing the masthead door leaves it reachable the same way every
+non-masthead page on this site is — sitemap, hover, tab order — plus a
+same-page cross-link: `mocap.html` and `iris.html` each carry an "Also try"
+paragraph pointing at the other.
 `game.html` and `iris.html` deliberately do **not** cross-link each other:
 each now has its own masthead door, so a footnote pointing from one to the
 other would just be a second route to a page reachable in one hop already.
@@ -155,10 +150,12 @@ other would just be a second route to a page reachable in one hop already.
 | --- | --- |
 | `iris.html` | The page: camera gate, canvas, paddle/ball/brick rendering, score/status region, and the `connect-src 'self' blob:` CSP meta tag (see "The vendored bundle phones home" below) |
 | `css/iris.css` | Stage/gate layout. No colour of its own beyond the shared palette. |
-| `js/iris.js` | Camera acquisition, Tasks Vision load (reusing Twin's `FaceLandmarker` boundary shape), iris-position smoothing, game loop, `speechSynthesis` calls |
+| `js/iris.js` | Camera acquisition, MediaPipe Tasks Vision `FaceLandmarker` load, iris-position smoothing, game loop, `speechSynthesis` calls |
 
-No new file under `assets/models/` or `vendor/` — both are already committed
-for Twin and reused as-is.
+`vendor/mediapipe/tasks-vision` and
+`assets/models/face-landmarker/face_landmarker.task` are the runtime and
+model this spec vendors — see "Why this needs MediaPipe Tasks Vision
+instead of Echo's LiteRT" above.
 
 ---
 
@@ -231,8 +228,8 @@ for anything.
   a tracking signal, not a rehabilitation tool, and does not carry that
   scope.
 - **No recording, no server-side anything.** Same structural privacy claim
-  as Echo and Twin: the capture frame and the landmarks never cross a
-  network boundary.
+  as Echo's: the capture frame and the landmarks never cross a network
+  boundary.
 
 ---
 
@@ -467,8 +464,9 @@ score ARKit-standard expression categories, confirmed present via `strings`
 on the extracted `.tflite` — and among those categories are
 `eyeLookInLeft`, `eyeLookInRight`, `eyeLookOutLeft`, and `eyeLookOutRight`:
 a purpose-built gaze-direction estimate, not geometry derived by hand from
-landmark positions. It ships inside the model Twin already loads; Twin
-simply never asks for it, so enabling it costs no new download, just
+landmark positions. It ships inside the same `face_landmarker.task` already
+committed for the corner-ratio signal above; nothing here asks for it by
+default, so enabling it costs no new download, just
 `outputFaceBlendshapes: true` on the existing `createFromOptions()` call.
 
 `gazeScoreFromBlendshapes()` in `js/iris.js` reads it. Looking to one side
@@ -616,43 +614,36 @@ Both `bf37945` and `2b104c5` were confirmed by a person playing the game
 
 ---
 
-## The vendored bundle phones home, and Iris inherits the mitigation
+## The vendored bundle phones home, and Iris has to mitigate it
 
-Reusing Twin's runtime means reusing its risk, not just its capability.
-`vendor/mediapipe/tasks-vision/vision_bundle.mjs` contains a usage-telemetry
-client instantiated unconditionally inside `createFromOptions()` — the same
-call both `js/twin.js` and a prospective `js/iris.js` make. That client
+Vendoring MediaPipe Tasks Vision means taking on its risk, not just its
+capability. `vendor/mediapipe/tasks-vision/vision_bundle.mjs` contains a
+usage-telemetry client instantiated unconditionally inside
+`createFromOptions()` — the same call `js/iris.js` makes. That client
 starts a 60-second flush interval on creation and, roughly every 30 seconds
 of wall-clock time since the last flush, the next `detectForVideo()` call
 queues a POST to `https://odml.pa.googleapis.com/v1/log`. There is no
-consumer-facing option to disable it (see `F04_TWIN.md`'s "The vendored
-bundle phones home, and the mitigation" for the full trace, kept there as
-the canonical write-up while `js/twin.js` still ships).
+consumer-facing option to disable it.
 
-Twin only reaches the 30-second threshold during its calibration window.
 Iris calls `detectForVideo()` every rendered frame for as long as a game
-runs — a strictly longer, harder-to-avoid exposure than Twin's. So
-`iris.html` needs the same mitigation Twin needed, more certainly than Twin
-did: a page-level `<meta http-equiv="Content-Security-Policy"
+runs, well past that 30-second threshold on any real session. So
+`iris.html` needs a page-level `<meta http-equiv="Content-Security-Policy"
 content="connect-src 'self' blob:">` tag, which makes the browser refuse the
 `fetch()` before it leaves the tab. `'self'` covers the same-origin
 model/WASM fetches `FilesetResolver` and `FaceLandmarker.createFromOptions()`
-need; the omission of `odml.pa.googleapis.com` is what turns F05-AC04 into a
-claim the browser enforces, not one that depends on the vendored dependency
-behaving. As with Twin, the blocked request logs a CSP violation to the
-console on purpose — AGENTS.md's clean-console verification step treats this
-one case as the expected, visible proof the block fired, not as a defect.
-
-If Twin's files and `F04_TWIN.md` are deleted as part of Twin's retirement
-before this section is next revised, the paragraph above — not the
-cross-reference — is the part of the record that must survive that deletion.
+need; `'blob:'` covers the vendored WASM loader's own `blob:` URL use; the
+omission of `odml.pa.googleapis.com` is what turns F05-AC04 into a claim the
+browser enforces, not one that depends on the vendored dependency behaving.
+The blocked request logs a CSP violation to the console on purpose —
+AGENTS.md's clean-console verification step treats this one case as the
+expected, visible proof the block fired, not as a defect.
 
 ---
 
 ## The DOM contract
 
-Same shape as `#echo--*` and `#twin--*`: every id looked up once, at module
-scope, in `js/iris.js`.
+Same shape as `#echo--*`: every id looked up once, at module scope, in
+`js/iris.js`.
 
 | Id | Element | Contract |
 | --- | --- | --- |
@@ -672,10 +663,10 @@ scope, in `js/iris.js`.
 | `iris--stop` | `button type="button"` | Releases the camera stream's tracks and stops the game loop |
 
 None of these use the `disabled` property, for the same reason
-`#echo--load`, `#twin--load`, and `#ask--load` don't: each sits on the page
-across a multi-second permission prompt or model load, and disabling on
-press strands a keyboard user on `<body>` for that window. `aria-disabled`
-plus a re-entry guard flag, same as the other three features.
+`#echo--load` and `#ask--load` don't: each sits on the page across a
+multi-second permission prompt or model load, and disabling on press
+strands a keyboard user on `<body>` for that window. `aria-disabled` plus a
+re-entry guard flag, same as the other two features.
 
 ---
 
@@ -685,8 +676,8 @@ plus a re-entry guard flag, same as the other three features.
 | --- | --- | --- |
 | F05-AC01 | The committed `face_landmarker.task`'s detector emits 478 landmarks (468 face mesh + 10 iris, indices 468–477), not 468. | **Verified 2026-08-09**: `face_landmarks_detector.tflite` extracted from the `.task` bundle and its output tensor inspected — shape `[1, 1, 1, 1434]`, 1434 = 478 × 3 |
 | F05-AC02 | The head-yaw-corrected eye-corner-relative gaze signal, run through calibration, is stable enough frame-to-frame to drive continuous paddle movement without a dwell timer, tracks eye movement independent of head position, and responds to a gaze shift within roughly a second rather than several (the original mean-landmark-x version and an intervening blendshapes-classifier version both failed this — see "How this got here"). | **Verified 2026-08-09**: human, real camera, real browser, actually played (not just measured from telemetry) — reported pass, further tuning expected as more sessions come in |
-| F05-AC03 | No new file is vendored under `vendor/` or `assets/models/`; `js/iris.js` loads the same `face_landmarker.task` already committed for Twin. | Structural: diff against `git status` after implementation |
-| F05-AC04 | The video frame and landmarks are never transmitted anywhere, including the same `odml.pa.googleapis.com` telemetry call the vendored `@mediapipe/tasks-vision` bundle makes unconditionally after ~30s of `detectForVideo()` (see "The vendored bundle phones home" above). `iris.html` ships the same `<meta http-equiv="Content-Security-Policy" content="connect-src 'self' blob:">` tag `twin.html` uses — Iris calls `detectForVideo()` every frame for the whole game, strictly longer exposure than Twin's calibration window, so this is required, not conditional. | Verify a CSP-violation console line for the blocked request and no successful third-party request in the network panel, same method as F04-AC03 |
+| F05-AC03 | `js/iris.js` loads `vendor/mediapipe/tasks-vision` and `assets/models/face-landmarker/face_landmarker.task`, vendored for this feature (see "Why this needs MediaPipe Tasks Vision instead of Echo's LiteRT" above). | Structural: diff against `git status` after implementation |
+| F05-AC04 | The video frame and landmarks are never transmitted anywhere, including the `odml.pa.googleapis.com` telemetry call the vendored `@mediapipe/tasks-vision` bundle makes unconditionally after ~30s of `detectForVideo()` (see "The vendored bundle phones home" above). `iris.html` ships a `<meta http-equiv="Content-Security-Policy" content="connect-src 'self' blob:">` tag — Iris calls `detectForVideo()` every frame for the whole game, so this is required, not conditional. | Verify a CSP-violation console line for the blocked request and no successful third-party request in the network panel |
 | F05-AC05 | Spoken lines are read from a small authored, fixed set, never generated at runtime. | Structural: `js/iris.js` |
 | F05-AC06 | None of `#iris--load`, `#iris--stop` use the `disabled` property; focus survives camera grant and load. | Human, keyboard traversal |
 | F05-AC07 | `iris.html` is listed in `sitemap.xml`. | `scripts/check_repo.py`, CI |
