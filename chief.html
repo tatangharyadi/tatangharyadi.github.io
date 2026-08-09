@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chief | Tatang Haryadi</title>
+    <meta name="description" content="Chief: a flyable, procedural cyberpunk dataspace, built live from Hacker News, GitHub's public events and the NVD's CVE feed. Fly through today's technology news." />
+    <meta name="theme-color" content="#dce0e8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#11111b" media="(prefers-color-scheme: dark)" />
+    <link rel="canonical" href="https://tatangharyadi.github.io/chief.html" />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Tatang Haryadi" />
+    <meta property="og:url" content="https://tatangharyadi.github.io/chief.html" />
+    <meta property="og:title" content="Chief" />
+    <meta property="og:description" content="A flyable cyberpunk scene built live from Hacker News, GitHub and the NVD." />
+
+    <!-- See specs/F06_CHIEF.md#the-site-first-cross-origin-connect-src. This page
+         is the first on the site that talks to hosts it does not control, on an
+         ongoing basis, for the life of the page. Each is a plain,
+         unauthenticated GET against a public read endpoint; nothing a visitor
+         does is ever sent to any of them. 'self' covers the vendored
+         three.module.min.js import and this page's own assets. -->
+    <meta http-equiv="Content-Security-Policy" content="connect-src 'self' https://hacker-news.firebaseio.com https://api.github.com https://services.nvd.nist.gov" />
+
+    <!-- Shared palette and reset, same file every other page uses. css/chief.css
+         is layout/chrome only — the neon scene colours live as literal hex
+         values inside js/chief.js's WebGL materials, which sit entirely outside
+         scripts/check_palette.py, the same way js/iris.js's and js/game.js's own
+         in-canvas colours already do. See specs/F06_CHIEF.md. -->
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/chief.css" />
+
+    <script type="importmap">
+        { "imports": { "three": "./vendor/three/three.module.min.js" } }
+    </script>
+    <script type="module" src="js/chief.js"></script>
+</head>
+
+<body>
+    <a class="skip-link" href="#chief--stage">Skip to the scene</a>
+
+    <header class="chief--head">
+        <h1>Chief</h1>
+        <p class="chief--sub">
+            A flyable, procedural scene built live from three public feeds —
+            Hacker News, GitHub's public events and the NVD's CVE feed — as
+            one way of showing what staying current with technology looks
+            like, continuously, in the background.
+        </p>
+        <p class="chief--sub"><a href="index.html">Back to the rest of the site</a></p>
+        <p class="chief--sub">Also try <a href="mocap.html">Echo</a> and
+            <a href="iris.html">Iris</a>, which read a person instead of the
+            news.</p>
+    </header>
+
+    <noscript>
+        <p class="chief--notice">
+            This page needs JavaScript to fetch the three feeds and to run the
+            WebGL scene they drive. Everything else on this site works
+            without it; this one genuinely cannot.
+        </p>
+    </noscript>
+
+    <!-- A landmark that exists for the whole session, unlike the child areas
+         below it that toggle `hidden` across the gate/flight sequence. -->
+    <main class="chief--page">
+
+    <!-- Hidden until js/chief.js reveals it, same rule as #iris--gate: a no-JS
+         visitor should never be shown a button that cannot do anything. -->
+    <div class="chief--gate" id="chief--gate" hidden>
+        <p>
+            Pressing this starts three independent, ongoing requests: to
+            Hacker News, to GitHub, and to the NVD. Each is a plain,
+            unauthenticated GET, repeated on its own schedule for as long as
+            this tab stays open, the same way loading any news site would
+            fetch its own front page. This is the site's equivalent of asking
+            for camera or microphone access, except what's being requested is
+            network access instead of hardware — see specs/F06_CHIEF.md.
+        </p>
+        <button type="button" class="chief--load" id="chief--load">
+            Start the flight
+        </button>
+        <p class="chief--gate-cost">Use the arrow keys to look and WASD to
+            move; no mouse or pointer lock required.</p>
+    </div>
+
+    <p class="chief--notice" id="chief--status" role="status" aria-live="polite"></p>
+
+    <div class="chief" id="chief" hidden>
+        <section class="chief--stage-wrap" aria-labelledby="chief--stage-title">
+            <h2 id="chief--stage-title" class="visually-hidden">The scene</h2>
+            <canvas class="chief--stage" id="chief--stage" aria-hidden="true"></canvas>
+        </section>
+
+        <p class="chief--help">
+            Arrow keys: look. W/A/S/D: move. Space: rise. Shift: descend.
+        </p>
+
+        <div class="chief--controls">
+            <button type="button" class="chief--recenter" id="chief--recenter">
+                Recenter
+            </button>
+            <button type="button" class="chief--stop" id="chief--stop">
+                Stop and disconnect
+            </button>
+        </div>
+    </div>
+
+    </main>
+</body>
+
+</html>
