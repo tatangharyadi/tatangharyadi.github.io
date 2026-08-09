@@ -5,23 +5,22 @@
 // the same one js/twin.js uses, reusing Twin's already-vendored runtime and
 // already-committed model (see specs/F05_IRIS.md, F05-AC03). What differs
 // is what happens with the model's output: Twin deforms a mesh with the 468
-// face-mesh points; Iris reads the model's face-blendshapes output (a
-// classifier already bundled inside the same face_landmarker.task file,
-// enabled here with outputFaceBlendshapes: true, that Twin's own code
-// leaves off) to drive a paddle, and never touches the DOM with a 3D
-// renderer at all — the "renderer" here is a plain 2D canvas. An earlier
-// version of this file read the ten raw iris landmarks (indices 468-477)
-// directly; specs/F05_IRIS.md documents why that signal turned out to
-// carry no usable gaze information on real hardware.
+// face-mesh points; Iris reads the position of each eye's iris landmark
+// relative to that eye's own corner-to-corner span (see
+// gazeScoreFromLandmarks()) to drive a paddle, and never touches the DOM
+// with a 3D renderer at all — the "renderer" here is a plain 2D canvas.
+// This file has already tried, and abandoned, two other gaze signals on
+// real hardware before landing here — see gazeScoreFromLandmarks()'s own
+// comment and specs/F05_IRIS.md for why each one failed.
 //
 // Two accuracy techniques ported from public MediaPipe-based gaze trackers
 // (see specs/F05_IRIS.md's "Head-pose correction and multi-point
-// calibration" section) sit on top of the blendshape signal: a head-yaw
-// correction term (also read from face_landmarker.task, via
+// calibration" section) sit on top of the corner-ratio signal: a head-yaw
+// correction term (read from face_landmarker.task via
 // outputFacialTransformationMatrixes: true) and a five-point weighted
 // polynomial calibration fit in place of the original two-point linear map.
-// Both are first-guess ports pending a real-hardware session, same
-// discipline the rest of this file's constants already follow.
+// Both are still first-guess ports pending a real-hardware session; only
+// the raw signal itself has now been swapped in response to one.
 
 import { FaceLandmarker, FilesetResolver } from '../vendor/mediapipe/tasks-vision/vision_bundle.mjs';
 
@@ -30,21 +29,17 @@ const FACE_MODEL_URL = 'assets/models/face-landmarker/face_landmarker.task';
 
 // Three straight rounds of hand-rolled geometry on the 478 face-mesh points
 // (raw iris x, then iris-x normalized against the eye's own corner span,
-// then that same ratio with heavier filtering) all failed on real hardware.
-// The last round's ?debug=1 readout proved why: smoothedGazeX didn't move
-// at all between a deliberate hard-left hold and a deliberate hard-right
-// hold. The corner-ratio signal carried no gaze information to filter or
-// calibrate in the first place — see specs/F05_IRIS.md's "the raw signal
-// itself has no dynamic range" section.
-//
-// The committed model bundle (assets/models/face-landmarker/face_landmarker.task)
-// already contains a face_blendshapes.tflite sub-model — a classifier
-// trained specifically to estimate expression and gaze-direction strength,
-// including the ARKit-standard eyeLookInLeft/eyeLookOutLeft/eyeLookInRight/
-// eyeLookOutRight categories used below. This is a purpose-built signal for
-// exactly this problem, not geometry we derived ourselves, and needs no new
-// asset: outputFaceBlendshapes: true is the only change to what the model
-// loads.
+// then that same ratio with heavier filtering) all failed on real hardware,
+// with no head-pose correction available at the time. The next round swapped
+// to the model's own face_blendshapes.tflite classifier instead — a
+// purpose-built gaze-direction signal, not geometry derived by hand — but a
+// real-hardware telemetry file (iris-calibration-*.json, 2026-08-09)
+// showed that signal not tracking gaze direction either:
+// eyeLookOutRight/eyeLookInLeft stayed flat across all five calibration
+// points, and eyeLookInRight/eyeLookOutLeft moved in the wrong direction
+// relative to the target. gazeScoreFromLandmarks() below returns to the
+// corner-ratio geometry, this time with the head-yaw correction below
+// applied to it — the ingredient the first three rounds never had.
 const RAW_GAZE_MEDIAN_WINDOW = 5;
 const IRIS_X_EMA_ALPHA = 0.15;
 
@@ -57,15 +52,15 @@ const IRIS_X_EMA_ALPHA = 0.15;
 // own real-hardware session yet — both are first-guess ports pending that,
 // same discipline as MIRROR_GAZE_X and IRIS_X_EMA_ALPHA above.
 
-// Blendshape scores are computed from landmarks already aligned to a
-// canonical face by the model, so they're less head-pose-sensitive than the
-// raw corner-ratio geometry the earlier, abandoned signal used — but ARKit
-// blendshape classifiers are documented to still drift under head rotation,
-// not to be pose-invariant outright. facialTransformationMatrixes is the
-// same already-committed model's own head-pose output (no new asset,
-// exactly the "flip a flag on the call Twin already makes" pattern
-// outputFaceBlendshapes used), so head yaw is available for free rather
-// than estimated from landmarks a second way.
+// Corner-ratio geometry is read straight from the raw image-space
+// landmarks, so unlike a canonical-aligned classifier it has no built-in
+// pose invariance at all — a head turn shifts an eye's corners and its iris
+// by different amounts under perspective, which is a plausible reason the
+// very first hand-rolled attempt (before this correction existed) showed no
+// usable range. facialTransformationMatrixes is the same already-committed
+// model's own head-pose output (no new asset, exactly the "flip a flag on
+// the call Twin already makes" pattern), so head yaw is available for free
+// rather than estimated from landmarks a second way.
 const HEAD_YAW_CORRECTION_GAIN = 0.2;
 
 // CAL_POINTS replaces the old two-point (left, right) capture with five,
@@ -107,16 +102,16 @@ const CAL_INTERIOR_WEIGHT = 1;
 // signal. Same first-guess discipline as IRIS_X_EMA_ALPHA.
 const PADDLE_EMA_ALPHA = 0.2;
 
-// Unlike raw landmark.x (camera-frame-relative, needed the flip the old
-// corner-ratio code applied here), the blendshape categories are already
-// subject-relative — "Right" means the visitor's own right eye regardless
-// of how the camera image is oriented. gazeScoreFromBlendshapes() already
-// resolves to "higher rawX = visitor looked to their own right", which is
-// the direction the paddle should move, so no flip should be needed. Kept
-// as a named toggle rather than deleted because the previous round's
-// verified assumption ("needs a flip") just inverted; if a real session
-// says the paddle now moves backwards, flip this rather than re-deriving
-// the sign from scratch again.
+// gazeScoreFromLandmarks() is built from raw landmark.x, which is
+// camera-frame-relative: a front-facing webcam's unmirrored image shows the
+// visitor's own right side on the image's left, the opposite of how they
+// see themselves in an actual mirror. The interim blendshape signal this
+// file tried in between didn't need this flip (its category names were
+// already subject-relative), but that round is gone now — this toggle is
+// live again exactly as it was for the very first corner-ratio attempt. Kept
+// as a named toggle rather than guessed inline because getting it wrong
+// makes the paddle move backwards, not stop moving, which a real session
+// will make obvious immediately.
 const MIRROR_GAZE_X = false;
 
 // Below this spread across all five captured raw values, calibration treats
@@ -231,7 +226,7 @@ let smoothedPaddleFraction = null;
 // correction itself is applied inline in updateGazeFromResult().
 let lastYaw = 0;
 
-// Latest frame's blendshape/yaw readout, kept so captureCalPoint() can
+// Latest frame's corner-ratio/yaw readout, kept so captureCalPoint() can
 // attach it to a telemetry entry without updateGazeFromResult() needing to
 // know calibration exists. null until the first frame with a detected face.
 let lastGazeInfo = null;
@@ -317,7 +312,6 @@ async function loadFaceLandmarker() {
         baseOptions: { modelAssetPath: FACE_MODEL_URL },
         runningMode: 'VIDEO',
         numFaces: 1,
-        outputFaceBlendshapes: true,
         outputFacialTransformationMatrixes: true,
     });
 }
@@ -372,19 +366,43 @@ function medianOf(values) {
 // RAW_GAZE_MEDIAN_WINDOW — see the constant's comment for why this exists.
 let rawGazeHistory = [];
 
+// Standard MediaPipe face-mesh indices (the same ones eye-aspect-ratio
+// implementations elsewhere use): each eye's own inner (nasal) and outer
+// (temporal) corner, plus the iris center the 478-point model adds on top
+// of the base 468.
+const RIGHT_EYE_IRIS = 468;
+const RIGHT_EYE_INNER = 133;
+const RIGHT_EYE_OUTER = 33;
+const LEFT_EYE_IRIS = 473;
+const LEFT_EYE_INNER = 362;
+const LEFT_EYE_OUTER = 263;
+
+// Where the iris center sits between an eye's own two corners, 0 at the
+// inner corner and 1 at the outer corner. null on a frame where the model
+// reports coincident corners (span ~0) rather than dividing by ~0 — the
+// same "hold rather than guess" rule droppedFrames already follows for a
+// missing face.
+function safeRatio(x, from, to) {
+    const span = to - from;
+    if (Math.abs(span) < 1e-6) return null;
+    return (x - from) / span;
+}
+
 // Looking to one side rotates each eye a different way relative to its own
-// nose-side/temple-side axis (this is normal conjugate gaze, not an error):
-// looking right moves the right eye temporally (eyeLookOutRight) and the
-// left eye nasally (eyeLookInLeft); looking left is the mirror pair. Adding
-// each side's two categories, rather than trusting either eye alone,
-// halves the effect of one eye's blendshape score being noisier than the
-// other's on a given frame.
-function gazeScoreFromBlendshapes(categories) {
-    const score = {};
-    for (const c of categories) score[c.categoryName] = c.score;
-    const right = ((score.eyeLookOutRight || 0) + (score.eyeLookInLeft || 0)) / 2;
-    const left = ((score.eyeLookInRight || 0) + (score.eyeLookOutLeft || 0)) / 2;
-    return { right, left, score };
+// corner axis (normal conjugate gaze, not an error): looking toward the
+// visitor's own right moves the right eye's iris toward its outer corner
+// (rightRatio -> 1) and the left eye's iris toward its INNER corner
+// (leftRatio -> 0). Flipping leftRatio makes both eyes read "closer to 1
+// means looking right", so averaging the two — rather than trusting either
+// eye alone — halves the effect of one eye's landmarks being noisier than
+// the other's on a given frame, the same role averaging two blendshape
+// categories per side played in the signal this replaces.
+function gazeScoreFromLandmarks(landmarks) {
+    const rightRatio = safeRatio(landmarks[RIGHT_EYE_IRIS].x, landmarks[RIGHT_EYE_INNER].x, landmarks[RIGHT_EYE_OUTER].x);
+    const leftRatio = safeRatio(landmarks[LEFT_EYE_IRIS].x, landmarks[LEFT_EYE_INNER].x, landmarks[LEFT_EYE_OUTER].x);
+    if (rightRatio === null || leftRatio === null) return null;
+    const eyeX = (rightRatio + (1 - leftRatio)) / 2;
+    return { eyeX, rightRatio, leftRatio };
 }
 
 // Column-major 4x4 model-to-camera transform, same convention
@@ -399,26 +417,28 @@ function yawFromMatrix(matrixData) {
 }
 
 function updateGazeFromResult(result) {
-    const blendshapes = result.faceBlendshapes && result.faceBlendshapes[0];
-    if (!blendshapes) {
+    const landmarks = result.faceLandmarks && result.faceLandmarks[0];
+    if (!landmarks) {
         droppedFrames += 1;
-        if (DEBUG) renderDebug({ right: null, left: null, rawX: null, medianX: null });
+        if (DEBUG) renderDebug({ eyeX: null, rawX: null, medianX: null });
         return; // no face this frame; hold the last position rather than guess
     }
 
     const matrix = result.facialTransformationMatrixes && result.facialTransformationMatrixes[0];
     lastYaw = matrix ? yawFromMatrix(matrix.data) : 0;
 
-    const { right, left, score } = gazeScoreFromBlendshapes(blendshapes.categories);
-    // right/left are each 0..1 confidences, not a position — center on 0.5
-    // and let a stronger "look right" than "look left" (or vice versa) push
-    // away from it in either direction.
-    const eyeX = 0.5 + (right - left) / 2;
+    const geo = gazeScoreFromLandmarks(landmarks);
+    if (!geo) {
+        droppedFrames += 1;
+        if (DEBUG) renderDebug({ eyeX: null, rawX: null, medianX: null });
+        return; // corners coincident this frame; hold rather than guess
+    }
+
     // Subtracting a yaw-scaled term compensates for head rotation reading as
     // eye movement — turning the head right, without moving the eyes in
     // their sockets, should not also read as "looking right". HEAD_YAW_CORRECTION_GAIN
     // is unverified against real hardware; see the constant's comment.
-    const rawX = Math.min(1, Math.max(0, eyeX - HEAD_YAW_CORRECTION_GAIN * lastYaw));
+    const rawX = Math.min(1, Math.max(0, geo.eyeX - HEAD_YAW_CORRECTION_GAIN * lastYaw));
     rawGazeHistory.push(rawX);
     if (rawGazeHistory.length > RAW_GAZE_MEDIAN_WINDOW) rawGazeHistory.shift();
     const medianX = medianOf(rawGazeHistory);
@@ -429,9 +449,9 @@ function updateGazeFromResult(result) {
     recentSmoothed.push(smoothedGazeX);
     if (recentSmoothed.length > CAPTURE_AVERAGE_WINDOW) recentSmoothed.shift();
 
-    lastGazeInfo = { right, left, score, rawX, medianX, yaw: lastYaw };
+    lastGazeInfo = { eyeX: geo.eyeX, rightRatio: geo.rightRatio, leftRatio: geo.leftRatio, rawX, medianX, yaw: lastYaw };
 
-    if (DEBUG) renderDebug({ right, left, rawX, medianX, score });
+    if (DEBUG) renderDebug({ eyeX: geo.eyeX, rightRatio: geo.rightRatio, leftRatio: geo.leftRatio, rawX, medianX });
 }
 
 function fmt(n) {
@@ -439,11 +459,9 @@ function fmt(n) {
 }
 
 function renderDebug(f) {
-    const s = f.score || {};
     const coeffsStr = calCoeffs ? calCoeffs.map((c) => c.toFixed(3)).join(', ') : ' -- ';
     els.debug.textContent =
-        `eyeLookOutRight ${fmt(s.eyeLookOutRight)}  eyeLookInLeft  ${fmt(s.eyeLookInLeft)}  -> right ${fmt(f.right)}\n` +
-        `eyeLookInRight  ${fmt(s.eyeLookInRight)}  eyeLookOutLeft ${fmt(s.eyeLookOutLeft)}  -> left  ${fmt(f.left)}\n` +
+        `rightRatio ${fmt(f.rightRatio)}  leftRatio ${fmt(f.leftRatio)}  -> eyeX ${fmt(f.eyeX)}\n` +
         `head yaw (rad) ${fmt(lastYaw)}  correction ${fmt(-HEAD_YAW_CORRECTION_GAIN * lastYaw)}\n` +
         `raw ${fmt(f.rawX)}  median ${fmt(f.medianX)}  smoothed ${fmt(smoothedGazeX)}\n` +
         `calibration fit (c0..c${CAL_POLY_DEGREE}): ${coeffsStr}\n` +
