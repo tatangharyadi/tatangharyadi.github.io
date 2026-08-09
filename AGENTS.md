@@ -9,8 +9,8 @@ A static personal site: plain HTML and CSS, no build step, no package manager,
 served by GitHub Pages from `main`. There is nothing to install and nothing to
 compile. Edit the files directly.
 
-**There are exactly six JavaScript files of our own: `js/ask.js`, `js/game.js`,
-`js/mocap.js`, `js/mocap-retarget.js`, `js/iris.js` and `js/chief.js`.** Everything else — the work index on the home page — is
+**There are exactly five JavaScript files of our own: `js/ask.js`, `js/game.js`,
+`js/mocap.js`, `js/mocap-retarget.js` and `js/iris.js`.** Everything else — the work index on the home page — is
 [htmx](https://htmx.org) asking for static HTML fragments under `fragments/` and
 swapping them in. htmx arrives from a CDN pinned by version and SRI digest.
 
@@ -102,29 +102,6 @@ on the site where "vendored means same-origin means private" needed a second
 mechanism to actually be true, and the CSP violation line it produces in the
 console is deliberate, not a regression — see that section before "cleaning
 up" the console output on `iris.html`.
-
-`js/chief.js` earns the sixth exception on grounds none of the first five
-share. Every prior exception's network story is either "there is no endpoint
-this page talks to at all" (`js/ask.js`'s vectors, `js/mocap.js`'s camera
-frames) or "one same-origin fetch, once, at load" (the models and runtimes
-`js/mocap.js` and `js/iris.js` pull in). `js/chief.js` breaks the site's other
-standing default — no host we do not control, the same rule that keeps
-webfonts off this site — deliberately and repeatedly: it holds open three
-independent polling loops, to Hacker News, GitHub and the NVD, for the entire
-time `chief.html` is open, because a demonstration of "keeping up with
-technology" that fetched once and froze would not demonstrate anything. The
-full argument for why that is worth doing, and how it degrades when one of
-the three goes quiet or rate-limits, is in
-[specs/F06_CHIEF.md](specs/F06_CHIEF.md#the-site-first-cross-origin-connect-src).
-`chief.html` closes the resulting gap the same way `iris.html` closes its
-own: a page-level `Content-Security-Policy` meta tag, here scoped to
-`connect-src 'self'` plus exactly the three feed hosts, so the browser
-refuses every other request outright. No new dependency is vendored to build
-it — the flight camera is hand-written against `THREE.Euler`/`THREE.Vector3`
-already in the vendored core, and the neon glow sprites are canvas-drawn
-textures, because `vendor/three/examples/jsm` carries no postprocessing or
-alternate-controls module and adding one to get bloom or pointer-lock flight
-would be a second, unrelated exception layered onto this one.
 
 Do not introduce a bundler, framework or package manager to solve a problem that a
 few lines of CSS would solve. The absence of a toolchain is a design decision, not

@@ -105,29 +105,33 @@
             <div class="masthead--container">
                 <div class="masthead--identity">
                     <h1 class="masthead--name">Tatang Haryadi</h1>
-                    <!-- The job title is three doors, one word each. chief.html is a
-                         flyable cyberpunk scene built from live public news feeds,
-                         iris.html is a gaze-controlled Breakout demo and game.html is
-                         a trading simulation compiled to WebAssembly from Rust; none
-                         is in the nav on purpose, because a hiring manager reading
-                         this page should not have to step over any of them to reach
+                    <!-- The job title is two doors, one word each: iris.html is a
+                         gaze-controlled Breakout demo and game.html is a trading
+                         simulation compiled to WebAssembly from Rust. Neither is in
+                         the nav on purpose, because a hiring manager reading this
+                         page should not have to step over either of them to reach
                          the work. Anyone who hovers the title, tabs through the page
                          or reads the sitemap finds them, which is the right audience.
+                         "Chief" carries no link — it once opened a third door,
+                         chief.html, a walkable neon-alley scene built from live news
+                         feeds, removed after two rounds of visual review concluded
+                         real-time WebGL primitives with no vendored postprocessing
+                         couldn't close the gap to the reference it was chasing. See
+                         the removal commit for that call, rather than re-adding one
+                         to `js/` and rediscovering it.
 
                          mocap.html (nicknamed Echo) used to hold the "Officer" door;
                          it lost that spot to game.html when Iris shipped, so it is
                          now reached from a link on iris.html instead — see the note
                          on iris.html's own header.
 
-                         All three stay plain <a href>s so they are real links:
+                         Both stay plain <a href>s so they are real links:
                          middle-click opens a tab, the keyboard reaches them with no
                          handler of ours, and they work with JavaScript off. The only
                          thing hidden is the underline, and only until hover or focus,
                          and only on the word carrying the link. -->
                     <p class="masthead--role">
-                        <a class="masthead--chief" id="masthead-chief" href="chief.html"
-                           title="Fly through the feeds"
-                           aria-label="Chief: a flyable cyberpunk scene built from live news feeds">Chief</a>
+                        Chief
                         <a class="masthead--iris" id="masthead-iris" href="iris.html"
                            title="Follow the gaze"
                            aria-label="Iris: a gaze-controlled Breakout game, on device">Technology</a>
