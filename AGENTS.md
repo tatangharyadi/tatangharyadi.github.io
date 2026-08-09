@@ -107,8 +107,9 @@ MediaPipe Tasks Vision `FaceLandmarker` Twin already loads out, a Breakout
 game drawn to a `<canvas>`. It is not a new runtime and not a new committed
 model — it reuses `vendor/mediapipe/tasks-vision` and
 `assets/models/face-landmarker/face_landmarker.task` exactly as already
-committed for Twin, reading the 10 iris landmarks (indices 468–477) that
-Twin's own code loads and never looks at, argued from scratch in
+committed for Twin, reading the model's face-blendshapes classifier output
+(`outputFaceBlendshapes: true`) that Twin's own code leaves off and never
+looks at, argued from scratch in
 [specs/F05_IRIS.md](specs/F05_IRIS.md). It also inherits Twin's CSP
 mitigation: `iris.html` carries the same `connect-src 'self' blob:` meta
 tag, for the same reason — the vendored bundle's usage-telemetry `fetch()`

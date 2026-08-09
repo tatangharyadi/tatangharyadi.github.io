@@ -142,17 +142,19 @@ visitor presses #iris--load
         └─ FilesetResolver.forVisionTasks('vendor/mediapipe/tasks-vision/wasm')
                  └─ FaceLandmarker.createFromOptions({ modelAssetPath: FACE_MODEL_URL,
                                                          numFaces: 1,
-                                                         outputFaceBlendshapes: false,
+                                                         outputFaceBlendshapes: true,
                                                          outputFacialTransformationMatrixes: false })
 
 every rendered frame
         │
-   detectForVideo() → 478 landmarks
+   detectForVideo() → faceBlendshapes[0].categories (ARKit-style scores)
         │
-   each eye's iris centre (468, 473) normalized against that eye's own
-   corner-to-corner span (33/133, 362/263) → averaged across both eyes →
-   EMA-smoothed → remapped through the session's calibration range (if any)
-   → mapped to paddle x-position across the canvas width
+   eyeLookOutRight + eyeLookInLeft (looking right) vs. eyeLookInRight +
+   eyeLookOutLeft (looking left) → centred 0.5 ± half the difference →
+   median-filtered → EMA-smoothed → remapped through the session's
+   calibration range (if any) → mapped to paddle x-position across the
+   canvas width. See "The raw signal itself had no dynamic range" below for
+   why this replaced the original 468/473 iris-landmark approach.
         │
    game loop: ball/brick/paddle collision, scoring, deterministic difficulty
    (same "rule-based, not model-based" shape as Echo's retargeting math)
@@ -357,6 +359,92 @@ eyes are still. If confirmed, the fix is raising `CAL_MIN_SEPARATION` (to
 bound gain, at the cost of forcing a visitor with a genuinely narrow range
 to use "Skip calibration" instead) — not another change to the filtering
 constants above, which the evidence so far says were never the amplifier.
+
+**This theory did not get the chance to be confirmed or killed on its own
+terms**, because the next real session found something upstream of it: the
+calibration marker (driven by `smoothedGazeX`, the same signal
+`calibratedX()` divides by its own range) did not move at all when the
+visitor looked left or right, before any calibration capture had happened.
+Asked to hold a hard left gaze and then a hard right gaze on the
+`?debug=1` screen with no calibration involved, the report back was "it
+does not moved" — no difference in the raw or smoothed reading between the
+two extremes. A signal with no measurable range between the two gaze
+positions it exists to distinguish cannot be fixed by any calibration
+divisor, however it's tuned: `calibratedX()` amplifies whatever range
+`smoothedGazeX` has, and on this hardware that range was, to observable
+precision, zero. Every fix up to this point — corner-relative
+normalization, the noise filters above, and the calibration-gain theory in
+this section — was tuning or reasoning about a signal that never carried
+the information those fixes assumed it did.
+
+### The raw signal itself had no dynamic range
+
+The eye-corner-ratio approach (iris x-position normalized against that same
+eye's own corner span, described under "Calibration" above) turned out to
+be the wrong signal to extract from the 478 face-mesh points on this
+visitor's hardware, not merely a noisy or unnormalized one. No amount of
+median filtering, EMA tuning, or calibration-range rescaling can recover
+gaze information from a signal that does not carry it in the first place.
+
+The fix is a different signal already present in the same committed asset.
+`assets/models/face-landmarker/face_landmarker.task` bundles four
+sub-models (confirmed with `unzip -l` on the committed file):
+`face_detector.tflite`, `face_landmarks_detector.tflite`,
+`geometry_pipeline_metadata_landmarks.binarypb`, and
+`face_blendshapes.tflite`. The last of these is a classifier — trained to
+score ARKit-standard expression categories, confirmed present via `strings`
+on the extracted `.tflite` — and among those categories are
+`eyeLookInLeft`, `eyeLookInRight`, `eyeLookOutLeft`, and `eyeLookOutRight`:
+a purpose-built gaze-direction estimate, not geometry derived by hand from
+landmark positions. It ships inside the model Twin already loads; Twin
+simply never asks for it, so enabling it costs no new download, just
+`outputFaceBlendshapes: true` on the existing `createFromOptions()` call.
+
+`gazeScoreFromBlendshapes()` in `js/iris.js` reads it. Looking to one side
+is conjugate gaze — each eye rotates a different way relative to its own
+nasal/temporal axis, not the same way — so looking right registers as the
+right eye's `eyeLookOutRight` (rotating toward the temple) together with
+the left eye's `eyeLookInLeft` (rotating toward the nose), and looking left
+is the mirror pair (`eyeLookInRight` + `eyeLookOutLeft`). Averaging each
+pair rather than trusting one eye halves the effect of either eye's score
+being noisier on a given frame. The result centres on 0.5 (straight ahead)
+and moves toward 1 or 0 as one side's pair outscores the other's, then
+passes through the same median-then-EMA smoothing the corner-ratio signal
+used (`RAW_GAZE_MEDIAN_WINDOW`, `IRIS_X_EMA_ALPHA` — unchanged), and the
+same `calibratedX()` remap.
+
+The one thing this diagnosis does not yet have is a name for whether the
+old corner-ratio signal failed for this visitor specifically (an eye shape,
+camera angle, or calibration quirk the geometry couldn't handle) or fails
+in general — the evidence is one visitor's hardware, not a survey. The
+blendshapes classifier being purpose-built for exactly this estimate,
+rather than a byproduct of landmark geometry not designed for it, is the
+reason to expect it generalizes better, not proof that it does.
+
+`MIRROR_GAZE_X` also flips from `true` to `false` with this change. The old
+signal used raw `landmark.x`, which is camera-frame-relative and needed the
+flip the corner-ratio code applied to read as visitor-relative. The
+blendshape category names are already visitor-relative — "Right" means the
+visitor's own right eye regardless of camera orientation — so
+`gazeScoreFromBlendshapes()` resolves directly to "higher score = visitor
+looked to their own right" with no flip needed. This is reasoned from the
+category semantics, not measured on hardware; if a real session finds the
+paddle now moves backwards, `MIRROR_GAZE_X` is the one constant to flip
+before re-deriving anything else.
+
+**This rewrite is unverified on real hardware.** It has been checked
+structurally — `node --check`, the CI scripts, and a chrome-devtools MCP
+session against the sandbox's fake camera confirming the model loads with
+`outputFaceBlendshapes: true` and `#iris--debug` populates with real
+category scores and no console errors — but the sandbox's camera feed
+never moves, so nothing here has exercised whether the new signal actually
+carries gaze information on a real visitor's hardware. The next real
+session should repeat exactly the test that killed the old signal, before
+touching calibration at all: open `?debug=1`, hold a hard left gaze, hold a
+hard right gaze, and check whether `raw`/`smoothed` move between the two.
+`renderDebug()` now prints the four blendshape scores and the two averaged
+per-side values alongside `raw`/`median`/`smoothed`, so that comparison
+doesn't need guessing at.
 
 ---
 

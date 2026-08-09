@@ -4,51 +4,52 @@
 // detectForVideo() every frame, stop and release everything on demand — is
 // the same one js/twin.js uses, reusing Twin's already-vendored runtime and
 // already-committed model (see specs/F05_IRIS.md, F05-AC03). What differs
-// is what happens with the landmarks: Twin deforms a mesh with all 468 face
-// points; Iris reads only the ten iris points (indices 468-477, Twin's own
-// code discards these) to drive a paddle, and never touches the DOM with a
-// 3D renderer at all — the "renderer" here is a plain 2D canvas.
+// is what happens with the model's output: Twin deforms a mesh with the 468
+// face-mesh points; Iris reads the model's face-blendshapes output (a
+// classifier already bundled inside the same face_landmarker.task file,
+// enabled here with outputFaceBlendshapes: true, that Twin's own code
+// leaves off) to drive a paddle, and never touches the DOM with a 3D
+// renderer at all — the "renderer" here is a plain 2D canvas. An earlier
+// version of this file read the ten raw iris landmarks (indices 468-477)
+// directly; specs/F05_IRIS.md documents why that signal turned out to
+// carry no usable gaze information on real hardware.
 
 import { FaceLandmarker, FilesetResolver } from '../vendor/mediapipe/tasks-vision/vision_bundle.mjs';
 
 const WASM_BASE = 'vendor/mediapipe/tasks-vision/wasm';
 const FACE_MODEL_URL = 'assets/models/face-landmarker/face_landmarker.task';
 
-// FaceLandmarker's 478-point layout gives each eye an iris centre plus its
-// own pair of horizontal corner landmarks. The centre's raw x moves just as
-// much when the head translates as when the eye itself moves in its
-// socket — averaging the raw landmark.x values (an earlier version of this
-// file did exactly that) tracks head position, not gaze, which is exactly
-// what real-camera testing surfaced. Normalizing each iris centre against
-// its own eye's corner-to-corner span cancels head translation because
-// both corners move with the head by the same amount the iris does.
-const RIGHT_IRIS_CENTER = 468;
-const RIGHT_EYE_OUTER = 33;
-const RIGHT_EYE_INNER = 133;
-const LEFT_IRIS_CENTER = 473;
-const LEFT_EYE_INNER = 362;
-const LEFT_EYE_OUTER = 263;
-
-// Dividing by an eye's own corner span (below) amplifies whatever
-// landmark-detection noise was already there, in rough proportion to how
-// small that span is relative to the frame — real testing showed this as
-// the paddle visibly twitching with no eye movement at all. Two guards
-// against that, applied before the EMA below: a per-eye reading is
-// discarded outright if its span is too small to trust, and the combined
-// per-frame reading is median-filtered over a short window so a single
-// noisy detection can't move the paddle — only a run of several
-// consistent frames can. Neither constant is verified against real
-// hardware yet; F05-AC02 is exactly the test that tells us whether either
-// needs to move.
-const MIN_EYE_SPAN = 0.02;
+// Three straight rounds of hand-rolled geometry on the 478 face-mesh points
+// (raw iris x, then iris-x normalized against the eye's own corner span,
+// then that same ratio with heavier filtering) all failed on real hardware.
+// The last round's ?debug=1 readout proved why: smoothedGazeX didn't move
+// at all between a deliberate hard-left hold and a deliberate hard-right
+// hold. The corner-ratio signal carried no gaze information to filter or
+// calibrate in the first place — see specs/F05_IRIS.md's "the raw signal
+// itself has no dynamic range" section.
+//
+// The committed model bundle (assets/models/face-landmarker/face_landmarker.task)
+// already contains a face_blendshapes.tflite sub-model — a classifier
+// trained specifically to estimate expression and gaze-direction strength,
+// including the ARKit-standard eyeLookInLeft/eyeLookOutLeft/eyeLookInRight/
+// eyeLookOutRight categories used below. This is a purpose-built signal for
+// exactly this problem, not geometry we derived ourselves, and needs no new
+// asset: outputFaceBlendshapes: true is the only change to what the model
+// loads.
 const RAW_GAZE_MEDIAN_WINDOW = 5;
 const IRIS_X_EMA_ALPHA = 0.15;
 
-// Looking left is looking toward the camera's right in an unmirrored feed
-// (the camera faces the visitor). Flip so "look left" moves the paddle
-// left from the visitor's own point of view. Flip this if AC02 testing
-// shows it feels backwards.
-const MIRROR_GAZE_X = true;
+// Unlike raw landmark.x (camera-frame-relative, needed the flip the old
+// corner-ratio code applied here), the blendshape categories are already
+// subject-relative — "Right" means the visitor's own right eye regardless
+// of how the camera image is oriented. gazeScoreFromBlendshapes() already
+// resolves to "higher rawX = visitor looked to their own right", which is
+// the direction the paddle should move, so no flip should be needed. Kept
+// as a named toggle rather than deleted because the previous round's
+// verified assumption ("needs a flip") just inverted; if a real session
+// says the paddle now moves backwards, flip this rather than re-deriving
+// the sign from scratch again.
+const MIRROR_GAZE_X = false;
 
 // Below this separation between the two captured points, calibration
 // treats the pair as noise rather than a real range — smoothedGazeX is
@@ -195,7 +196,7 @@ async function loadFaceLandmarker() {
         baseOptions: { modelAssetPath: FACE_MODEL_URL },
         runningMode: 'VIDEO',
         numFaces: 1,
-        outputFaceBlendshapes: false,
+        outputFaceBlendshapes: true,
         outputFacialTransformationMatrixes: false,
     });
 }
@@ -241,21 +242,6 @@ function resetBall(g) {
     g.ball.vy = -140;
 }
 
-// Where the iris centre sits between the eye's own two corners, as a 0..1
-// fraction, or null if the span is too small to trust (near-profile head
-// angle, partial occlusion, a bad detection). Order-independent (min/max
-// rather than assuming which corner has the smaller x) because the two
-// eyes' corner pairs run in opposite left-right order in FaceLandmarker's
-// output. A small span is exactly where dividing by it turns ordinary
-// landmark jitter into a large swing in the result, so it is discarded
-// rather than trusted.
-function eyeRatio(iris, cornerA, cornerB) {
-    const lo = Math.min(cornerA.x, cornerB.x);
-    const hi = Math.max(cornerA.x, cornerB.x);
-    if (hi - lo < MIN_EYE_SPAN) return null;
-    return (iris.x - lo) / (hi - lo);
-}
-
 function medianOf(values) {
     const sorted = values.slice().sort((a, b) => a - b);
     return sorted[Math.floor(sorted.length / 2)];
@@ -265,27 +251,34 @@ function medianOf(values) {
 // RAW_GAZE_MEDIAN_WINDOW — see the constant's comment for why this exists.
 let rawGazeHistory = [];
 
-function updateGazeFromLandmarks(landmarks) {
-    const rightIris = landmarks[RIGHT_IRIS_CENTER];
-    const rightOuter = landmarks[RIGHT_EYE_OUTER];
-    const rightInner = landmarks[RIGHT_EYE_INNER];
-    const leftIris = landmarks[LEFT_IRIS_CENTER];
-    const leftInner = landmarks[LEFT_EYE_INNER];
-    const leftOuter = landmarks[LEFT_EYE_OUTER];
-    if (!rightIris || !rightOuter || !rightInner || !leftIris || !leftInner || !leftOuter) return;
+// Looking to one side rotates each eye a different way relative to its own
+// nose-side/temple-side axis (this is normal conjugate gaze, not an error):
+// looking right moves the right eye temporally (eyeLookOutRight) and the
+// left eye nasally (eyeLookInLeft); looking left is the mirror pair. Adding
+// each side's two categories, rather than trusting either eye alone,
+// halves the effect of one eye's blendshape score being noisier than the
+// other's on a given frame.
+function gazeScoreFromBlendshapes(categories) {
+    const score = {};
+    for (const c of categories) score[c.categoryName] = c.score;
+    const right = ((score.eyeLookOutRight || 0) + (score.eyeLookInLeft || 0)) / 2;
+    const left = ((score.eyeLookInRight || 0) + (score.eyeLookOutLeft || 0)) / 2;
+    return { right, left, score };
+}
 
-    const rightSpan = Math.abs(rightOuter.x - rightInner.x);
-    const leftSpan = Math.abs(leftInner.x - leftOuter.x);
-    const rightRatio = eyeRatio(rightIris, rightOuter, rightInner);
-    const leftRatio = eyeRatio(leftIris, leftInner, leftOuter);
-    const ratios = [rightRatio, leftRatio].filter((r) => r !== null);
-    if (ratios.length === 0) {
+function updateGazeFromResult(result) {
+    const blendshapes = result.faceBlendshapes && result.faceBlendshapes[0];
+    if (!blendshapes) {
         droppedFrames += 1;
-        if (DEBUG) renderDebug({ rightRatio, leftRatio, rightSpan, leftSpan, rawX: null, medianX: null });
-        return; // both eyes unreliable this frame; hold the last position rather than guess
+        if (DEBUG) renderDebug({ right: null, left: null, rawX: null, medianX: null });
+        return; // no face this frame; hold the last position rather than guess
     }
 
-    const rawX = ratios.reduce((sum, r) => sum + r, 0) / ratios.length;
+    const { right, left, score } = gazeScoreFromBlendshapes(blendshapes.categories);
+    // right/left are each 0..1 confidences, not a position — center on 0.5
+    // and let a stronger "look right" than "look left" (or vice versa) push
+    // away from it in either direction.
+    const rawX = Math.min(1, Math.max(0, 0.5 + (right - left) / 2));
     rawGazeHistory.push(rawX);
     if (rawGazeHistory.length > RAW_GAZE_MEDIAN_WINDOW) rawGazeHistory.shift();
     const medianX = medianOf(rawGazeHistory);
@@ -293,7 +286,7 @@ function updateGazeFromLandmarks(landmarks) {
     const gazeX = MIRROR_GAZE_X ? 1 - medianX : medianX;
     smoothedGazeX = smoothedGazeX + IRIS_X_EMA_ALPHA * (gazeX - smoothedGazeX);
 
-    if (DEBUG) renderDebug({ rightRatio, leftRatio, rightSpan, leftSpan, rawX, medianX });
+    if (DEBUG) renderDebug({ right, left, rawX, medianX, score });
 }
 
 function fmt(n) {
@@ -304,18 +297,16 @@ function renderDebug(f) {
     // calMax - calMin is the thing to watch: calibratedX divides by it, so a
     // narrow-but-passing capture (anything just above CAL_MIN_SEPARATION)
     // turns ordinary smoothedGazeX wander into a much larger paddle swing.
-    // Two "fix" commits both targeted rawX/medianX/smoothedGazeX upstream of
-    // this and neither held — this line is here to test the theory that the
-    // amplifier was downstream of all of them the whole time.
     const range = calMin === null ? null : calMax - calMin;
     const gain = range === null ? 1 : 1 / range;
+    const s = f.score || {};
     els.debug.textContent =
-        `right ratio ${fmt(f.rightRatio)}  span ${fmt(f.rightSpan)}\n` +
-        `left  ratio ${fmt(f.leftRatio)}  span ${fmt(f.leftSpan)}\n` +
+        `eyeLookOutRight ${fmt(s.eyeLookOutRight)}  eyeLookInLeft  ${fmt(s.eyeLookInLeft)}  -> right ${fmt(f.right)}\n` +
+        `eyeLookInRight  ${fmt(s.eyeLookInRight)}  eyeLookOutLeft ${fmt(s.eyeLookOutLeft)}  -> left  ${fmt(f.left)}\n` +
         `raw ${fmt(f.rawX)}  median ${fmt(f.medianX)}  smoothed ${fmt(smoothedGazeX)}\n` +
         `calMin ${fmt(calMin)}  calMax ${fmt(calMax)}  range ${fmt(range)}  gain ${gain.toFixed(1)}x\n` +
         `paddle fraction ${fmt(calibratedX(smoothedGazeX))}\n` +
-        `dropped frames (both eyes unreliable): ${droppedFrames}`;
+        `dropped frames (no face this frame): ${droppedFrames}`;
 }
 
 function calibratedX(x) {
@@ -443,8 +434,7 @@ function frame(now) {
     if (!faceLandmarker) return;
 
     const result = faceLandmarker.detectForVideo(els.video, now);
-    const landmarks = result.faceLandmarks && result.faceLandmarks[0];
-    if (landmarks) updateGazeFromLandmarks(landmarks);
+    updateGazeFromResult(result);
 
     if (mode === 'calibrating') {
         els.calMarker.style.left = `${smoothedGazeX * 100}%`;
