@@ -1,30 +1,61 @@
 # F05: Iris, a gaze-controlled Breakout
 
-**Status:** implemented, pending human verification. `iris.html`,
-`css/iris.css` and `js/iris.js` are written and pass every check this repo
-can run without camera hardware (CI-mirroring scripts, a headless browser
-load with a clean console and the expected accessibility tree). First
-real-camera testing (2026-08-09) found the gaze signal was tracking head
-position rather than eye movement; the fix (eye-corner-relative
-normalization, see "Calibration" below) and a two-point calibration step
-are both implemented. A second real-camera pass the same day found that fix
-introduced a new problem — the paddle twitching on its own with the eyes
-still, from landmark noise amplified by the corner-span division. A second
-fix (a degenerate-span guard, a median pre-filter and a lower EMA alpha —
-see "The corner-relative fix traded head-tracking for noise amplification"
-below) is implemented but **not yet verified against real hardware at
-all** — the fake camera this sandbox has access to cannot exhibit either
-the head-tracking failure or the twitching, so neither fix has been
-confirmed by anything other than a human eye on a webcam. AC02 (real-camera
-iris landmark stability: tracks eye movement independent of head position,
-and does not drift or twitch with the eyes still), AC04 (the CSP-violation
-line firing against a live camera session), AC06 (full keyboard traversal
-through a real camera grant, now including the calibration step) and AC08
-(canvas text contrast, which Lighthouse cannot read off canvas pixels) all
-need a human with a webcam and have not been checked. `MIRROR_GAZE_X`,
-`IRIS_X_EMA_ALPHA`, `MIN_EYE_SPAN`, `RAW_GAZE_MEDIAN_WINDOW` and
-`CAL_MIN_SEPARATION` in `js/iris.js` are first-guess constants pending that
-pass and should be expected to change.
+**Status:** implemented, iterating against real-hardware telemetry. The
+gaze signal, calibration shape and DOM contract described below are all
+current as of commit `2b104c5`; the sections under "Calibration" that
+follow the current description are kept as a narrative record of every
+signal and fix this feature tried and rejected before landing here — see
+"How this got here" for the reading order.
+
+The signal actually shipping is eye-corner-ratio geometry (`landmark 468`
+against its own eye's `33`/`133` corners, `473` against `362`/`263`), head-
+yaw-corrected using the same model's `outputFacialTransformationMatrixes`
+output, smoothed with a median-then-EMA cascade, and mapped through a
+five-point weighted-polynomial calibration fit (not the original two-point
+linear map). This replaced an intermediate attempt that read the model's
+`face_blendshapes.tflite` classifier instead of hand-rolled geometry — that
+attempt is also in the record below, and also failed on real hardware.
+
+Two real-hardware telemetry rounds since the corner-ratio-plus-calibration
+signal landed have each found and fixed a distinct problem:
+
+- **"The paddle barely moved"** (session 2, 2026-08-09): telemetry showed
+  the paddle could reach both edges, but a full sweep took ~3 seconds of
+  real gaze movement — too slow for gameplay. Root-caused to over-heavy
+  raw-side smoothing (`RAW_GAZE_MEDIAN_WINDOW` was 5, `IRIS_X_EMA_ALPHA` was
+  0.15) now that `PADDLE_EMA_ALPHA` exists as a dedicated post-calibration
+  jitter absorber; fixed in commit `bf37945` (median window 5→3, EMA alpha
+  0.15→0.3).
+- **Erratic paddle swings from small gaze movements** (session 3, same
+  day): a fresh telemetry pair showed the same ~3-second high-to-low swing
+  time as before, but with the intermediate signal oscillating wildly
+  rather than moving cleanly — traced to a calibration capture where two
+  adjacent points (targets 0.5 and 0.75) read almost identically
+  (`capturedRaw` differing by 0.0007), which `CAL_MIN_SEPARATION`'s
+  overall-spread check doesn't catch, producing a degree-2 fit whose vertex
+  sat inside the visitor's natural gaze range and amplified ordinary signal
+  noise into full-track swings. Fixed in commit `2b104c5`: after fitting,
+  check whether the vertex falls inside the captured raw range and, if so,
+  refit at degree 1 instead of keeping the degenerate quadratic.
+
+Neither fix has yet been confirmed against a fourth real-hardware session
+played, not just measured — see "Pending" below. AC02 (real-camera gaze
+signal stability and responsiveness), AC04 (the CSP-violation line firing
+against a live camera session), AC06 (full keyboard traversal through a
+real camera grant, including the calibration step) and AC08 (canvas text
+contrast, which Lighthouse cannot read off canvas pixels) all need a human
+with a webcam. `MIRROR_GAZE_X`, `HEAD_YAW_CORRECTION_GAIN`,
+`IRIS_X_EMA_ALPHA`, `RAW_GAZE_MEDIAN_WINDOW`, `PADDLE_EMA_ALPHA` and
+`CAL_MIN_SEPARATION` in `js/iris.js` are still first-guess constants (or,
+for the first two rounds' worth, retuned first guesses) and should be
+expected to change again as more sessions come in.
+
+### Pending
+
+A fourth real-hardware telemetry pair, played rather than only measured,
+is needed to confirm both `bf37945` and `2b104c5` actually fixed what they
+targeted — the analysis behind each was telemetry-only, not a person
+reporting the paddle feels right.
 
 The premise that the iris landmarks exist at all is no longer assumed: the
 committed `assets/models/face-landmarker/face_landmarker.task`'s
@@ -142,19 +173,29 @@ visitor presses #iris--load
         └─ FilesetResolver.forVisionTasks('vendor/mediapipe/tasks-vision/wasm')
                  └─ FaceLandmarker.createFromOptions({ modelAssetPath: FACE_MODEL_URL,
                                                          numFaces: 1,
-                                                         outputFaceBlendshapes: true,
-                                                         outputFacialTransformationMatrixes: false })
+                                                         outputFacialTransformationMatrixes: true })
+
+five-point calibration (before gameplay, see "Calibration" below)
+        │
+   look at each of 5 targets in turn, press "Capture this point" → last
+   CAPTURE_AVERAGE_WINDOW smoothed readings averaged into one raw sample per
+   point → weighted least-squares polynomial (degree 2, edges weighted 2x)
+   fit through the 5 (raw, target) pairs → degree-1 refit if the fitted
+   curve's vertex falls inside the captured raw range (see "A second,
+   distinct problem" below) → calCoeffs, or null if "Skip calibration"
 
 every rendered frame
         │
-   detectForVideo() → faceBlendshapes[0].categories (ARKit-style scores)
+   detectForVideo() → faceLandmarks[0] (478 points) +
+   facialTransformationMatrixes[0] (head pose)
         │
-   eyeLookOutRight + eyeLookInLeft (looking right) vs. eyeLookInRight +
-   eyeLookOutLeft (looking left) → centred 0.5 ± half the difference →
-   median-filtered → EMA-smoothed → remapped through the session's
-   calibration range (if any) → mapped to paddle x-position across the
-   canvas width. See "The raw signal itself had no dynamic range" below for
-   why this replaced the original 468/473 iris-landmark approach.
+   iris 468/473 position normalized against that eye's own 33/133, 362/263
+   corner span (gazeScoreFromLandmarks) → corrected by head yaw extracted
+   from the transformation matrix (HEAD_YAW_CORRECTION_GAIN) → rolling
+   median (RAW_GAZE_MEDIAN_WINDOW) → EMA (IRIS_X_EMA_ALPHA) → calCoeffs
+   polynomial remap, clamped to [0,1] → second EMA (PADDLE_EMA_ALPHA) →
+   paddle x-position across the canvas width. See "How this got here" below
+   for the blendshape-classifier signal this replaced.
         │
    game loop: ball/brick/paddle collision, scoring, deterministic difficulty
    (same "rule-based, not model-based" shape as Echo's retargeting math)
@@ -199,42 +240,62 @@ for anything.
 
 ## Calibration
 
-First real-camera testing of F05-AC02 (2026-08-09) found the original
-mapping was tracking head position, not eye movement: `updateGazeFromLandmarks`
-averaged the raw, frame-absolute x of the ten iris landmarks, and that value
-moves just as much when the head translates left-right as when the eyes
-move within their sockets — the two are not distinguishable from landmark
-position alone. The fix normalizes each eye's iris centre (landmark 468 for
-the right eye, 473 for the left) against that same eye's own corner-to-corner
-span (33/133 and 362/263), which cancels head translation because both
-corners move with the head by the same amount the iris does. This is now
-the actual gaze signal `smoothedGazeX` carries, in `js/iris.js`.
+The current implementation, as of commit `2b104c5`. The gaze signal is
+eye-corner-ratio geometry: each eye's iris landmark (468 right, 473 left)
+normalized against that same eye's own corner-to-corner span (33/133,
+362/263), which cancels head *translation* because both corners move with
+the head by the same amount the iris does — see `gazeScoreFromLandmarks()`.
+Head *rotation* (yaw) is not cancelled by the corner-ratio alone, so a
+separate correction term, read from the same model's
+`facialTransformationMatrixes` output, is subtracted before the signal is
+used at all: `HEAD_YAW_CORRECTION_GAIN`. This combined value is
+`smoothedGazeX`'s input.
 
-Even head-translation-corrected, a comfortable eye-movement range rarely
-spans the full 0..1 the corner-relative ratio can theoretically reach, and
-that range differs by visitor (eye shape, camera angle, glasses). A fixed
-linear map from that ratio to the paddle track therefore leaves part of
-the track unreachable for most people — the scope cut above assumed a
-relative signal wouldn't need this, and real testing showed otherwise.
+A comfortable eye-movement range rarely spans the full 0..1 the corner-
+ratio can theoretically reach, and that range differs by visitor (eye
+shape, camera angle, glasses) and isn't necessarily linear across it — a
+fixed or two-point linear map leaves part of the track unreachable, or
+uneven, for most people. `CAL_POINTS` defines five targets (0, 0.25, 0.5,
+0.75, 1 across the track); the visitor looks at each in turn and presses
+"Capture this point". `captureCalPoint()` averages the last
+`CAPTURE_AVERAGE_WINDOW` smoothed readings as that point's raw sample
+(rather than a single instantaneous read, which is exactly the kind of
+value transient noise shows up in), then — once all five are in —
+`fitPolynomial()` fits a degree-`CAL_POLY_DEGREE` (2) weighted least-
+squares curve through the five (raw, target) pairs, with the two edge
+points weighted `CAL_EDGE_WEIGHT` (2x) against the three interior points'
+`CAL_INTERIOR_WEIGHT` (1x) — favoring getting the paddle's full left/right
+reach right over interior smoothness, since running out of track before
+the visitor's own comfortable range does is the more visible failure.
+`calibratedX()` evaluates this fit and clamps to `[0,1]`; a null
+`calCoeffs` (calibration skipped or rejected) falls back to passing the raw
+signal through unchanged.
 
-The fix is a two-point calibration step inserted between camera+model load
-and gameplay: look at the left edge, press "Capture left"; look at the
-right edge, press "Capture right". The two raw `smoothedGazeX` readings
-become `calMin`/`calMax`, and `stepGame` maps through that range instead of
-the raw 0..1 signal directly. A "Skip calibration" control keeps the
-original fixed mapping available for a visitor who would rather not do the
-capture step, or whose setup makes it unnecessary. A "Recalibrate" control
-in the game view re-enters the same step without re-requesting the camera
-or reloading the model — only the mapping range needs to change.
+Two validity guards run after all five captures, both falling back rather
+than shipping a fit expected to misbehave:
 
-`CAL_MIN_SEPARATION` (0.03) rejects a capture pair too close together to be
-a deliberate left/right pair rather than the same point measured twice;
-below it, "Start playing" stays `aria-disabled` and the visitor is asked to
-try again or skip. This is also the shape a static/synthetic camera feed
-hits directly — anything that never moves produces two nearly identical
-captures and never satisfies the guard, which is expected: it does not
-mean calibration is broken, only that there is no real head or eye motion
-to calibrate against.
+- `CAL_MIN_SEPARATION` (0.03) rejects the whole capture if the *overall*
+  spread of the five raw values — `max - min` across all of them — is
+  below it: a static/synthetic camera, or a visitor whose gaze genuinely
+  isn't moving the signal, produces this by construction. `calCoeffs` is
+  set to `null` and the session plays uncalibrated.
+- The vertex check (added in `2b104c5`, see "A second, distinct problem"
+  below) computes the fitted degree-2 curve's vertex (`-c1/(2c2)`) and, if
+  it falls *inside* the five captured raw values' range, refits at degree 1
+  instead of discarding the fit outright — a straight line can't produce a
+  vertex at all, so it can't have this problem.
+
+Neither guard requires a monotonic or evenly-spaced capture; both are
+narrower checks aimed at specific failure shapes real telemetry has
+actually produced, not a general well-conditioned-ness test. A capture that
+fails neither guard but is still poorly conditioned in some other way is a
+plausible future finding, not a case already covered.
+
+A "Skip calibration" control (`#iris--cal-skip`) leaves `calCoeffs` at
+`null` and plays with the raw signal directly, for a visitor who would
+rather not do the capture step. A "Recalibrate" control (`#iris--recalibrate`)
+in the game view re-enters the same five-point step without re-requesting
+the camera or reloading the model — only the fit needs to change.
 
 The camera/model lifecycle is shared across calibration and gameplay: the
 capture rAF loop keeps calling `detectForVideo()` and updating
@@ -244,6 +305,18 @@ capturing — deliberately not a live text region, since an `aria-live`
 announcement on every animation frame would be unusable noise for a screen
 reader user. The status text before and after each capture is the
 non-visual equivalent.
+
+### How this got here
+
+Everything from here to "The vendored bundle phones home" is a narrative
+record, in order, of every gaze signal and calibration shape this feature
+tried before landing on the one described above — kept because each dead
+end ruled something out that the next attempt needed to know, not because
+any of it is still shipping. The two-point calibration and corner-ratio
+signal this section starts from were both later superseded (five-point
+weighted polynomial; head-yaw-corrected corner ratio, after an intervening
+blendshapes attempt also failed) — see "Calibration" above for what
+actually ships.
 
 ### The corner-relative fix traded head-tracking for noise amplification
 
@@ -446,6 +519,103 @@ hard right gaze, and check whether `raw`/`smoothed` move between the two.
 per-side values alongside `raw`/`median`/`smoothed`, so that comparison
 doesn't need guessing at.
 
+### The blendshapes classifier failed on real hardware too
+
+A real-hardware telemetry file (`iris-calibration-*.json`, 2026-08-09)
+answered the question the previous section left open, and answered it
+against the blendshapes signal, not for it: `eyeLookOutRight` and
+`eyeLookInLeft` stayed flat across all five calibration points, and
+`eyeLookInRight`/`eyeLookOutLeft` moved, but in the wrong direction
+relative to the target. A classifier purpose-built for this estimate was
+still, on this hardware, not tracking gaze direction.
+
+`gazeScoreFromLandmarks()` returns to the corner-ratio geometry this
+section started from, this time with `HEAD_YAW_CORRECTION_GAIN` applied —
+the ingredient the three earlier corner-ratio rounds never had, and a
+plausible reason the very first one showed no usable range at all: a head
+turn shifts an eye's corners and its iris by different amounts under
+perspective, which corner-ratio math alone has no way to distinguish from
+an actual gaze shift. `MIRROR_GAZE_X` flips back to `false`, since the
+corner-ratio signal is camera-frame-relative again, not the blendshape
+categories' visitor-relative naming.
+
+At the same time, the original two-point linear calibration is replaced by
+the five-point weighted polynomial fit described under "Calibration"
+above, porting two techniques ("Head-pose correction and multi-point
+calibration") from public MediaPipe-based gaze trackers
+(`aciderix/React-Eye-Tracker-V1`, `ChiShengChen/gaze_track_webcam`) that
+report working accuracy on the same `FaceLandmarker` API. Both were
+first-guess ports pending a real-hardware session of their own — not
+verified by anything about *why* they generalize, just by matching a shape
+that reportedly works elsewhere.
+
+### "The paddle barely moved" — a real latency problem, found by asking the wrong question first
+
+The first real-hardware session against the corner-ratio-plus-calibration
+signal reported "fitted" calibration with real, distinct coefficients and
+still summarized as "barely moved". Telemetry alone looked like a
+validated fix at first pass — the play session's `targetFraction` reached
+both 0 and 1 with no visible jitter — and it took the visitor's direct,
+live contradiction of that reading ("the paddle barely moved") to send the
+analysis back to the same data asking a different question: not *does the
+signal reach the full range*, but *how long does a sweep across it take*.
+It took roughly 3 seconds of real gaze movement to go from one extreme to
+the other — numerically full-range, but far slower than a dodge in actual
+gameplay needs.
+
+The cause was excessive latency stacked in the raw-side smoothing cascade,
+sized for a problem (per-frame landmark noise) a later stage now also
+absorbs: `PADDLE_EMA_ALPHA`, added to damp the calibration fit's own noise
+amplification (see its own comment in `js/iris.js`), sits downstream of
+`RAW_GAZE_MEDIAN_WINDOW` and `IRIS_X_EMA_ALPHA` and does the same kind of
+smoothing job. With a dedicated stage already absorbing jitter after
+calibration, the raw-side stages no longer needed to be tuned as if they
+were the only line of defense against it. Commit `bf37945` cut
+`RAW_GAZE_MEDIAN_WINDOW` from 5 to 3 and raised `IRIS_X_EMA_ALPHA` from
+0.15 to 0.3, trading some of the raw signal's own noise rejection for
+lower latency, on the reasoning that `PADDLE_EMA_ALPHA` can absorb what
+that trade reintroduces.
+
+### A second, distinct problem: erratic swings from a poorly-conditioned fit
+
+A fresh telemetry pair requested to validate `bf37945` showed the same
+~3-second high-to-low swing time as before — on its own, indistinguishable
+from "the latency fix didn't work". But this swing was oscillatory rather
+than a clean sweep: `smoothedGazeX` drifted gently and monotonically across
+the whole window while `targetFraction` (the post-calibration value)
+whipsawed between roughly 0.08 and 0.90 several times within it. A timing
+metric that looks the same can mean two structurally different things, and
+only inspecting the intermediate signal shape — not just start and end —
+told them apart.
+
+The calibration capture behind this session had two adjacent points
+(targets 0.5 and 0.75) whose `capturedRaw` values differed by only 0.0007,
+against jumps of 0.0125–0.0522 between every other pair — plausibly a
+visitor undershooting a small angular target ("a quarter of the way from
+the right") rather than a fluke, and a shape worth expecting to recur, not
+a one-off bad capture. `CAL_MIN_SEPARATION` checks only the overall spread
+across all five points, which this capture still cleared (0.0799, larger
+than a prior session's passing capture). The resulting degree-2 fit had a
+vertex at raw x ≈ 0.538, sitting inside this visitor's observed gameplay
+range (0.452–0.550) — meaning the fitted curve was nearly flat (paddle
+pinned near an edge) through much of that range and very steep just below
+it, so ordinary frame-to-frame signal noise near the steep zone was
+amplified into large `targetFraction` swings. This is a different failure
+from `bf37945`'s target: reachable range and responsiveness were both
+fine; the *mapping* was pathological in a way neither prior guard caught.
+
+Commit `2b104c5` added the vertex check described under "Calibration"
+above: if the fitted degree-2 curve's vertex falls inside the captured raw
+range, refit at degree 1. Verified against both this session's raw values
+(vertex 0.538, inside its range [0.464, 0.544] → refit fires, producing a
+monotonic map) and a prior session's (vertex ≈0.542, outside its range
+[0.480, 0.526] → unaffected), by replicating `fitPolynomial()` outside the
+browser against both sessions' actual telemetry.
+
+Neither `bf37945` nor `2b104c5` has yet been confirmed by a person playing
+the game and reporting on it, only by re-deriving properties of past
+telemetry — see "Pending" at the top of this document.
+
 ---
 
 ## The vendored bundle phones home, and Iris inherits the mitigation
@@ -492,12 +662,11 @@ scope, in `js/iris.js`.
 | `iris--gate` | `div` | States what camera access is used for and that nothing leaves the tab, before the press |
 | `iris--load` | `button type="button"` | Requests the camera and starts loading the runtime and model |
 | `iris--video` | `video` | `muted`, `playsinline` |
-| `iris--calibrate` | `div` | Two-point calibration step, shown after load succeeds and before gameplay |
+| `iris--calibrate` | `div` | Five-point calibration step, shown after load succeeds and before gameplay |
+| `iris--cal-target` | `div` | `aria-hidden` marker for where to look, positioned per step by `showCalStep()` |
 | `iris--cal-marker` | `div` | `aria-hidden` live visual readout of the current raw gaze position, decorative only |
-| `iris--cal-left` | `button type="button"` | Captures the current gaze position as the left end of the range |
-| `iris--cal-right` | `button type="button"` | Captures the current gaze position as the right end of the range |
-| `iris--cal-start` | `button type="button"` | Commits the calibration range and starts the game; `aria-disabled` until both ends are captured with enough separation |
-| `iris--cal-skip` | `button type="button"` | Starts the game with no calibration range (raw signal used directly) |
+| `iris--cal-capture` | `button type="button"` | Captures the current gaze position as the current step's sample and advances to the next; on the fifth capture, fits (or falls back — see "Calibration" above) and starts the game |
+| `iris--cal-skip` | `button type="button"` | Starts the game with no calibration fit (raw signal used directly) |
 | `iris--stage` | `canvas` | Paddle/ball/brick rendering |
 | `iris--debug` | `pre` | `hidden` and `aria-hidden` unless the URL carries `?debug=1`; raw per-eye gaze diagnostics, see "Diagnostic instrumentation" above |
 | `iris--status` | `p` | `role="status"`, `aria-live="polite"` |
@@ -517,14 +686,14 @@ plus a re-entry guard flag, same as the other three features.
 | ID | Criterion | Evidence |
 | --- | --- | --- |
 | F05-AC01 | The committed `face_landmarker.task`'s detector emits 478 landmarks (468 face mesh + 10 iris, indices 468–477), not 468. | **Verified 2026-08-09**: `face_landmarks_detector.tflite` extracted from the `.task` bundle and its output tensor inspected — shape `[1, 1, 1, 1434]`, 1434 = 478 × 3 |
-| F05-AC02 | The eye-corner-relative gaze signal is stable enough frame-to-frame, after EMA smoothing, to drive continuous paddle movement without a dwell timer, and tracks eye movement independent of head position (the original mean-landmark-x version failed this — see "Calibration"). | Human, real camera, real browser — **run this before anything else in this spec is built** |
+| F05-AC02 | The head-yaw-corrected eye-corner-relative gaze signal, run through calibration, is stable enough frame-to-frame to drive continuous paddle movement without a dwell timer, tracks eye movement independent of head position, and responds to a gaze shift within roughly a second rather than several (the original mean-landmark-x version and an intervening blendshapes-classifier version both failed this — see "How this got here"). | Human, real camera, real browser, actually played rather than only measured from telemetry — see "Pending" at the top of this document |
 | F05-AC03 | No new file is vendored under `vendor/` or `assets/models/`; `js/iris.js` loads the same `face_landmarker.task` already committed for Twin. | Structural: diff against `git status` after implementation |
 | F05-AC04 | The video frame and landmarks are never transmitted anywhere, including the same `odml.pa.googleapis.com` telemetry call the vendored `@mediapipe/tasks-vision` bundle makes unconditionally after ~30s of `detectForVideo()` (see "The vendored bundle phones home" above). `iris.html` ships the same `<meta http-equiv="Content-Security-Policy" content="connect-src 'self' blob:">` tag `twin.html` uses — Iris calls `detectForVideo()` every frame for the whole game, strictly longer exposure than Twin's calibration window, so this is required, not conditional. | Verify a CSP-violation console line for the blocked request and no successful third-party request in the network panel, same method as F04-AC03 |
 | F05-AC05 | Spoken lines are read from a small authored, fixed set, never generated at runtime. | Structural: `js/iris.js` |
 | F05-AC06 | None of `#iris--load`, `#iris--stop` use the `disabled` property; focus survives camera grant and load. | Human, keyboard traversal |
 | F05-AC07 | `iris.html` is listed in `sitemap.xml`. | `scripts/check_repo.py`, CI |
 | F05-AC08 | Contrast holds at 4.5:1 for text in both flavours, checked against Latte. | Human, per colour scheme |
-| F05-AC09 | The two-point calibration step is reachable and completable by keyboard alone, `iris--cal-start` stays `aria-disabled` (never `disabled`) until both ends are captured with enough separation, and "Skip calibration" and "Recalibrate" both leave the page in a state a keyboard user can continue from without a focus loss to `<body>`. | Human, keyboard traversal, real camera |
+| F05-AC09 | The five-point calibration step is reachable and completable by keyboard alone via repeated presses of `iris--cal-capture`, and "Skip calibration" and "Recalibrate" both leave the page in a state a keyboard user can continue from without a focus loss to `<body>`. | Human, keyboard traversal, real camera |
 
 ---
 
