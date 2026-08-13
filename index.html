@@ -39,16 +39,40 @@
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
-        "@type": "Person",
-        "name": "Tatang Haryadi",
-        "url": "https://tatangharyadi.github.io/",
-        "image": "https://tatangharyadi.github.io/assets/images/tatangharyadi.webp",
-        "jobTitle": "Chief Technology Officer",
-        "description": "A CTO with a career in accelerating digital transformations and product innovation.",
-        "sameAs": [
-            "https://www.linkedin.com/in/tatangharyadi/",
-            "https://github.com/tatangharyadi",
-            "https://medium.com/@tatangharyadi"
+        "@graph": [
+            {
+                "@type": "Person",
+                "@id": "https://tatangharyadi.github.io/#person",
+                "name": "Tatang Haryadi",
+                "url": "https://tatangharyadi.github.io/",
+                "image": "https://tatangharyadi.github.io/assets/images/tatangharyadi.webp",
+                "jobTitle": "Chief Technology Officer",
+                "description": "A CTO with a career in accelerating digital transformations and product innovation.",
+                "knowsAbout": [
+                    "Digital Transformation",
+                    "Fractional CTO",
+                    "FinOps",
+                    "Technology Strategy",
+                    "Agentic AI",
+                    "Restaurant Technology",
+                    "Retail Technology",
+                    "WebAssembly"
+                ],
+                "knowsLanguage": ["en", "id"],
+                "sameAs": [
+                    "https://www.linkedin.com/in/tatangharyadi/",
+                    "https://github.com/tatangharyadi",
+                    "https://medium.com/@tatangharyadi"
+                ]
+            },
+            {
+                "@type": "ProfessionalService",
+                "name": "Tatang Haryadi | Fractional CTO",
+                "url": "https://tatangharyadi.github.io/portfolio.html#now",
+                "provider": { "@id": "https://tatangharyadi.github.io/#person" },
+                "areaServed": "Jakarta Metropolitan Area",
+                "description": "Fractional CTO work: technology strategy, turning around at-risk projects, and total-cost-of-ownership optimisation, on an as-needed basis."
+            }
         ]
     }
     </script>
