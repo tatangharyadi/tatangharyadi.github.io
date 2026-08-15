@@ -33,18 +33,31 @@ risk picture:
   to `vae_encoder`, and undocumented anywhere in the model card.
   `vae_encoder`'s `latent_sample` output is also `float16` and needs
   converting back before the noise-mixing math.
-- **`vae_encoder` cannot run on the WebGPU execution provider at all, on the
-  pinned `onnxruntime-web@1.18.0-dev.20240118-28a16c223c` build.** It fails
-  with `[WebGPU] Kernel "[Clip] /Clip" failed. Error: Invalid data type` —
-  there is no `fp16` WebGPU kernel for `Clip` in this build. Forcing just
-  that one session onto `executionProviders: ["wasm"]` (CPU) works, but at a
-  real cost: **the encode step alone took ~52 seconds** in this sandboxed
-  environment, dwarfing `unet` (~1s) and `vae_decoder` (~1s) on WebGPU. A
-  production implementation needs either a newer ONNX Runtime Web build with
-  a working `fp16` WebGPU `Clip` kernel, or this 52-second CPU fallback has
-  to be budgeted into F06-AC03's latency number directly — it is not a
-  rounding error next to the sub-second UNet/decoder steps, it is the
-  dominant cost of the whole pipeline as measured.
+- **`vae_encoder` cannot run on the WebGPU execution provider at all on the
+  `guschmue/ort-webgpu` reference demo's pinned
+  `onnxruntime-web@1.18.0-dev.20240118-28a16c223c` build, but this is a
+  version problem, not an architectural one, and it is already fixed
+  upstream.** That build fails with `[WebGPU] Kernel "[Clip] /Clip" failed.
+  Error: Invalid data type` — there is no `fp16` WebGPU kernel for `Clip` in
+  it. [PR #21584](https://github.com/microsoft/onnxruntime/pull/21584)
+  ("[js/webgpu] support float16 for Clip") added exactly that kernel and
+  merged 2024-08-28; the fix first shipped in `onnxruntime-web@1.19.2` and
+  is present in every release since, including current stable `1.27.0`.
+  Re-running the same prototype pinned to `onnxruntime-web@1.20.1` instead
+  confirmed this directly: `vae_encoder` now runs on WebGPU with no
+  execution-provider override, no error, in **595ms** — not 52 seconds on
+  `wasm`. One accompanying API change came with the newer build: it expects
+  a native `Float16Array`-backed tensor rather than a `Uint16Array` of
+  manually bit-packed IEEE-754 halves (the old build predates
+  `Float16Array` support in its JS API); Chrome already ships native
+  `Float16Array`, so this is a straightforward code change, not a new risk.
+  With this fix, a full pipeline pass — `text_encoder` (346ms) +
+  `vae_encoder` (595ms) + `unet` (706ms) + `vae_decoder` (819ms) — completed
+  in about **2.5 seconds total**, all four sessions on WebGPU, no CPU
+  fallback anywhere. **This retires the 52-second bottleneck as a concern:
+  the fix is to pin a current `onnxruntime-web` release (`1.20.1` or later,
+  not the reference demo's stale `1.18.0-dev` pin), not to accept a
+  degraded CPU path.**
 - **The noised-latent mechanism works and responds to `strength` in the
   expected direction.** At `strength=0.5` the output was a coherent,
   recognizably-derived stylized portrait (same head position and framing as
@@ -75,12 +88,13 @@ size budget for this spec.
 One premise remains open:
 
 - **Real-hardware inference latency is still unmeasured on ordinary
-  consumer hardware.** The prototype's numbers (unet ~1s, vae_decoder ~1s
-  on WebGPU; vae_encoder ~52s on wasm/CPU) came from this sandbox's
-  environment, not a visitor's laptop integrated GPU in a real browser tab.
-  The 52-second `vae_encoder` figure in particular needs re-measuring on
-  whatever hardware/EP combination a shipped implementation would actually
-  use, since it is now the known bottleneck rather than an unknown one.
+  consumer hardware.** All four prototype numbers above (~2.5s total, all
+  WebGPU) came from this sandbox's environment, not a visitor's laptop
+  integrated GPU in a real browser tab. With the `onnxruntime-web` version
+  bump, there is no longer a known CPU-bound bottleneck to specifically
+  budget for — but the whole pipeline still needs a real-hardware run
+  before claiming ~2.5s (or whatever multiple of it a weaker GPU produces)
+  is a "tolerable time on ordinary hardware."
 
 The prototype itself is a throwaway HTML/JS harness (extending
 `guschmue/ort-webgpu`'s demo file, served locally, driven with a browser
