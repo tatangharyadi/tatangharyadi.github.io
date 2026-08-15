@@ -85,16 +85,27 @@ accuracy/output-quality trade-off at int8 is untested here. 2.58GB, as a
 one-time cached page load rather than a per-visit cost, is accepted as the
 size budget for this spec.
 
-One premise remains open:
+**F06-AC03 is now measured on real hardware, with one caveat.** The
+prototype's browser automation runs on a real machine, not an isolated
+sandbox — a MacBook Pro with Apple M4 Pro (confirmed via `system_profiler`:
+14 CPU cores, 20 GPU cores), matching `navigator.gpu`'s reported adapter
+(`vendor: apple`, `architecture: metal-3`, `shader-f16` supported). Two
+independent runs on this hardware, all four sessions on WebGPU, produced:
 
-- **Real-hardware inference latency is still unmeasured on ordinary
-  consumer hardware.** All four prototype numbers above (~2.5s total, all
-  WebGPU) came from this sandbox's environment, not a visitor's laptop
-  integrated GPU in a real browser tab. With the `onnxruntime-web` version
-  bump, there is no longer a known CPU-bound bottleneck to specifically
-  budget for — but the whole pipeline still needs a real-hardware run
-  before claiming ~2.5s (or whatever multiple of it a weaker GPU produces)
-  is a "tolerable time on ordinary hardware."
+| run | text_encoder | vae_encoder | unet | vae_decoder | total |
+|---|---|---|---|---|---|
+| 1 | 346ms | 595ms | 706ms | 819ms | ~2.47s |
+| 2 | 434ms | 379ms | 483ms | 788ms | ~2.08s |
+
+Both land in the same **~2–2.5 second** band for one end-to-end img2img
+generation, session-loading time excluded. The caveat: an M4 Pro MacBook
+Pro is a current, premium machine, not the low end of "ordinary hardware" —
+an older laptop, an integrated (non-discrete) GPU, or a phone would likely
+be meaningfully slower, and none of those were tested here. Whether
+~2–2.5s (as a floor, not a ceiling) is "tolerable" is a product judgment
+that can now be made against a real number instead of an estimate, but the
+number should be read as best-case rather than typical-case until a
+lower-end device is also tried.
 
 The prototype itself is a throwaway HTML/JS harness (extending
 `guschmue/ort-webgpu`'s demo file, served locally, driven with a browser
