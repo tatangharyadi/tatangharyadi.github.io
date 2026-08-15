@@ -238,6 +238,28 @@ A gaze-controlled Breakout, reading iris position from MediaPipe's
   place of the masthead door `mocap.html` gave up. Full detail is in
   F05_IRIS.md.
 
+### F06: Muse → [F06_MUSE.md](F06_MUSE.md)
+
+An in-browser avatar illustrator: a visitor uploads a photo, gets back a
+stylized illustrated portrait with five head-rotation poses, crossfaded the
+same way Draft's team-directory avatars are.
+
+- Reuses the already-vendored MediaPipe Face Landmarker for face detection,
+  rather than adding a second face model.
+- The stylization itself needs a real generative model, not a landmark
+  model — a diffusion model (SD-Turbo) fetched at runtime from Hugging
+  Face, since it is roughly 30 times larger than every ML asset this repo
+  has ever vendored combined and does not fit the committed-asset
+  precedent every other feature here follows.
+- **This is the first ML dependency on the site that is not same-origin.**
+  The photo, landmarks and generated images never leave the tab; only the
+  model weights are fetched, from an exact pinned revision, behind a CSP
+  that names Hugging Face's host explicitly. Full argument in F06_MUSE.md.
+- **Status: proposed, not implemented.** Whether image-to-image is even
+  achievable with the identified model in a browser, its real download
+  size, and its real-hardware inference latency are all unverified — see
+  F06_MUSE.md's own "Pending" section. No code exists yet.
+
 ## Verification
 
 There is no test suite for the site itself. The mechanical invariants are checked
