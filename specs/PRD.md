@@ -255,10 +255,12 @@ same way Draft's team-directory avatars are.
   The photo, landmarks and generated images never leave the tab; only the
   model weights are fetched, from an exact pinned revision, behind a CSP
   that names Hugging Face's host explicitly. Full argument in F06_MUSE.md.
-- **Status: proposed, not implemented.** Whether image-to-image is even
-  achievable with the identified model in a browser, its real download
-  size, and its real-hardware inference latency are all unverified — see
-  F06_MUSE.md's own "Pending" section. No code exists yet.
+- **Status: deferred until a browser-feasible identity-preserving model
+  exists.** Prototyping against a real photo showed SD-Turbo's single-step
+  img2img cannot hit the targeted illustration style without losing the
+  subject's identity, at any strength tried — a structural limit of the
+  model, not a prompt problem. No code exists, and none should be built
+  against this model. Full finding in F06_MUSE.md's "F06-AC11" entry.
 
 ## Verification
 

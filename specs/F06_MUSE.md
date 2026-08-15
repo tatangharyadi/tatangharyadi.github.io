@@ -1,10 +1,13 @@
 # F06: Muse, an in-browser avatar illustrator
 
-**Status:** proposed, not implemented. This document is the design decision
-itself — no `js/muse.js`, `muse.html`, or vendored/fetched model exists yet.
-Everything below is the plan a first implementation would follow, written up
-before any code so the CDN exception it requires (see "The model has to leave
-same-origin" below) is argued and reviewed on its own terms first.
+**Status: deferred until a browser-feasible identity-preserving model
+exists.** No `js/muse.js`, `muse.html`, or vendored/fetched model exists, and
+none should be built against the model this spec originally targeted — see
+"F06-AC11: identity is not preserved, and this is not a prompt problem"
+below. Everything below the Pending section is the plan that was drafted
+before that finding, kept for the parts that remain true (the CDN exception
+argument, the size and latency numbers) rather than rewritten, so a future
+attempt does not have to re-derive them.
 
 ### Pending
 
@@ -114,13 +117,54 @@ need to be; it exists only to answer the question above. It reused the
 already-vendored MediaPipe assets' sibling pattern of "fetch a real model,
 run it for real" rather than mocking anything.
 
-Everything past this point assumes the two remaining premises resolve
-favorably. If the size or latency numbers come back too large, the fallback
-is a much smaller, fixed-style neural style-transfer network (AnimeGAN-class,
-low tens of MB, single canned look, no prompt control) instead of a
-diffusion model — a strictly worse match for Draft's quality bar, but the
-only vendorable option. That fallback is not designed here; it is only named
-as the next thing to consider if this spec's premises fail.
+**F06-AC11: identity is not preserved, and this is not a prompt problem.
+This is the finding that defers the whole spec.** The same prototype was run
+against a real reference photo at three prompt/strength combinations chosen
+to target a specific illustrated-portrait look:
+
+| strength | prompt intent | style match | identity |
+|---|---|---|---|
+| 0.55 | illustration/airbrush style | close to the target style | wrong hair colour and style, glasses absent — a different person |
+| 0.30 | same prompt, lower strength | n/a | output degraded to a formless blur |
+| 0.40 | prompt explicitly asked to "preserve facial structure and eyeglasses" | glasses present, softer style | face shape and structure still drifted to a different person |
+
+Explicitly asking the model in the prompt to keep the subject's features did
+not help. The cause is structural, not a wording problem: SD-Turbo's
+single-step "poor man's EulerA" scheme only produces a coherent image in a
+narrow strength band (roughly 0.4–0.6); below that it degrades into noise
+before it degrades into a good likeness. Within that band, a single
+denoising step doesn't leave enough room for the UNet to stay anchored to
+the input latent — it substantially repaints the face rather than lightly
+restyling it. Style and likeness cannot both be hit with this model, at any
+strength tried.
+
+Fixing this needs a different model, not different parameters, and neither
+option is a drop-in today:
+
+- **A multi-step model instead of a single-step distillation** — regular
+  SD1.5 img2img (15–25 steps) or an LCM-LoRA-distilled SD1.5 (4–8 steps)
+  gives the denoising process room to stay anchored to the input, which is
+  exactly the mechanism SD-Turbo's one step lacks. This is plausible to
+  export to ONNX and run client-side — SD1.5 ONNX exports are well
+  established — but nobody has published a ready `onnxruntime-web` bundle
+  for it the way `schmuell/sd-turbo-ort-web` exists for Turbo; it would have
+  to be built, and at 4–25× the UNet passes, latency would land well above
+  the ~2.5s measured for AC03, likely into the 15–30+ second range,
+  untested.
+- **IP-Adapter-FaceID or similar** — conditions generation on a
+  face-recognition embedding rather than relying on img2img noise level, so
+  identity survives independent of strength. This is the model class
+  actually designed for this problem, but every implementation found
+  (ComfyUI, WebUI, HF Spaces) is server-side; there is no browser/ONNX-web
+  precedent to build from at all. Exporting the face embedder, the
+  IP-Adapter cross-attention layers and the base UNet together as a
+  client-side pipeline would be new engineering with no prior art, not an
+  integration of existing parts.
+
+Neither is a small addition to what's already prototyped. Reopening this
+spec should start from re-prototyping one of these two paths against a real
+photo, the same way AC01 was verified above — not from resuming
+implementation of the SD-Turbo pipeline this spec originally targeted.
 
 ---
 
@@ -367,6 +411,7 @@ re-entry guard flag, same as the other three features.
 | F06-AC08 | None of `#muse--upload`, `#muse--restart` use the `disabled` property; focus survives file selection and model load. | Human, keyboard traversal |
 | F06-AC09 | `muse.html` is listed in `sitemap.xml`. | `scripts/check_repo.py`, CI |
 | F06-AC10 | Contrast holds at 4.5:1 for text in both flavours, checked against Latte. | Human, per colour scheme |
+| F06-AC11 | The stylized output stays recognizable as the uploaded person, not just a same-pose/same-framing generic face. | **Failed — see Pending. This is why the spec is deferred.** Three strength/prompt combinations against a real photo all lost identity — either the face became a different person, or the output degraded to a formless blur. Not fixable by prompt wording; requires a different, currently browser-unproven model (see Pending). |
 
 ---
 
