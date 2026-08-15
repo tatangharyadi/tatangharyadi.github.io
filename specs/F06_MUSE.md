@@ -8,43 +8,94 @@ same-origin" below) is argued and reviewed on its own terms first.
 
 ### Pending
 
-Three premises below are not yet verified and gate implementation:
+**F06-AC01 is now verified.** A standalone browser prototype (not committed
+to this repo — a scratch harness, described below) confirmed img2img is
+achievable against the real `schmuell/sd-turbo-ort-web` files served live
+from Hugging Face, with three concrete findings that change this spec's
+risk picture:
 
-- **Image-to-image is architecturally possible but not yet demonstrated.**
-  Microsoft's reference ONNX Runtime Web port of SD-Turbo
-  (`microsoft/onnxruntime-inference-examples/js/sd-turbo`) only implements
-  text-to-image: it starts every generation from random noise, never from a
-  visitor's photo. The model repo it fetches from,
-  [`schmuell/sd-turbo-ort-web`](https://huggingface.co/schmuell/sd-turbo-ort-web),
-  does bundle both a `vae_encoder` and a `vae_decoder` — the pair img2img
-  needs to encode a photo into the latent space before diffusing it, not just
-  decode a result — so the model files support it. But no working browser
-  example doing that encode step was found in this research pass. Before any
-  other work here, someone needs to confirm ONNX Runtime Web's JS API can run
-  the `vae_encoder` graph and produce a latent Muse can partially noise and
-  feed into the existing UNet loop.
-- **The model's real download size is unmeasured.** The HF repo above totals
-  2.58GB across all six component folders (`text_encoder`, `tokenizer`,
-  `unet`, `vae_decoder`, `vae_encoder`, `scheduler`) — that figure came from
-  the repo's file listing, not from what the example code actually fetches at
-  runtime, and it is very likely unquantized `fp32` weights sitting alongside
-  smaller precision variants. Nothing in this research pass found a
-  documented `fp16` or `int8` total. This has to be pinned to an actual byte
-  count of the files Muse would fetch before "does it fit" can be answered.
-- **Real-hardware inference latency is unmeasured.** The one number found —
-  "sub-one-second, ~100ms accelerated" — was reported against an RTX 4090
-  through native WebGPU benchmarking, not a typical visitor's laptop
-  integrated GPU through a browser tab. Muse needs a real low-end-hardware
-  session, the same way F05-AC02 needed a real webcam, before claiming
-  generation completes in a tolerable time.
+- **The reference implementation behind this HF repo is
+  [`guschmue/ort-webgpu`](https://github.com/guschmue/ort-webgpu)'s
+  `sd-turbo/index.html`** (the repo's author, `schmuell`, is a Microsoft ORT
+  engineer; the model card names no demo, but the file is easy to find once
+  you know the model was exported for it). It is text-to-image only — it
+  never loads `vae_encoder` and starts every generation from
+  `randn_latents()`. The prototype extended that exact file rather than
+  starting from scratch: same session options, same `freeDimensionOverrides`,
+  same single-step "poor man's EulerA" scheduler math, with `vae_encoder`
+  added and a `strength` parameter controlling how much noise is mixed into
+  the encoded photo latent before the existing UNet call.
+- **`vae_encoder`'s input must be an explicit `float16` tensor, not
+  `float32`.** Feeding it `float32` (as every other input in the reference
+  demo is fed) fails immediately with `Unexpected input data type. Actual:
+  (tensor(float)), expected: (tensor(float16))`. `text_encoder`, `unet` and
+  `vae_decoder` all accept `float32` directly — this constraint is specific
+  to `vae_encoder`, and undocumented anywhere in the model card.
+  `vae_encoder`'s `latent_sample` output is also `float16` and needs
+  converting back before the noise-mixing math.
+- **`vae_encoder` cannot run on the WebGPU execution provider at all, on the
+  pinned `onnxruntime-web@1.18.0-dev.20240118-28a16c223c` build.** It fails
+  with `[WebGPU] Kernel "[Clip] /Clip" failed. Error: Invalid data type` —
+  there is no `fp16` WebGPU kernel for `Clip` in this build. Forcing just
+  that one session onto `executionProviders: ["wasm"]` (CPU) works, but at a
+  real cost: **the encode step alone took ~52 seconds** in this sandboxed
+  environment, dwarfing `unet` (~1s) and `vae_decoder` (~1s) on WebGPU. A
+  production implementation needs either a newer ONNX Runtime Web build with
+  a working `fp16` WebGPU `Clip` kernel, or this 52-second CPU fallback has
+  to be budgeted into F06-AC03's latency number directly — it is not a
+  rounding error next to the sub-second UNet/decoder steps, it is the
+  dominant cost of the whole pipeline as measured.
+- **The noised-latent mechanism works and responds to `strength` in the
+  expected direction.** At `strength=0.5` the output was a coherent,
+  recognizably-derived stylized portrait (same head position and framing as
+  the input, restyled per the prompt). At `strength=0.15` the output stayed
+  close to unedited input pixels with almost no stylization — consistent
+  with feeding the UNet a much lower effective noise level than SD-Turbo's
+  single-step distillation was tuned against. This is qualitative, not a
+  tuned production default, but it demonstrates the mechanism (encode →
+  partial noise → single UNet pass → decode) is sound, not just that it
+  runs without erroring.
 
-Everything past this point assumes those three resolve favorably. If the
-size or latency numbers come back too large, the fallback is a much smaller,
-fixed-style neural style-transfer network (AnimeGAN-class, low tens of MB,
-single canned look, no prompt control) instead of a diffusion model — a
-strictly worse match for Draft's quality bar, but the only vendorable
-option. That fallback is not designed here; it is only named as the
-next thing to consider if this spec's premises fail.
+Two premises remain open:
+
+- **The model's real download size is now measured, not estimated: 2.58GB**
+  fetched live from `https://huggingface.co/schmuell/sd-turbo-ort-web/resolve/main/`
+  in the prototype (`text_encoder/model.onnx` 681.4MB, `unet/model.onnx`
+  1733.4MB, `vae_decoder/model.onnx` 99.1MB, `vae_encoder/model.onnx`
+  68.4MB) — matching the repo's file listing exactly, confirming these are
+  the actual bytes a visitor's browser would transfer, not an overestimate
+  from unused files. Two other mirrors checked
+  (`onnxruntime/sd-turbo`, `tlwu/sd-turbo-onnxruntime`) total the same
+  2.58GB to within rounding, i.e. the same fp32-scale export re-hosted, not
+  a smaller alternative. One genuinely smaller quantized alternative was
+  found — `MiCkSoftware/sd-turbo-onnx-q8-static-arm64` at **1.45GB total**
+  (int8, `unet/model.onnx.data` external-data split) — but it was not the
+  repo this spec or the prototype targeted, and its accuracy/output-quality
+  trade-off at int8 is untested here. Whether 2.58GB (or 1.45GB) is
+  "acceptable for a one-time page load" is a product judgment, not a
+  technical one, and is still open.
+- **Real-hardware inference latency is still unmeasured on ordinary
+  consumer hardware.** The prototype's numbers (unet ~1s, vae_decoder ~1s
+  on WebGPU; vae_encoder ~52s on wasm/CPU) came from this sandbox's
+  environment, not a visitor's laptop integrated GPU in a real browser tab.
+  The 52-second `vae_encoder` figure in particular needs re-measuring on
+  whatever hardware/EP combination a shipped implementation would actually
+  use, since it is now the known bottleneck rather than an unknown one.
+
+The prototype itself is a throwaway HTML/JS harness (extending
+`guschmue/ort-webgpu`'s demo file, served locally, driven with a browser
+automation tool) — it was not committed to this repository and does not
+need to be; it exists only to answer the question above. It reused the
+already-vendored MediaPipe assets' sibling pattern of "fetch a real model,
+run it for real" rather than mocking anything.
+
+Everything past this point assumes the two remaining premises resolve
+favorably. If the size or latency numbers come back too large, the fallback
+is a much smaller, fixed-style neural style-transfer network (AnimeGAN-class,
+low tens of MB, single canned look, no prompt control) instead of a
+diffusion model — a strictly worse match for Draft's quality bar, but the
+only vendorable option. That fallback is not designed here; it is only named
+as the next thing to consider if this spec's premises fail.
 
 ---
 
