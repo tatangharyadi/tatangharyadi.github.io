@@ -56,24 +56,24 @@ risk picture:
   partial noise → single UNet pass → decode) is sound, not just that it
   runs without erroring.
 
-Two premises remain open:
+**F06-AC02 is resolved: 2.58GB is acceptable.** The real fetched size,
+measured live from `https://huggingface.co/schmuell/sd-turbo-ort-web/resolve/main/`
+in the prototype (`text_encoder/model.onnx` 681.4MB, `unet/model.onnx`
+1733.4MB, `vae_decoder/model.onnx` 99.1MB, `vae_encoder/model.onnx`
+68.4MB), matches the repo's file listing exactly — these are the actual
+bytes a visitor's browser transfers, not an overestimate from unused files.
+Two other mirrors checked (`onnxruntime/sd-turbo`, `tlwu/sd-turbo-onnxruntime`)
+total the same 2.58GB to within rounding, i.e. the same fp32-scale export
+re-hosted, not a smaller alternative. One genuinely smaller quantized
+alternative was found — `MiCkSoftware/sd-turbo-onnx-q8-static-arm64` at
+**1.45GB total** (int8, `unet/model.onnx.data` external-data split) — but it
+was not the repo this spec or the prototype targeted, and its
+accuracy/output-quality trade-off at int8 is untested here. 2.58GB, as a
+one-time cached page load rather than a per-visit cost, is accepted as the
+size budget for this spec.
 
-- **The model's real download size is now measured, not estimated: 2.58GB**
-  fetched live from `https://huggingface.co/schmuell/sd-turbo-ort-web/resolve/main/`
-  in the prototype (`text_encoder/model.onnx` 681.4MB, `unet/model.onnx`
-  1733.4MB, `vae_decoder/model.onnx` 99.1MB, `vae_encoder/model.onnx`
-  68.4MB) — matching the repo's file listing exactly, confirming these are
-  the actual bytes a visitor's browser would transfer, not an overestimate
-  from unused files. Two other mirrors checked
-  (`onnxruntime/sd-turbo`, `tlwu/sd-turbo-onnxruntime`) total the same
-  2.58GB to within rounding, i.e. the same fp32-scale export re-hosted, not
-  a smaller alternative. One genuinely smaller quantized alternative was
-  found — `MiCkSoftware/sd-turbo-onnx-q8-static-arm64` at **1.45GB total**
-  (int8, `unet/model.onnx.data` external-data split) — but it was not the
-  repo this spec or the prototype targeted, and its accuracy/output-quality
-  trade-off at int8 is untested here. Whether 2.58GB (or 1.45GB) is
-  "acceptable for a one-time page load" is a product judgment, not a
-  technical one, and is still open.
+One premise remains open:
+
 - **Real-hardware inference latency is still unmeasured on ordinary
   consumer hardware.** The prototype's numbers (unet ~1s, vae_decoder ~1s
   on WebGPU; vae_encoder ~52s on wasm/CPU) came from this sandbox's
