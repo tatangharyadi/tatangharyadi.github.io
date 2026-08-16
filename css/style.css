@@ -210,9 +210,17 @@ nav .logo a:hover {
 .masthead--container {
   padding-top: 9rem;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
   gap: 3rem;
+}
+
+/* The portrait sits after the identity in source order — see the note in the
+   850px breakpoint below for why that stays fixed — so it is moved to the
+   visual left with `order` rather than the DOM, leaving reading order and
+   focus order untouched. */
+.masthead--portrait {
+  order: -1;
 }
 
 .masthead--name {
@@ -950,7 +958,13 @@ nav .logo a:hover {
   }
 
   /* Source order puts the portrait after the identity, which is the order it
-     should read in, so nothing needs reordering here. */
+     should read in on a single stacked column, so the desktop `order: -1`
+     that moves it to the visual left is undone here rather than carried into
+     the stack. */
+  .masthead--portrait {
+    order: 0;
+  }
+
   .readout > div {
     grid-template-columns: minmax(0, 1fr);
     gap: 0.25rem;
