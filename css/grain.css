@@ -1,0 +1,272 @@
+/* Grain. Layout only — every colour below is one of css/style.css's shared
+   custom properties, so this file is not a sixth place
+   scripts/check_palette.py would have to track. */
+
+/* Neither section on this page ever gets the `hidden` attribute — encode and
+   decode are both always present — but the sample-carrier <img> and the
+   result panels do, and the browser's own `[hidden]` rule is too low
+   specificity to survive this file's other selectors. Same fix as
+   css/iris.css and css/game.css. */
+[hidden] {
+    display: none !important;
+}
+
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    background: var(--bg-alt);
+    color: var(--text);
+    padding: 0.5rem 1rem;
+    border-radius: 0 0 8px 0;
+    z-index: 10;
+}
+
+.skip-link:focus {
+    left: 0;
+}
+
+.grain--page {
+    display: block;
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: 0 1.5rem 3rem;
+}
+
+.grain--head {
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: 2rem 1.5rem 1rem;
+}
+
+.grain--sub {
+    max-width: var(--measure);
+    color: var(--text-muted);
+}
+
+.grain--sub a {
+    color: var(--accent-text);
+    text-decoration: underline;
+}
+
+.grain--honest {
+    font-size: 0.9rem;
+}
+
+.grain--notice {
+    color: var(--text-muted);
+    min-height: 1.25em;
+}
+
+.grain--section {
+    margin: 2rem 0;
+    padding: 1.25rem 1.5rem;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.grain--section h2 {
+    margin-top: 0;
+}
+
+.grain--field {
+    margin: 0 0 1.5rem;
+}
+
+.grain--field-heading {
+    margin: 0 0 0.35rem;
+}
+
+.grain--field-hint {
+    margin: 0 0 0.75rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.grain--drop {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--bg);
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+}
+
+.grain--drop.grain--drop-over {
+    border-color: var(--accent-text);
+}
+
+.grain--file-label {
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    color: var(--bg);
+    background: var(--accent-text);
+    border: 2px solid var(--accent-text);
+}
+
+.grain--file-label:hover {
+    color: var(--accent-text);
+    background: var(--bg);
+}
+
+.grain--file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.grain--file-input:focus-visible + .grain--file-label,
+.grain--file-label:has(+ .grain--file-input:focus-visible) {
+    outline: 3px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
+.grain--or {
+    margin: 0.75rem 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.grain--sample {
+    font: inherit;
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    color: var(--accent-text);
+    background: var(--bg);
+    border: 2px solid var(--accent-text);
+}
+
+.grain--sample:hover {
+    color: var(--bg);
+    background: var(--accent-text);
+}
+
+.grain--sample:focus-visible {
+    outline: 3px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
+.grain--carrier-preview,
+.grain--stego-preview {
+    display: block;
+    margin: 1rem 0;
+    max-width: 100%;
+    max-height: 240px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.grain--capacity {
+    margin: 0.75rem 0 0;
+    font-size: 0.9rem;
+}
+
+.grain--label {
+    display: block;
+    margin: 0 0 0.25rem;
+    font-weight: 600;
+}
+
+.grain--pass-row {
+    margin: 0 0 0.75rem;
+}
+
+.grain--input {
+    font: inherit;
+    width: 100%;
+    max-width: 24rem;
+    padding: 0.5rem 0.75rem;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.grain--input:focus-visible {
+    outline: 3px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
+.grain--pass-show-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.75rem;
+}
+
+.grain--checkbox:focus-visible {
+    outline: 3px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
+.grain--pass-hint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.grain--action {
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.6rem 1.25rem;
+    border-radius: 6px;
+    color: var(--bg);
+    background: var(--accent-text);
+    border: 2px solid var(--accent-text);
+}
+
+.grain--action:hover {
+    color: var(--accent-text);
+    background: var(--bg);
+}
+
+.grain--action:focus-visible {
+    outline: 3px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
+.grain--action[aria-disabled='true'] {
+    cursor: progress;
+    opacity: 0.6;
+}
+
+.grain--result {
+    margin-top: 1.5rem;
+}
+
+.grain--download {
+    display: inline-block;
+    font-weight: 600;
+    color: var(--accent-text);
+    text-decoration: underline;
+}
+
+.grain--download:focus-visible {
+    outline: 3px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
+@media (max-width: 750px) {
+    .grain--head {
+        padding: 1.5rem 1rem 0.75rem;
+    }
+
+    .grain--page {
+        padding: 0 1rem 2rem;
+    }
+
+    .grain--drop {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

@@ -62,6 +62,9 @@ mocap.html ─── js/mocap.js ──┬── vendor/litert ── assets/mod
               │            │        (BlazePose pose inference)     → F03_MOCAP
               │            └── vendor/three ─── assets/character/RobotExpressive.glb
               └── js/mocap-retarget.js  (landmarks → bone quaternions)
+
+grain.html ─── js/grain.js ── crypto.subtle (AES-256-GCM, PBKDF2) + <canvas>
+                                    (encrypt, then LSB-hide in a PNG)  → F07_GRAIN
 ```
 
 Three properties hold across the whole diagram:
@@ -262,6 +265,37 @@ same way Draft's team-directory avatars are.
   model, not a prompt problem. No code exists, and none should be built
   against this model. Full finding in F06_MUSE.md's "F06-AC11" entry.
 
+### F07: Grain → [F07_GRAIN.md](F07_GRAIN.md)
+
+A file hidden inside a picture: encrypted client-side with a passphrase, then
+its ciphertext written into a carrier PNG's pixels via least-significant-bit
+steganography.
+
+- Encryption is real, not obfuscation: PBKDF2-HMAC-SHA-256 (600,000
+  iterations, random salt) derives a non-extractable AES-256-GCM key from the
+  passphrase; the ciphertext, its 16-byte auth tag, and a 42-byte header
+  (magic, version, KDF iteration count, salt, IV, ciphertext length) are all
+  that ever touch the carrier's pixels. The header itself is authenticated as
+  AES-GCM's additional data, so a tampered header fails decryption instead of
+  silently pointing a decoder at garbage.
+- The hidden filename lives inside the encryption boundary — it is never
+  cleartext anywhere in the container.
+- LSB embedding writes one bit per R, G or B channel of each pixel, alpha left
+  untouched by the bit scheme but forced to full opacity before embedding, to
+  avoid alpha-premultiplication corrupting the low bit on a later decode.
+  Output is PNG only, since anything lossy would destroy the hidden bits.
+- Both directions run entirely against `crypto.subtle` and `<canvas>` — no
+  vendored runtime, no model weights, nothing fetched. `grain.html` sets
+  `connect-src 'none'`, the tightest CSP on the site, because this page has no
+  fragment or endpoint to ask for in the first place.
+- The page states its own limit rather than overselling it: LSB steganography
+  hides a file from a human eye and from a server that never receives it, not
+  from statistical steganalysis. That caveat is in the page's own prose.
+- It is the sixth JavaScript file of our own, and — unlike `js/iris.js` and
+  `js/mocap.js` — is not a boundary in front of a vendored runtime. The
+  argument for it is that encryption and bit-level pixel encoding are
+  computation no markup could stand in for; full case in F07_GRAIN.md.
+
 ## Verification
 
 There is no test suite for the site itself. The mechanical invariants are checked
@@ -274,6 +308,7 @@ in CI and the rest is checked by a person in a browser, which is deliberate:
 | `propagate_work.py --check` | Fragments are exactly what the generator emits | CI |
 | `check_corpus.py` | The search index still describes the page | CI |
 | `check_palette.py` | The palette agrees across all five copies | CI |
+| `check_grain.py` | Grain's fixtures still match `js/grain.js`'s header format and KDF, and pin its ciphertext — a regression pin, not a proof; see the script's own header | CI |
 | `check_repo.py` | `.nojekyll` present, nav in step, sitemap in step | CI |
 | `gen_game_data.py --check` | `world.rs` is freshly generated and the map is playable | CI |
 | `build_game.sh --check` | The committed wasm matches its recorded hash | CI |
@@ -300,10 +335,10 @@ in CI and the rest is checked by a person in a browser, which is deliberate:
 
 - A backend of any kind. Adding one would dissolve the property F01 exists to demonstrate.
 - A bundler, framework or package manager to solve something a few lines of CSS solve.
-- A JavaScript file of our own without an argument made from scratch. Four
-  exist now (`js/ask.js`, `js/game.js`, `js/mocap.js`, `js/mocap-retarget.js`)
-  and each is argued individually in AGENTS.md; a fifth needs its own case,
-  not an appeal to precedent.
+- A JavaScript file of our own without an argument made from scratch. Six
+  exist now (`js/ask.js`, `js/game.js`, `js/mocap.js`, `js/mocap-retarget.js`,
+  `js/iris.js`, `js/grain.js`) and each is argued individually in AGENTS.md; a
+  seventh needs its own case, not an appeal to precedent.
 - A comment system, newsletter or analytics.
 - Reproducible wasm builds. The committed hash proves the binary has not changed
   since it was committed, and does not prove it is what `game/src` compiles to.
