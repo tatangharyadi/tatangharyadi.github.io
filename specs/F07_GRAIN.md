@@ -1,15 +1,21 @@
 # F07: Grain, a file hidden inside a picture
 
-**Status:** implemented, pending human verification. `grain.html`,
-`css/grain.css` and `js/grain.js` are written and pass every check this repo
-can run without a browser: `scripts/check_grain.py` cross-checks the header
-format, KDF and ciphertext against a fixture pair (`scripts/fixtures/grain/`)
-generated with Node's `webcrypto` and a from-scratch stdlib PNG encoder — see
-that script's own header for exactly what it proves and what it only pins.
-What still needs a human in a browser is a full encode → decode round trip
-against a real `<canvas>` and `crypto.subtle`, the clean-console/network check
-that `connect-src 'none'` actually holds, and every item in "Acceptance
-criteria" below marked Human.
+**Status:** implemented and verified live in a real browser (Chrome
+DevTools, 2026-08-16). `grain.html`, `css/grain.css` and `js/grain.js` pass
+every check this repo can run without a browser — `scripts/check_grain.py`
+cross-checks the header format, KDF and ciphertext against a fixture pair
+(`scripts/fixtures/grain/`) generated with Node's `webcrypto` and a
+from-scratch stdlib PNG encoder, see that script's own header for exactly
+what it proves and what it only pins — and every item in "Acceptance
+criteria" below marked Human has now been run against a live page: a full
+encode → decode round trip, a wrong passphrase, a hand-tampered stego image,
+an undersized carrier, a hand-crafted out-of-range KDF header, a clean
+network panel confirming `connect-src 'none'` holds even against the page's
+own blob URLs, keyboard/focus traversal, and a Lighthouse audit in both
+colour schemes (Accessibility 100, Best Practices 100 in both; SEO 92 in
+both, the only failing audit being Lighthouse's own robots.txt/llms.txt probe
+request getting blocked by this page's CSP, not a defect in the site's
+robots.txt, which was confirmed to serve 200 directly).
 
 ---
 
