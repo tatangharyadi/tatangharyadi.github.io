@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grain | Tatang Haryadi</title>
+    <meta name="description" content="Grain: hide an encrypted file inside a PNG's pixels, entirely in your browser. AES-256-GCM behind a passphrase, then least-significant-bit steganography. Nothing is ever uploaded." />
+    <meta name="theme-color" content="#dce0e8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#11111b" media="(prefers-color-scheme: dark)" />
+    <link rel="canonical" href="https://tatangharyadi.github.io/grain.html" />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Tatang Haryadi" />
+    <meta property="og:url" content="https://tatangharyadi.github.io/grain.html" />
+    <meta property="og:title" content="Grain" />
+    <meta property="og:description" content="Hide an encrypted file inside a PNG's pixels, entirely on device." />
+
+    <!-- Every byte this page touches — the carrier image, the payload file, the
+         derived key, the ciphertext, the stego PNG — stays in this tab. There is
+         no server this feature could talk to even if it wanted one, so the
+         policy below is not a mitigation for a leak some vendored bundle might
+         attempt (contrast js/iris.js's telemetry block) — it is a hard
+         guarantee this page makes about itself. 'none' rather than 'self':
+         nothing here is ever fetched, not even same-origin. img-src needs
+         blob: and data: for the canvas round trip (createImageBitmap reads a
+         blob: URL, the sample avatar is drawn from an <img> the page already
+         has); nothing else needs relaxing. -->
+    <meta http-equiv="Content-Security-Policy" content="connect-src 'none'; img-src 'self' blob: data:" />
+
+    <!-- Shared palette and reset, same file every other page uses, so this
+         page is not a sixth place scripts/check_palette.py would have to
+         track. css/grain.css is layout only. -->
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/grain.css" />
+
+    <script type="module" src="js/grain.js"></script>
+</head>
+
+<body>
+    <a class="skip-link" href="#grain--stage">Skip to the tool</a>
+
+    <header class="grain--head">
+        <h1>Grain</h1>
+        <p class="grain--sub">
+            Hide a file inside a picture. The file is encrypted with a
+            passphrase first — real AES-256-GCM, not an obfuscation — and only
+            the ciphertext is ever written into the image's pixels. Nothing
+            here is uploaded anywhere; encrypting, hiding and reading all
+            happen in this tab.
+        </p>
+        <p class="grain--sub"><a href="index.html">Back to the rest of the site</a></p>
+        <p class="grain--sub grain--honest">
+            Worth saying plainly: a picture with more entropy in its low bits
+            than a camera or a renderer would ever produce is not invisible to
+            a statistical steganalysis tool, only to a human eye and to a
+            server that never receives it. Treat this as a way to carry a file
+            inside a picture, not as a way to defeat forensic inspection.
+        </p>
+    </header>
+
+    <noscript>
+        <p class="grain--notice">
+            This page needs JavaScript to run the encryption and pixel work
+            that make it work. Everything else on this site works without it;
+            this one genuinely cannot.
+        </p>
+    </noscript>
+
+    <!-- A landmark that exists for the whole session. Nothing on this page
+         hides the other section while one is in use — encode and decode are
+         both always present — so unlike #iris--page this wrapper is not
+         covering a hide/show sequence. It exists anyway, for the same reason:
+         a persistent <main> is the right default, not a special case. -->
+    <main class="grain--page" id="grain--stage">
+
+    <section class="grain--section" id="grain--encode-section" aria-labelledby="grain--encode-heading">
+        <h2 id="grain--encode-heading">Hide a file</h2>
+
+        <div class="grain--field">
+            <h3 class="grain--field-heading">1. Pick a carrier image</h3>
+            <p class="grain--field-hint">
+                A PNG or any image your browser can decode. It is never sent
+                anywhere and never modified in place — hiding a file in it
+                produces a second, new PNG.
+            </p>
+            <div class="grain--drop" id="grain--carrier-drop">
+                <label class="grain--file-label" for="grain--carrier">
+                    Choose an image file
+                </label>
+                <input class="grain--file-input" type="file" id="grain--carrier" accept="image/*" />
+            </div>
+            <p class="grain--or">or</p>
+            <button type="button" class="grain--sample" id="grain--sample">
+                Use the avatar from this site's home page
+            </button>
+            <!-- Read-only source for the sample carrier. Never redrawn back
+                 to disk, never treated as anything but pixels to copy from —
+                 see js/grain.js. -->
+            <img class="grain--sample-img" id="grain--sample-img" src="assets/images/tatangharyadi.webp" alt="" aria-hidden="true" />
+            <img class="grain--carrier-preview" id="grain--carrier-preview" alt="The chosen carrier image" hidden />
+            <p class="grain--capacity" id="grain--capacity" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="grain--field">
+            <h3 class="grain--field-heading">2. Pick the file to hide</h3>
+            <p class="grain--field-hint">
+                Any file type. Its name and contents are both encrypted before
+                a single bit of it touches the carrier.
+            </p>
+            <div class="grain--drop" id="grain--payload-drop">
+                <label class="grain--file-label" for="grain--payload">
+                    Choose a file to hide
+                </label>
+                <input class="grain--file-input" type="file" id="grain--payload" />
+            </div>
+            <!-- The file input's native "chosen file" text is clipped along
+                 with the rest of the control (see .grain--file-input), so
+                 this is the only place the choice is confirmed — same reason
+                 grain--capacity exists for the carrier picker below. -->
+            <p class="grain--notice" id="grain--payload-name" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="grain--field">
+            <h3 class="grain--field-heading">3. Set a passphrase</h3>
+            <p class="grain--field-hint">
+                This is the only key. There is no recovery: lose the
+                passphrase and the hidden file is unreadable, by design.
+            </p>
+            <div class="grain--pass-row">
+                <label class="grain--label" for="grain--pass">Passphrase</label>
+                <input class="grain--input" type="password" id="grain--pass"
+                    autocomplete="off" spellcheck="false" autocapitalize="off" />
+            </div>
+            <div class="grain--pass-row">
+                <label class="grain--label" for="grain--pass-confirm">Confirm passphrase</label>
+                <input class="grain--input" type="password" id="grain--pass-confirm"
+                    autocomplete="off" spellcheck="false" autocapitalize="off" />
+            </div>
+            <div class="grain--pass-show-row">
+                <input class="grain--checkbox" type="checkbox" id="grain--pass-show" />
+                <label for="grain--pass-show">Show passphrases</label>
+            </div>
+            <p class="grain--pass-hint" id="grain--pass-hint">
+                Longer is what actually matters here: this page runs 600,000
+                rounds of key derivation specifically to make a short
+                passphrase expensive to guess, but it cannot make a short one
+                as strong as a long one.
+            </p>
+            <p class="grain--notice" id="grain--pass-status" role="status" aria-live="polite"></p>
+        </div>
+
+        <button type="button" class="grain--action" id="grain--encode" aria-disabled="false">
+            Encrypt and hide
+        </button>
+        <p class="grain--notice" id="grain--encode-status" role="status" aria-live="polite"></p>
+
+        <div class="grain--result" id="grain--encode-result" hidden>
+            <h3 class="grain--field-heading">Result</h3>
+            <img class="grain--stego-preview" id="grain--stego-preview" alt="The carrier image, now holding the hidden file" />
+            <p>
+                <a class="grain--download" id="grain--download" download="grain-stego.png">
+                    Download the stego PNG
+                </a>
+            </p>
+        </div>
+    </section>
+
+    <section class="grain--section" id="grain--decode-section" aria-labelledby="grain--decode-heading">
+        <h2 id="grain--decode-heading">Reveal a hidden file</h2>
+
+        <div class="grain--field">
+            <h3 class="grain--field-heading">1. Pick a stego image</h3>
+            <p class="grain--field-hint">
+                A PNG produced by the tool above. Any resave through a lossy
+                format, or through an editor that recompresses pixels,
+                destroys the hidden bits — this only ever works on the exact
+                PNG bytes this page wrote.
+            </p>
+            <div class="grain--drop" id="grain--stego-drop">
+                <label class="grain--file-label" for="grain--stego">
+                    Choose a stego PNG
+                </label>
+                <input class="grain--file-input" type="file" id="grain--stego" accept="image/png" />
+            </div>
+            <p class="grain--notice" id="grain--stego-name" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="grain--field">
+            <h3 class="grain--field-heading">2. Enter the passphrase</h3>
+            <div class="grain--pass-row">
+                <label class="grain--label" for="grain--decode-pass">Passphrase</label>
+                <input class="grain--input" type="password" id="grain--decode-pass"
+                    autocomplete="off" spellcheck="false" autocapitalize="off" />
+            </div>
+            <div class="grain--pass-show-row">
+                <input class="grain--checkbox" type="checkbox" id="grain--decode-pass-show" />
+                <label for="grain--decode-pass-show">Show passphrase</label>
+            </div>
+        </div>
+
+        <button type="button" class="grain--action" id="grain--decode" aria-disabled="false">
+            Reveal
+        </button>
+        <p class="grain--notice" id="grain--decode-status" role="status" aria-live="polite"></p>
+
+        <div class="grain--result" id="grain--decode-result" hidden>
+            <h3 class="grain--field-heading">Recovered file</h3>
+            <p>
+                <a class="grain--download" id="grain--extracted">
+                    Download the recovered file
+                </a>
+            </p>
+        </div>
+    </section>
+
+    </main>
+</body>
+
+</html>

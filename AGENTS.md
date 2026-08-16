@@ -9,8 +9,8 @@ A static personal site: plain HTML and CSS, no build step, no package manager,
 served by GitHub Pages from `main`. There is nothing to install and nothing to
 compile. Edit the files directly.
 
-**There are exactly five JavaScript files of our own: `js/ask.js`, `js/game.js`,
-`js/mocap.js`, `js/mocap-retarget.js` and `js/iris.js`.** Everything else — the work index on the home page — is
+**There are exactly six JavaScript files of our own: `js/ask.js`, `js/game.js`,
+`js/mocap.js`, `js/mocap-retarget.js`, `js/iris.js` and `js/grain.js`.** Everything else — the work index on the home page — is
 [htmx](https://htmx.org) asking for static HTML fragments under `fragments/` and
 swapping them in. htmx arrives from a CDN pinned by version and SRI digest.
 
@@ -103,6 +103,18 @@ mechanism to actually be true, and the CSP violation line it produces in the
 console is deliberate, not a regression — see that section before "cleaning
 up" the console output on `iris.html`.
 
+`js/grain.js` earns the sixth exception on different grounds again: it is not
+a boundary in front of a vendored runtime at all, it is the whole feature.
+Grain encrypts a file with a passphrase (AES-256-GCM via WebCrypto, key
+stretched through PBKDF2) and hides the ciphertext in a carrier PNG's pixels
+with least-significant-bit steganography, entirely with browser-native APIs —
+`crypto.subtle` and `<canvas>` — and nothing vendored. There is no markup this
+could be instead: a passphrase-derived key, an authenticated 42-byte header
+and a bit-level pixel encoding are computation, not a document a server could
+have sent. `grain.html` carries `connect-src 'none'`, tighter than the `'self'`
+every htmx page needs, because this page has no fragment to ask for in the
+first place — see [specs/F07_GRAIN.md](specs/F07_GRAIN.md).
+
 Do not introduce a bundler, framework or package manager to solve a problem that a
 few lines of CSS would solve. The absence of a toolchain is a design decision, not
 an oversight — see [ARCHITECTURE.md](ARCHITECTURE.md#no-build-step). `game/` is
@@ -188,6 +200,12 @@ not pretend to cover them. **A green CI does not mean a change is verified.**
 12. **[CI]** If any colour changed, `python3 scripts/check_palette.py`. The palette
     is written out in **five** places and nothing but this script keeps them in
     step; see the bullet under "Other things not to break".
+13. **[CI]** If you touched `js/grain.js`'s header format, bit order or crypto
+    parameters, `python3 scripts/check_grain.py`. It is a regression pin against
+    the fixtures in `scripts/fixtures/grain/`, not a proof — stdlib Python has no
+    AES-GCM to check the encryption itself against, so read the script's own
+    header comment for exactly what it can and cannot catch. If it fails on a
+    deliberate format change, regenerate the fixtures rather than editing the pin.
 
 ## Accessibility invariants
 

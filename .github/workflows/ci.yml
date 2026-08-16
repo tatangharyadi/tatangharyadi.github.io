@@ -60,6 +60,13 @@ jobs:
       - name: Palette is in step across every copy
         run: python3 scripts/check_palette.py
 
+      # Cannot re-run js/grain.js's AES-256-GCM against its own fixtures —
+      # stdlib Python has no AES-GCM — so this is a regression pin, not a
+      # proof, and says so in its own header comment: see
+      # scripts/check_grain.py for exactly what it does and does not catch.
+      - name: Grain fixtures still match js/grain.js's format
+        run: python3 scripts/check_grain.py
+
       - name: .nojekyll present and sitemap in step
         run: python3 scripts/check_repo.py
 
