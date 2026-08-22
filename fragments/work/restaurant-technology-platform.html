@@ -22,68 +22,52 @@
         in the restaurant industry. Three systems, built in the order that
         let each one pay for the next.</p>
 
-    <p>The sequence was the strategy. Going from an MVP to more than a hundred
-        outlets in six months does not leave room to build three systems in
-        parallel and integrate them at the end, and it punishes any component
-        that cannot be rolled out to a live kitchen during service. So each
-        system had to be independently useful on the day it shipped, and each
-        one had to make the next cheaper rather than merely possible. That is a
-        harder constraint than it sounds: it rules out the platform-first
-        approach where nothing is visible to an operator until the foundations
-        are finished.</p>
+    <p>The sequence was the strategy. Rapid outlet growth doesn't leave room
+        to build three systems in parallel and integrate them at the end, and
+        it punishes any component that can't be rolled out to a live kitchen
+        during service. So each system had to be independently useful on the
+        day it shipped, and each one had to lower the cost of the next. Merely
+        making it possible wasn't the bar. That
+        ruled out the platform-first approach, where nothing is visible to an
+        operator until the foundations are finished.</p>
 
-    <p><strong>Front of house</strong> came first: point-of-sale, kitchen
-        display system, loyalty programme and real-time analytics. Getting the
-        transaction layer right early meant every later system had trustworthy
-        data to read from, rather than a reporting pipeline bolted on after the
-        fact.</p>
+    <p>Front of house came first: point-of-sale, kitchen
+        display system, loyalty programme and real-time analytics. That gave
+        every later system trustworthy transaction data from day one, which
+        mattered once reporting had to be built on top of it rather than
+        bolted on after the fact.</p>
 
-    <p><strong>The IoT layer</strong> was built with Operations rather than for
-        them, because the waste it targeted was operational, not technical. An
-        ESP32-based system handled temperature monitoring, energy metering and
-        AI-on-the-edge detection, with EMQX as the broker. Inference runs on
-        the device: a kitchen with intermittent connectivity still needs its
-        cold storage watched, and paying to stream raw sensor data to the cloud
-        to answer a question the device can answer itself is a cost with no
-        matching benefit.</p>
+    <p>The IoT layer was designed alongside Operations, because the
+        waste it targeted showed up on the kitchen floor, not in a code
+        review. An
+        ESP32-based system handled temperature monitoring and energy metering,
+        with EMQX as the broker, and it also ran AI-on-the-edge detection.
+        Inference runs on the device, because a kitchen with intermittent
+        connectivity still needs its cold storage watched, and streaming raw
+        sensor data to the cloud just to answer a question the device can
+        answer itself doesn't buy anything.</p>
 
-    <p>Edge inference is not free, and the price is paid somewhere other than
+    <p>Edge inference isn't free, and the price is paid somewhere other than
         the cloud bill. Models and firmware have to reach devices sitting
         behind a restaurant's network, which means an update path that works
-        unattended, and a device that decides for itself is a device you cannot
+        unattended, and a device that decides for itself is a device you can't
         debug by reading a log in one place. I took that trade because the
         failure it protects against is the one that actually costs money: cold
-        storage going out of range during an outage is spoilage, and an alert
-        that depends on the same link that just failed is not an alert. Where
-        the question was analytical rather than urgent, the data went to the
-        cloud and the answer waited.</p>
-
-    <p><strong>Menu planning</strong> was the piece that needed AI to be worth
-        anything. It uses an LLM with vector search to query product mix data
-        and infer location-specific variations — the same dish sells
-        differently two kilometres apart, and the interesting signal is in that
-        variation rather than in the aggregate. Retrieval over real product mix
-        data, not a model asked to guess at a menu.</p>
-
-    <p>Retrieval rather than fine-tuning, and that is a cost decision as much
-        as a quality one. Product mix changes every week; a fine-tuned model
-        encodes the mix as of the day it was trained and has to be retrained to
-        learn that a dish stopped selling. Retrieval reads the current numbers
-        at query time, so the system improves when the data does and there is
-        no training budget to defend annually. The other half of it is that a
-        retrieved answer can be traced to the rows it came from, and a
-        recommendation an operations manager cannot interrogate is a
-        recommendation they will correctly ignore.</p>
+        storage going out of range during an outage is spoilage. I didn't
+        route that alert over the same link most likely to be down during the
+        outage it's meant to catch, since that link carried only questions
+        that could wait for an answer, and their data went to the cloud
+        instead.</p>
 
     <p>I also took ownership of product management directly, driving the
-        roadmap for B2B value-added services and loyalty features. Owning the
-        roadmap rather than receiving it is what made the sequencing above
-        enforceable: the order systems get built in is a product decision
-        before it is an engineering one, and a CTO who only holds the
-        engineering half of it can advise on that order but cannot hold it.</p>
+        roadmap for B2B value-added services and loyalty features. I owned that
+        roadmap instead of receiving it, which made the sequencing above
+        enforceable. The order systems get built in is a product decision
+        first and an engineering one second. A CTO who only holds the
+        engineering half of that decision can advise on the order without
+        being the one accountable for it.</p>
 
     <ul class="project--impact" role="list">
-        <li>From MVP to <strong>100+ outlets in 6 months</strong></li>
         <li><strong>Increased RPR</strong></li>
     </ul>
 
