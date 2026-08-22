@@ -18,47 +18,58 @@
         <span class="project--role">Director of Engineering, Yummy Corp</span>
     </p>
 
-    <p>The platform worked but the unit economics did not scale: cost per
-        outlet was not falling as outlets were added. Refactoring the entire
-        technology platform was the only way to change that shape, so it was a
-        cost-structure problem before it was an engineering one.</p>
+    <p>The platform worked, but cost per outlet wasn't falling as outlets
+        were added. The unit economics didn't scale. Refactoring the entire
+        technology platform was the only way to change that shape: the
+        underlying issue was cost structure, and the platform was already
+        technically sound.</p>
 
     <p>Cost per outlet is the number that decides whether a ghost kitchen
-        business works, and it is the one a technology organisation can move
-        without anybody in the kitchens changing what they do. If each new
-        outlet brings its own licence, its own integration and its own share of
-        an operations team, the technology is a variable cost wearing a fixed
-        cost's clothing, and growth makes the problem larger rather than
-        cheaper. Every decision below was chosen against that single test:
-        does this make the hundredth outlet cheaper than the tenth.</p>
+        business works, and it's the one a technology organisation can move
+        without anybody in the kitchens changing what they do. Each new outlet
+        brings its own licence and its own integration, and it also adds another
+        slice of operations headcount. The technology is a variable cost
+        wearing a fixed cost's clothing, and growth makes the problem larger
+        rather than cheaper, and every decision below was tested against whether it
+        made the hundredth outlet cheaper than the tenth.</p>
+
+    <p>The platform itself is three products wearing one balance sheet. There's
+        a SaaS layer for other ghost kitchen operators, centralised menu management
+        across delivery platforms and order fulfilment tied to raw-materials
+        consumption, with the ERP integration below sitting under both. There are also self-service apps for
+        food court customers: ordering kiosks, online self-order and queue
+        management. None of that shows up in the 80% figure at the end of
+        this, since it's the surface area the refactor had to keep working while it
+        changed underneath.</p>
 
     <p><strong>Migrating AWS to GCP and repurchasing cloud-native ERP.</strong>
-        Repurchasing rather than migrating the existing ERP was the harder call
-        and the right one — carrying a self-managed system into a new
-        environment would have moved the licence and operational burden intact
-        rather than removing it.</p>
+        Repurchasing the existing ERP, instead of migrating it, was the
+        harder call
+        and the right one. Carrying a self-managed system into a new
+        environment would have moved the licence and operational burden
+        intact, still unresolved.</p>
 
-    <p><strong>Then developer experience, treated as a cost lever rather than a
-        perk.</strong> GitHub Actions, Terraform and Go, leaning on managed GCP
+    <p>Developer experience came next, treated as a cost lever:
+        GitHub Actions, Terraform and Go, leaning on managed GCP
         services wherever running something ourselves earned nothing. Release
         cycle time is the metric that compounds: everything downstream of it
         gets cheaper when it drops.</p>
 
-    <p><strong>And the org chart, because the expense line is mostly
-        people.</strong> Trainee and upskilling programmes to build capability
-        in-house, with outsourcing reserved for genuinely specialised work.
-        Buying permanent headcount for a temporary specialism is how technology
-        budgets quietly ratchet upward.</p>
+    <p>And the org chart, because the expense line is mostly
+        people. Trainee and upskilling programmes to build capability
+        in-house, with outsourcing reserved for genuinely specialised work,
+        since buying permanent headcount for a temporary specialism only adds
+        to the budget without adding to capability.</p>
 
-    <p>An 80% reduction is not one saving, and it is worth being precise about
-        that rather than letting the figure imply a single clever move. It is a
+    <p>An 80% reduction isn't one saving, and the figure shouldn't be read as
+        a single clever move. It is a
         licensing model replaced, a self-managed estate handed to managed
         services, an outsourcing line brought in-house, and a release process
         that stopped consuming people. None of those individually gets close.
         They compound because each one removes work the next one would
-        otherwise have had to keep paying for, which is also why the order
-        mattered: doing the org chart first would have meant training a team to
-        operate infrastructure I was about to delete.</p>
+        otherwise have had to keep paying for. That's also why the order
+        mattered, since doing the org chart first would have meant training a
+        team to operate infrastructure I was about to delete.</p>
 
     <ul class="project--impact" role="list">
         <li><strong>80% reduction</strong> in ICT-related expenses</li>

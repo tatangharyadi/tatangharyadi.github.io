@@ -87,9 +87,9 @@
                     writing the code myself to leading a global team of fifty. Three
                     engagements below, in the detail the work index on the home page has
                     no room for: what the problem actually was, what I decided, and what it
-                    cost. Then one thing I built rather than led, the search on this
-                    site, which runs its model in your browser. How I run a team and how
-                    I decide follow those, then what I am working on now.</p>
+                    cost. Then one thing I actually built — the search on this
+                    site — which runs its model in your browser. How I run a team and how
+                    I decide follow those, then what I'm working on now.</p>
             </header>
 
             <!-- Also the answer to the broadest questions the search gets asked, which
@@ -103,37 +103,36 @@
                     <span class="project--role">Jakarta Metropolitan Area</span>
                 </p>
 
-                <p>I am a CTO who tends to be handed two problems at once: a technology
-                    programme that is not landing, and an organisation that is not yet
+                <p>I'm a CTO who tends to be handed two problems at once: a technology
+                    programme that isn't landing, and an organisation that isn't yet
                     shaped to land it. Most of what follows is the first problem being
-                    solved by fixing the second, because a programme that is late for
-                    structural reasons cannot be rescued by pushing harder on the
+                    solved by fixing the second, because a programme that's late for
+                    structural reasons can't be rescued by pushing harder on the
                     schedule.</p>
 
                 <p>The work has been in retail, food and beverage, travel and FinOps, at
                     publicly listed companies, at multinationals and at startups. The
                     range matters less than the pattern inside it: an ERP or a warehouse
-                    system at the centre, a commerce channel on top of it, and a team who
-                    have to be able to keep both running after I am no longer the person
-                    who understands them.</p>
+                    system at the centre, with a commerce channel built on top of it. A
+                    team has to be able to keep both running after I'm no longer the
+                    person who understands them.</p>
 
-                <p>I have led a global technology team of up to fifty across Indonesia,
+                <p>I've led a global technology team of up to fifty across Indonesia,
                     Vietnam, Malaysia and the Philippines, and earlier in my career I
                     built the offshore IT services startups that supply teams like that
-                    one. Both halves matter to how I hire: I have been on the side that
+                    one. Both halves matter to how I hire: I've been on the side that
                     sells capacity as well as the side that buys it.</p>
 
-                <p>I still write code, and I would rather demonstrate that than assert
-                    it. The semantic search on the front page of this site is mine end to
-                    end, from the quantisation choice to the accessibility invariants, and
-                    the repository it is built from is public. That is a claim you can
-                    check rather than one you have to take on trust, which is the only
-                    kind worth making about being hands on.</p>
+                <p>I still write code, and the semantic search on the front page of
+                    this site is the proof: mine end to end, from the quantisation choice
+                    to the accessibility invariants, and the repository it's built from is
+                    public. Anyone can check that claim against the code itself.</p>
 
-                <p>I also work as a fractional CTO: technology strategy, turning around
-                    at-risk projects, and total cost of ownership. The engagements that
-                    suit it best are the ones where an unbiased outside read is worth more
-                    to a board than another pair of hands.</p>
+                <p>I also work as a fractional CTO, mostly on technology strategy and
+                    total cost of ownership. Sometimes that means turning around a
+                    project that's already at risk. The engagements that
+                    suit it best are the ones where a board needs an unbiased outside read
+                    more than it needs another pair of hands.</p>
             </article>
 
             <article class="project" id="restaurant-technology-platform">
@@ -147,68 +146,52 @@
                     in the restaurant industry. Three systems, built in the order that
                     let each one pay for the next.</p>
 
-                <p>The sequence was the strategy. Going from an MVP to more than a hundred
-                    outlets in six months does not leave room to build three systems in
-                    parallel and integrate them at the end, and it punishes any component
-                    that cannot be rolled out to a live kitchen during service. So each
-                    system had to be independently useful on the day it shipped, and each
-                    one had to make the next cheaper rather than merely possible. That is a
-                    harder constraint than it sounds: it rules out the platform-first
-                    approach where nothing is visible to an operator until the foundations
-                    are finished.</p>
+                <p>The sequence was the strategy. Rapid outlet growth doesn't leave room
+                    to build three systems in parallel and integrate them at the end, and
+                    it punishes any component that can't be rolled out to a live kitchen
+                    during service. So each system had to be independently useful on the
+                    day it shipped, and each one had to lower the cost of the next. Merely
+                    making it possible wasn't the bar. That
+                    ruled out the platform-first approach, where nothing is visible to an
+                    operator until the foundations are finished.</p>
 
-                <p><strong>Front of house</strong> came first: point-of-sale, kitchen
-                    display system, loyalty programme and real-time analytics. Getting the
-                    transaction layer right early meant every later system had trustworthy
-                    data to read from, rather than a reporting pipeline bolted on after the
-                    fact.</p>
+                <p>Front of house came first: point-of-sale, kitchen
+                    display system, loyalty programme and real-time analytics. That gave
+                    every later system trustworthy transaction data from day one, which
+                    mattered once reporting had to be built on top of it rather than
+                    bolted on after the fact.</p>
 
-                <p><strong>The IoT layer</strong> was built with Operations rather than for
-                    them, because the waste it targeted was operational, not technical. An
-                    ESP32-based system handled temperature monitoring, energy metering and
-                    AI-on-the-edge detection, with EMQX as the broker. Inference runs on
-                    the device: a kitchen with intermittent connectivity still needs its
-                    cold storage watched, and paying to stream raw sensor data to the cloud
-                    to answer a question the device can answer itself is a cost with no
-                    matching benefit.</p>
+                <p>The IoT layer was designed alongside Operations, because the
+                    waste it targeted showed up on the kitchen floor, not in a code
+                    review. An
+                    ESP32-based system handled temperature monitoring and energy metering,
+                    with EMQX as the broker, and it also ran AI-on-the-edge detection.
+                    Inference runs on the device, because a kitchen with intermittent
+                    connectivity still needs its cold storage watched, and streaming raw
+                    sensor data to the cloud just to answer a question the device can
+                    answer itself doesn't buy anything.</p>
 
-                <p>Edge inference is not free, and the price is paid somewhere other than
+                <p>Edge inference isn't free, and the price is paid somewhere other than
                     the cloud bill. Models and firmware have to reach devices sitting
                     behind a restaurant's network, which means an update path that works
-                    unattended, and a device that decides for itself is a device you cannot
+                    unattended, and a device that decides for itself is a device you can't
                     debug by reading a log in one place. I took that trade because the
                     failure it protects against is the one that actually costs money: cold
-                    storage going out of range during an outage is spoilage, and an alert
-                    that depends on the same link that just failed is not an alert. Where
-                    the question was analytical rather than urgent, the data went to the
-                    cloud and the answer waited.</p>
-
-                <p><strong>Menu planning</strong> was the piece that needed AI to be worth
-                    anything. It uses an LLM with vector search to query product mix data
-                    and infer location-specific variations — the same dish sells
-                    differently two kilometres apart, and the interesting signal is in that
-                    variation rather than in the aggregate. Retrieval over real product mix
-                    data, not a model asked to guess at a menu.</p>
-
-                <p>Retrieval rather than fine-tuning, and that is a cost decision as much
-                    as a quality one. Product mix changes every week; a fine-tuned model
-                    encodes the mix as of the day it was trained and has to be retrained to
-                    learn that a dish stopped selling. Retrieval reads the current numbers
-                    at query time, so the system improves when the data does and there is
-                    no training budget to defend annually. The other half of it is that a
-                    retrieved answer can be traced to the rows it came from, and a
-                    recommendation an operations manager cannot interrogate is a
-                    recommendation they will correctly ignore.</p>
+                    storage going out of range during an outage is spoilage. I didn't
+                    route that alert over the same link most likely to be down during the
+                    outage it's meant to catch, since that link carried only questions
+                    that could wait for an answer, and their data went to the cloud
+                    instead.</p>
 
                 <p>I also took ownership of product management directly, driving the
-                    roadmap for B2B value-added services and loyalty features. Owning the
-                    roadmap rather than receiving it is what made the sequencing above
-                    enforceable: the order systems get built in is a product decision
-                    before it is an engineering one, and a CTO who only holds the
-                    engineering half of it can advise on that order but cannot hold it.</p>
+                    roadmap for B2B value-added services and loyalty features. I owned that
+                    roadmap instead of receiving it, which made the sequencing above
+                    enforceable. The order systems get built in is a product decision
+                    first and an engineering one second. A CTO who only holds the
+                    engineering half of that decision can advise on the order without
+                    being the one accountable for it.</p>
 
                 <ul class="project--impact" role="list">
-                    <li>From MVP to <strong>100+ outlets in 6 months</strong></li>
                     <li><strong>Increased RPR</strong></li>
                 </ul>
             </article>
@@ -220,47 +203,58 @@
                     <span class="project--role">Director of Engineering, Yummy Corp</span>
                 </p>
 
-                <p>The platform worked but the unit economics did not scale: cost per
-                    outlet was not falling as outlets were added. Refactoring the entire
-                    technology platform was the only way to change that shape, so it was a
-                    cost-structure problem before it was an engineering one.</p>
+                <p>The platform worked, but cost per outlet wasn't falling as outlets
+                    were added. The unit economics didn't scale. Refactoring the entire
+                    technology platform was the only way to change that shape: the
+                    underlying issue was cost structure, and the platform was already
+                    technically sound.</p>
 
                 <p>Cost per outlet is the number that decides whether a ghost kitchen
-                    business works, and it is the one a technology organisation can move
-                    without anybody in the kitchens changing what they do. If each new
-                    outlet brings its own licence, its own integration and its own share of
-                    an operations team, the technology is a variable cost wearing a fixed
-                    cost's clothing, and growth makes the problem larger rather than
-                    cheaper. Every decision below was chosen against that single test:
-                    does this make the hundredth outlet cheaper than the tenth.</p>
+                    business works, and it's the one a technology organisation can move
+                    without anybody in the kitchens changing what they do. Each new outlet
+                    brings its own licence and its own integration, and it also adds another
+                    slice of operations headcount. The technology is a variable cost
+                    wearing a fixed cost's clothing, and growth makes the problem larger
+                    rather than cheaper, and every decision below was tested against whether it
+                    made the hundredth outlet cheaper than the tenth.</p>
+
+                <p>The platform itself is three products wearing one balance sheet. There's
+                    a SaaS layer for other ghost kitchen operators, centralised menu management
+                    across delivery platforms and order fulfilment tied to raw-materials
+                    consumption, with the ERP integration below sitting under both. There are also self-service apps for
+                    food court customers: ordering kiosks, online self-order and queue
+                    management. None of that shows up in the 80% figure at the end of
+                    this, since it's the surface area the refactor had to keep working while it
+                    changed underneath.</p>
 
                 <p><strong>Migrating AWS to GCP and repurchasing cloud-native ERP.</strong>
-                    Repurchasing rather than migrating the existing ERP was the harder call
-                    and the right one — carrying a self-managed system into a new
-                    environment would have moved the licence and operational burden intact
-                    rather than removing it.</p>
+                    Repurchasing the existing ERP, instead of migrating it, was the
+                    harder call
+                    and the right one. Carrying a self-managed system into a new
+                    environment would have moved the licence and operational burden
+                    intact, still unresolved.</p>
 
-                <p><strong>Then developer experience, treated as a cost lever rather than a
-                    perk.</strong> GitHub Actions, Terraform and Go, leaning on managed GCP
+                <p>Developer experience came next, treated as a cost lever:
+                    GitHub Actions, Terraform and Go, leaning on managed GCP
                     services wherever running something ourselves earned nothing. Release
                     cycle time is the metric that compounds: everything downstream of it
                     gets cheaper when it drops.</p>
 
-                <p><strong>And the org chart, because the expense line is mostly
-                    people.</strong> Trainee and upskilling programmes to build capability
-                    in-house, with outsourcing reserved for genuinely specialised work.
-                    Buying permanent headcount for a temporary specialism is how technology
-                    budgets quietly ratchet upward.</p>
+                <p>And the org chart, because the expense line is mostly
+                    people. Trainee and upskilling programmes to build capability
+                    in-house, with outsourcing reserved for genuinely specialised work,
+                    since buying permanent headcount for a temporary specialism only adds
+                    to the budget without adding to capability.</p>
 
-                <p>An 80% reduction is not one saving, and it is worth being precise about
-                    that rather than letting the figure imply a single clever move. It is a
+                <p>An 80% reduction isn't one saving, and the figure shouldn't be read as
+                    a single clever move. It is a
                     licensing model replaced, a self-managed estate handed to managed
                     services, an outsourcing line brought in-house, and a release process
                     that stopped consuming people. None of those individually gets close.
                     They compound because each one removes work the next one would
-                    otherwise have had to keep paying for, which is also why the order
-                    mattered: doing the org chart first would have meant training a team to
-                    operate infrastructure I was about to delete.</p>
+                    otherwise have had to keep paying for. That's also why the order
+                    mattered, since doing the org chart first would have meant training a
+                    team to operate infrastructure I was about to delete.</p>
 
                 <ul class="project--impact" role="list">
                     <li><strong>80% reduction</strong> in ICT-related expenses</li>
@@ -276,46 +270,48 @@
                 </p>
 
                 <p>A B2B2C e-commerce transformation three years behind schedule, and a
-                    USD 3 million ERP and WMS migration that was not going to land. The
+                    USD 3 million ERP and WMS migration that wasn't going to land, so the
                     first job was triage.</p>
 
-                <p><strong>The rescue turned on scope, not delivery speed.</strong> The
-                    programme was replacing ERP and WMS together. I implemented the new WMS
-                    and kept the legacy ERP for financials and manufacturing — the
-                    warehouse was where the pain and the return actually were, and the
-                    financial modules were working. That split is what realised the ROI on
-                    a project already written off, and it is the decision I would point to
-                    first: the fastest way to finish was to stop doing part of it.</p>
+                <p><strong>The rescue turned on scope.</strong> The
+                    programme was replacing ERP and WMS together, an ambitious combination for
+                    a project already three years late. I implemented the new WMS
+                    and kept the legacy ERP for financials and manufacturing. The
+                    warehouse was where the pain and the return actually were. The financial
+                    modules already worked. That split is what realised the ROI on
+                    a project already written off, and it's the decision I would point to
+                    first — finishing meant stopping part of the work.</p>
 
-                <p>The hard part of that decision was not technical. A programme three
+                <p>The hard part of that decision had nothing to do with the
+                    technology. A programme three
                     years in has a sunk cost that everyone can name and a set of
-                    commitments people have already defended in front of a board, so
-                    proposing to deliver less than was promised reads as conceding failure
-                    at exactly the moment nobody wants to. What made it possible to carry
-                    was separating the two systems on evidence rather than on preference:
-                    the warehouse was where the operational pain and the measurable return
-                    both sat, and the financial modules were not the thing anyone was
-                    complaining about. Descoping the part that was working is easier to
-                    argue than descoping the part that is late.</p>
+                    commitments people have already defended in front of a board. Proposing to deliver less than was promised reads as conceding failure
+                    at exactly the moment nobody wants to. I made it possible to carry
+                    by separating the two systems on evidence: the warehouse was
+                    where the operational pain and the measurable return
+                    both sat, and the financial modules weren't the thing anyone was
+                    complaining about. Pulling back on the part that was already working
+                    was the easier case to make, so that's the direction I argued.</p>
 
-                <p><strong>Re-engineering the IT function was the other half.</strong> A
-                    programme that has missed for three years is usually not staffed
-                    wrongly so much as organised to produce reports about delivery instead
-                    of delivery. Changing who decided what, and shortening the distance
-                    between a problem being seen and being fixed, is what let a nine-month
-                    plan be credible rather than optimistic. The same team largely
+                <p>Re-engineering the IT function was the other half. A
+                    programme that's missed for three years is usually organised to
+                    produce status reports, regardless of who's
+                    staffed on it. Changing who decided what, and shortening the distance
+                    between a problem being seen and being fixed, is what gave a
+                    nine-month plan its credibility. The same team largely
                     delivered it.</p>
 
-                <p><strong>The transformation then completed in nine months</strong> after
+                <p>The transformation then completed in nine months after
                     three years of not completing, on an IT function re-engineered to
-                    deliver rather than a longer timeline.</p>
+                    deliver.</p>
 
-                <p>From there the work was compounding rather than corrective: refactoring
-                    the distributor point-of-sale system; seamless omnichannel UX across
-                    e-commerce, point-of-sale and loyalty, which is what moved customer
-                    lifetime value; and consolidating disparate sales, stock and assortment
-                    data into PowerBI dashboards to give a distributor 360 view — the
-                    reporting nobody could assemble while the data sat in separate systems.</p>
+                <p>From there the work compounded on what was already fixed. The
+                    distributor point-of-sale system needed refactoring, and the
+                    e-commerce, point-of-sale and loyalty channels needed one unified
+                    omnichannel UX, which is what moved customer lifetime value. Giving a
+                    distributor a 360 view took consolidating disparate sales, stock and
+                    assortment data into PowerBI dashboards. That's the reporting nobody could
+                    assemble while the data sat in separate systems.</p>
 
                 <p>Finally, harmonising IT systems across affiliates in Vietnam, Malaysia
                     and the Philippines with a global cross-functional team, so regional
@@ -354,75 +350,80 @@
                 <p>The search on the front page of this site answers questions about
                     these projects by running a sentence embedding model inside the
                     visitor's own browser.
-                    There is no inference server, no API key and no request carrying the
-                    question anywhere. It is small, and it is deliberately small: the
-                    point was to build the thing end to end rather than describe having
-                    once specified it.</p>
+                    There is no inference server and no API key — the question itself never
+                    leaves the tab. It's deliberately small, because the point was building
+                    the thing end to end. Describing having once specified it wouldn't
+                    have done that.</p>
 
                 <p><strong>all-MiniLM-L6-v2, quantised to 8-bit, executed by ONNX Runtime
                     on WebAssembly</strong> through Transformers.js. Quantisation is what
                     makes the model shippable at all — full precision is four times the
-                    weight for a retrieval quality difference this corpus cannot resolve.
-                    The runtime runs single-threaded because GitHub Pages cannot send the
+                    weight for a retrieval quality difference this corpus can't resolve.
+                    The runtime runs single-threaded because GitHub Pages can't send the
                     COOP and COEP headers that <code>SharedArrayBuffer</code> requires, so
                     the threaded build would silently fall back anyway. I measured
-                    <code>crossOriginIsolated</code> in the deployed page rather than
-                    assuming it.</p>
+                    <code>crossOriginIsolated</code> in the deployed page. Assuming it
+                    held wasn't good enough.</p>
 
-                <p><strong>The model, the runtime and the weights are all served from this
-                    origin.</strong> The obvious build fetches them from a model hub on
+                <p>The model and the runtime are served from this origin, and so
+                    are the weights, because vendoring only works if nothing quietly reaches
+                    outside the page. The obvious build fetches them from a model hub on
                     first use. That would mean pinning a CDN script by SRI digest in one
                     breath and then pulling tens of megabytes of unpinned executable
                     WebAssembly from a third party in the next — the same integrity
                     problem an order of magnitude larger. Vendoring costs repository size
-                    and buys a page with no third-party requests at all, which I verified
-                    in the network panel rather than in the source.</p>
+                    and buys a page with no third-party requests at all. I confirmed
+                    that by watching the network panel, not by reading the source.</p>
 
-                <p><strong>Retrieval is an exhaustive cosine scan, not an approximate
-                    index.</strong> A few dozen passages at 384 dimensions is under ten
+                <p>Retrieval is an exhaustive cosine scan. A few dozen
+                    passages at 384 dimensions is under ten
                     thousand multiply-accumulates — microseconds, and four orders of
                     magnitude below the cost of embedding the question that precedes it.
-                    An HNSW graph would add a dependency, a build artefact and a recall
-                    tradeoff to optimise the part that is already free. Knowing where that
-                    crossover sits is the engineering; reaching for the vector database
-                    before it is the failure mode.</p>
+                    An HNSW graph would add a dependency and a build artefact just to
+                    optimise the part that's already free. It's an elevator installed for
+                    one flight of stairs. It would also cost recall, since an exhaustive
+                    scan has none of that tradeoff to begin with. Knowing where that
+                    crossover sits is the engineering. Reaching for the vector database
+                    before that crossover arrives adds complexity for no benefit.</p>
 
-                <p><strong>The index is generated by a page, not by a script.</strong>
+                <p><strong>The index is generated by a page.</strong>
                     Embeddings are precomputed and committed, because asking every
                     visitor's device to embed the whole corpus before answering the
                     first question is a cost paid thousands of times to save paying it
-                    once. What that buys is a way for the index to drift from the prose
-                    it describes, so the generator runs in a browser, against the same
+                    once. That risks letting the index drift from the prose
+                    it describes. So the generator runs in a browser, against the same
                     vendored runtime and weights the site ships, which makes the vectors
                     the ones the live code would have produced by construction. A build
-                    on a server could not promise that: outside a browser the runtime's
+                    on a server couldn't promise that: outside a browser the runtime's
                     backend registry is empty, and a vector computed by a different
-                    stack does not raise an error, it just retrieves worse. A check in
+                    stack doesn't raise an error, it just retrieves worse. A check in
                     CI then fails the build if any committed passage stops appearing on
                     this page.</p>
 
-                <p><strong>Where this approach stops working, which is the part worth
-                    knowing.</strong> It is bounded by the download, not by the search.
+                <p>This approach stops working somewhere, and that's the part worth
+                    knowing. The search itself is nearly free. The download is what
+                    bounds it.
                     Twenty megabytes is a defensible one-time cost on a page someone chose
                     to interrogate, and it would be indefensible on a page that had to
                     answer before the visitor asked for anything. The linear scan holds to
-                    a few thousand passages on this hardware; past that the crossover with
-                    an approximate index finally arrives and the honest move is to take the
-                    dependency I argued against above. And a 384-dimension general-purpose
+                    a few thousand passages on this hardware. Past that, the crossover with
+                    an approximate index finally arrives, and the honest move is to take
+                    the dependency I argued against above. And a 384-dimension general-purpose
                     embedding retrieves topics well and proper nouns poorly, so a question
                     naming one specific system is better served by find-in-page on the
-                    portfolio. Knowing which of those limits is nearest is the difference
-                    between shipping this here and shipping it everywhere.</p>
+                    portfolio. Knowing which of those limits applies first is what makes
+                    this design workable here without making it a general-purpose
+                    solution.</p>
 
-                <p><strong>The accessibility constraints shaped the code more than the
-                    model did.</strong> The load button cannot use the disabled property,
+                <p>The accessibility constraints shaped this code the most.
+                    The load button can't use the disabled property,
                     because disabling the control somebody just pressed moves keyboard
                     focus to the document body, and here it would strand them there for the
                     length of a multi-second download. It sets an ARIA state and guards
                     re-entry with a flag instead. Results are announced through a live
                     region, because focus deliberately stays where the visitor put it.
-                    These are the decisions that never show up in a demo and entirely
-                    decide whether anyone can use the thing.</p>
+                    These are the decisions a demo never shows, the ones that
+                    determine whether anyone can actually use the feature.</p>
 
                 <ul class="project--impact" role="list">
                     <li><strong>No inference cost and no data egress</strong> — the
@@ -441,40 +442,40 @@
 
                 <p>A global technology team of up to fifty, distributed across Indonesia,
                     Vietnam, Malaysia and the Philippines. Distributed across markets is a
-                    different problem from distributed across cities: the teams were
-                    attached to affiliates with their own systems, their own regulators and
-                    their own commercial priorities, so the work was not only building
-                    software together but agreeing what was genuinely shared and what only
-                    looked shared. Harmonising systems across those affiliates was as much
-                    an organisational negotiation as a technical migration.</p>
+                    different problem from distributed across cities. The teams were
+                    attached to affiliates with their own systems and their own
+                    regulators, each with commercial priorities of its own, so the work
+                    meant building software together, and it meant agreeing what was
+                    genuinely shared and what only looked shared. I spent most of that time negotiating with those affiliates,
+                    not harmonising systems.</p>
 
-                <p><strong>Build capability rather than buy it, with a stated exception.</strong>
+                <p><strong>Build capability in-house, with a stated exception.</strong>
                     Trainee and upskilling programmes were how the ghost kitchen cost
-                    structure actually changed, and they are the part of that story I would
+                    structure actually changed. They are the part of that story I would
                     defend hardest, because they are the part that kept paying after I
-                    left. Outsourcing was reserved for genuinely specialised work: a
-                    specialism you need once does not justify permanent headcount, and
+                    left. Outsourcing was reserved for genuinely specialised work. A
+                    specialism you need once doesn't justify permanent headcount, and
                     hiring for it anyway is how a technology budget ratchets upward in a
-                    way nobody can later point at. Having built offshore IT services
-                    businesses earlier in my career, I have sat on the vendor side of that
-                    conversation too, which makes me harder to sell to.</p>
+                    way nobody can later point at. I've built offshore IT services
+                    businesses earlier in my career, so I've sat on the vendor side of
+                    that conversation too. A vendor has a harder time selling me on
+                    headcount I don't need.</p>
 
-                <p><strong>Measure the delivery system, not the developers.</strong> DORA
-                    metrics, read as properties of the pipeline rather than as a
-                    scoreboard. Release cycle time is the one I watch first because it
+                <p>Measure the delivery system: DORA
+                    metrics, read as properties of the pipeline. Release cycle time is
+                    the one I watch first because it
                     compounds: everything downstream of a shorter cycle gets cheaper, and a
-                    team that can ship on a Tuesday afternoon makes different and better
-                    decisions than one that batches for a monthly window. When those
+                    team that can ship on a Tuesday afternoon makes decisions a team
+                    batching for a monthly window simply doesn't get to make. When those
                     numbers get used to rank individuals they stop measuring anything, so
-                    that is a line worth holding explicitly.</p>
+                    I hold that line explicitly when reviewing them.</p>
 
-                <p><strong>I read the diffs, and I am careful about what that is for.</strong>
+                <p><strong>I read the diffs, and I'm careful about what that's for.</strong>
                     Staying close to the code is how I keep an accurate model of what is
-                    expensive, which is what makes an estimate arguable rather than
-                    accepted on authority. It is not a licence to review my way into other
-                    people's work. The distinction matters: a CTO who reads code to stay
-                    calibrated is useful, and one who reads it to stay in control is a
-                    bottleneck with a title.</p>
+                    expensive, which is what makes an estimate arguable on its merits.
+                    It isn't a licence to review my way into other
+                    people's work. Reviewing everything to stay in control slows the team
+                    down, and that's the failure mode I watch for in myself.</p>
             </article>
 
             <article class="project" id="how-i-decide">
@@ -484,45 +485,49 @@
                     <span class="project--role">Drawn from the projects above</span>
                 </p>
 
-                <p>These are not a philosophy written in advance. They are what the four
-                    projects above have in common, noticed afterwards, which is the only
-                    honest way to arrive at a principle.</p>
+                <p>None of this was written down as a philosophy in advance. It's what
+                    the four projects above have in common, noticed only afterwards, not a
+                    plan followed from the start.</p>
 
-                <p><strong>Find the cost structure before writing the plan.</strong> The
-                    ghost kitchen looked like a platform refactor and was a unit economics
-                    problem; the retail programme looked like a delivery problem and was a
-                    scope problem. In both cases the technical plan that follows from the
-                    right diagnosis is unrecognisable from the one that follows from the
-                    wrong one, and no amount of execution quality recovers from starting on
-                    the second.</p>
+                <p>Find the cost structure before writing the plan. The
+                    ghost kitchen looked like a platform refactor, but the real problem was
+                    unit economics. The retail programme looked like a delivery problem, but
+                    the real problem was scope. Same diagnosis, different symptom. Get the
+                    diagnosis wrong and no amount of good execution fixes the plan that
+                    follows from it.</p>
 
-                <p><strong>Descoping is a delivery technique.</strong> The fastest way to
-                    finish a programme that is years late is usually to stop doing part of
-                    it. This is unpopular because it looks like retreat, so it has to be
-                    argued on evidence about where the return actually sits, and it has to
-                    be argued early enough that the saving is real.</p>
+                <p>The fastest way to finish a programme that's years late is usually to
+                    stop doing part of it. That's descoping. It's a delivery technique, not
+                    a retreat, though it looks like one, which is why it's unpopular and
+                    why it has to be argued on evidence about where the return actually
+                    sits, argued early enough that the saving is real.</p>
 
-                <p><strong>Prefer the boring component and justify the interesting one.</strong>
-                    Managed services where running it ourselves earns nothing, an exhaustive
-                    scan where a vector database would be slower, retrieval where
-                    fine-tuning would need a budget line every year. The bias is not against
-                    sophisticated tools; it is that a sophisticated tool has to beat the
-                    simple one on a number I can name before it arrives, not after.</p>
+                <p>Prefer the boring component and justify the interesting one.
+                    This shows up as managed services over running it ourselves, and as
+                    retrieval over fine-tuning, for the same reason each time: the boring
+                    option had already beaten the alternative on a number I could name
+                    before deciding. The exhaustive scan behind the search on this site is
+                    the same call, made once more, against a vector database that would only
+                    have paid for itself later. A sophisticated tool only wins the argument
+                    when it beats the simple one on a number I can name in advance, and
+                    without that number it doesn't get adopted here.</p>
 
-                <p><strong>Measure the thing rather than assume it.</strong> I checked
+                <p>I checked
                     whether cross-origin isolation was available in the deployed page
                     before concluding threads were unavailable, and I read the transfer
-                    sizes off the network panel rather than off the files on disk. Most
+                    sizes straight off the network panel, live, not off the files sitting
+                    on disk. That's the whole discipline: measure the thing rather than
+                    assume it. Most
                     architecture arguments are settled by one measurement that nobody
-                    bothered to take, and taking it is cheaper than winning the argument.</p>
+                    bothered to take, and it's usually cheaper to take that measurement
+                    than to keep arguing without one.</p>
 
-                <p><strong>Leave it maintainable by whoever is next.</strong> A system that
-                    only works while its author is present has not been finished. This site
+                <p>Leave it maintainable by whoever is next. A system that
+                    only works while its author is present hasn't been finished. This site
                     is the small version of the same instinct: no build step and no package
-                    manager, so it is still editable years from now without reviving a
-                    toolchain, and every invariant that would be easy to break by accident
-                    is enforced by a check rather than written in a document nobody
-                    rereads.</p>
+                    manager, so it's still editable years from now without reviving a
+                    toolchain. A check enforces every invariant that would otherwise be
+                    easy to break by accident.</p>
             </article>
 
             <article class="project" id="now">
@@ -535,26 +540,29 @@
                     fast-tracking product–market fit from agentic AI and SaaS through to
                     IoT.</p>
 
-                <p>Also available for fractional CTO work: technology strategy, turning
-                    around at-risk projects, and total-cost-of-ownership optimisation —
-                    technology leadership on an as-needed basis, and an unbiased outside
-                    perspective.</p>
+                <p>Also available for fractional CTO work: technology strategy and
+                    total-cost-of-ownership optimisation, technology leadership on an
+                    as-needed basis. That can extend to turning around a project that's
+                    already at risk, or simply giving a board an unbiased outside
+                    perspective. Sometimes just that.</p>
 
                 <p>In practice that covers SaaS and custom software development, IT
                     consulting, information management, project management and strategic
-                    planning, and it is usually one of three situations: a board that needs
-                    an independent read on a programme it is being reassured about, a
-                    company whose technology spend has grown faster than its technology,
-                    or a founding team who need someone senior enough to say which half of
-                    the roadmap to delete. The common thread is that the useful thing is a
-                    decision, not capacity.</p>
+                    planning. Usually the client is a board that needs an independent read
+                    on a programme it's being reassured about. Sometimes technology spend
+                    has simply outgrown what the technology itself can justify, and the
+                    founding team needs someone senior enough to say which half of the
+                    roadmap to delete. Either way, what's actually needed is a decision, not
+                    extra capacity.</p>
 
-                <p>The agentic AI work is current rather than historical, and it is
-                    hands-on. The search on this site is the smallest publishable piece of
-                    it: local inference, retrieval over a real corpus, and a set of
-                    deliberate refusals about what to add. Building at that level is what
+                <p>The agentic AI work is current and hands-on. The search
+                    on this site is the smallest publishable piece of
+                    it: local inference and retrieval over a real corpus. It also comes
+                    with a set of deliberate refusals about what to add. Building at that
+                    level is what
                     keeps me able to tell the difference between a capability and a demo,
-                    which is most of what a board is paying a CTO for at the moment.</p>
+                    and that distinction is largely what a board wants from a CTO on this
+                    topic right now.</p>
             </article>
 
             <section class="project" id="skills">
@@ -581,21 +589,21 @@
 
             <section class="project" id="earlier">
                 <h2>Earlier</h2>
-                <p>Before the CTO roles: leading IT functions, delivering projects and
-                    writing code, including building offshore IT services startups.</p>
+                <p>Before the CTO roles, I led IT functions and delivered projects. I
+                    also wrote code myself, including building offshore IT services
+                    startups.</p>
 
                 <p>The substance of it was ERP implementation, B2B2C e-commerce operations
                     and omnichannel initiatives at publicly listed and multinational
-                    companies, then technology strategy for startups. That order turns out
-                    to matter. Having implemented ERP rather than only commissioned it is
-                    why the retail rescue could be scoped confidently: knowing which
+                    companies, then technology strategy for startups. That order matters:
+                    I implemented ERP myself instead of just commissioning it, and that's
+                    why the retail rescue could be scoped confidently. Knowing which
                     modules are genuinely entangled and which merely appear to be in the
-                    vendor's diagram is not something you can acquire from a status
-                    report.</p>
+                    vendor's diagram isn't knowledge you can get from a status report.</p>
 
                 <p>It started in code, as a programmer and then a systems analyst, which is
-                    the part I have never fully left. Every role since has been further
-                    from the keyboard by title and closer to it in practice than the title
+                    the part I've never fully left, and every role since has moved further
+                    from the keyboard by title. Less so in practice than the title
                     suggests.</p>
 
                 <ul class="history--list" role="list">
